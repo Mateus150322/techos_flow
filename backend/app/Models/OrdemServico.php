@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use App\Models\Endereco;
 use App\Models\User;
@@ -12,7 +13,7 @@ class OrdemServico extends Model
 {
     use HasUuids;
 
-    protected $table = 'ordens_servico';
+    protected $table = 'ordem_servicos';
 
     protected $fillable = [
         'numero',
@@ -33,7 +34,7 @@ class OrdemServico extends Model
         return $this->belongsTo(Endereco::class, 'endereco_id');
     }
 
-    public function criadaPOr()
+    public function criadaPor()
     {
         return $this->belongsTo(User::class, 'criada_por_id');
     }
