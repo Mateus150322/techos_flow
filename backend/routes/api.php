@@ -29,6 +29,9 @@ Route::prefix('v1')->group(function () {
 
         });
 
+        Route::get('ordens-servico', [OrdemServicoController::class, 'index']);
+        Route::get('ordens-servico/{id}', [OrdemServicoController::class, 'show']);
+
         
     });
 });
