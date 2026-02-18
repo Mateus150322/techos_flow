@@ -54,7 +54,7 @@ class ExecucaoController extends Controller
     public function finalizar(Request $request, string $id)
     {
         $data = $request->validate([
-            'execucao_id' => 'required|uuid|exists:execucaos,id',
+            'execucao_id' => 'required|uuid|exists:execucoes,id',
             'data_fim' => 'nullable|date',
             'observacao' => 'nullable|string',
         ]);

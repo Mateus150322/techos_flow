@@ -10,7 +10,7 @@ class Execucao extends Model
 {
     use HasUuids;
 
-    protected $table = 'execucaos';
+    protected $table = 'execucoes';
 
     protected $fillable = [
         'os_id',
