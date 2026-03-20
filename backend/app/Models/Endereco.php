@@ -14,6 +14,7 @@ class Endereco extends Model
     protected $fillable = [
         'rua',
         'numero',
+        'complemento',
         'bairro',
         'cidade',
         'estado',

@@ -15,6 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('rua',200);
             $table->string('numero',10)->nullable();
+            $table->string('complemento',255)->nullable();
             $table->string('bairro',120);
             $table->string('cidade',120);
             $table->string('estado',2);

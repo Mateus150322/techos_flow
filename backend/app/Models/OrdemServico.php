@@ -18,6 +18,7 @@ class OrdemServico extends Model
     protected $fillable = [
         'numero',
         'tipo',
+        'nome_cliente',
         'status',
         'prioridade',
         'data_abertura',
@@ -26,7 +27,12 @@ class OrdemServico extends Model
         'observacoes',
         'motivo_nao_execucao',
         'endereco_id',
-        'criada_por_id'
+        'criada_por_id',
+    ];
+
+    protected $casts = [
+        'data_abertura' => 'datetime',
+        'data_encerramento' => 'datetime',
     ];
 
     public function endereco()
@@ -41,7 +47,7 @@ class OrdemServico extends Model
 
     public function execucoes()
     {
-        return $this->hasMany(Execucao::class, 'os_id');
+        return $this->hasMany(Execucao::class, 'os_id')->orderBy('data_inicio', 'desc');
     }
 
     public function anexos()
@@ -49,4 +55,3 @@ class OrdemServico extends Model
         return $this->hasMany(Anexo::class, 'os_id');
     }
 }
-    

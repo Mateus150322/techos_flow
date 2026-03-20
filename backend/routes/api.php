@@ -15,6 +15,8 @@ Route::prefix('v1')->group(function () {
 
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+
+        Route::get('/enderecos', [EnderecoController::class, 'index']);
         Route::post('/enderecos', [EnderecoController::class, 'store']);
 
         // Atendente e Admin podem abrir OS
