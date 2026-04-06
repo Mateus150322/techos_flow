@@ -21,6 +21,24 @@ class DatabaseSeeder extends Seeder
             'role' => 'administrador'
         ]);
 
+        // 👨‍🔧 Técnico
+        $tecnico = User::create([
+            'id' => Str::uuid(),
+            'name' => 'Tecnico',
+            'email' => 'tecnico@teste.com',
+            'password' => bcrypt('123456'),
+            'role' => 'tecnico'
+        ]);
+
+        // 👩‍💼 Atendente
+        $atendente = User::create([
+            'id' => Str::uuid(),
+            'name' => 'Atendente',
+            'email' => 'atendente@teste.com',
+            'password' => bcrypt('123456'),
+            'role' => 'atendente'
+        ]);
+
         // 📍 Endereço
         $endereco = Endereco::create([
             'id' => Str::uuid(),

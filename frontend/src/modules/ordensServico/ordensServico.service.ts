@@ -39,8 +39,8 @@ export type Execucao = {
 
 export type Anexo = {
   id: string;
-  nome?: string | null;
-  arquivo?: string | null;
+  caminho?: string | null;
+  tipo?: string | null;
   url?: string | null;
 };
 
@@ -55,6 +55,8 @@ export type OrdemServico = {
   data_encerramento: string | null;
   descricao: string;
   endereco?: Endereco | null;
+  tecnico_responsavel_id?: string | null;
+  tecnicoResponsavel?: Usuario | null;
 };
 
 export type OrdemServicoDetalhe = OrdemServico & {
@@ -74,6 +76,7 @@ export type Paginated<T> = {
 export type CriarOrdemAtendentePayload = {
   tipo_servico: string;
   nome_cliente: string;
+  prioridade: number;
   descricao: string;
   endereco: {
     logradouro: string;
@@ -107,5 +110,69 @@ export async function criarOrdem(
   payload: CriarOrdemAtendentePayload
 ): Promise<OrdemServicoDetalhe> {
   const { data } = await api.post<OrdemServicoDetalhe>("/ordens-servico", payload);
+  return data;
+}
+
+export type IniciarExecucaoPayload = {
+  data_inicio?: string;
+  observacao?: string;
+};
+
+export type FinalizarExecucaoPayload = {
+  execucao_id: string;
+  data_fim?: string;
+  observacao?: string;
+};
+
+export async function iniciarExecucao(
+  osId: string,
+  payload?: IniciarExecucaoPayload
+) {
+  const { data } = await api.post(`/ordens-servico/${osId}/iniciar`, payload ?? {});
+  return data;
+}
+
+export async function finalizarExecucao(
+  osId: string,
+  payload: FinalizarExecucaoPayload
+) {
+  const { data } = await api.post(
+    `/ordens-servico/${osId}/execucoes/finalizar`,
+    payload
+  );
+  return data;
+}
+
+export type MarcarNaoExecutadaPayload = {
+  motivo_nao_execucao: string;
+};
+
+export async function marcarNaoExecutada(
+  osId: string,
+  payload: MarcarNaoExecutadaPayload
+) {
+  const { data } = await api.post(`/ordens-servico/${osId}/nao-executada`, payload);
+  return data;
+}
+
+export async function enviarAnexo(osId: string, arquivo: File, tipo?: string) {
+  const formData = new FormData();
+  formData.append("arquivo", arquivo);
+
+  if (tipo) {
+    formData.append("tipo", tipo);
+  }
+
+  const { data } = await api.post(`/ordens-servico/${osId}/anexos`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return data;
+}
+
+export async function aceitarOrdem(osId: string) {
+  const { data } = await api.post(`/ordens-servico/${osId}/aceitar`);
   return data;
 }

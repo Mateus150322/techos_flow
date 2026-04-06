@@ -28,6 +28,7 @@ class OrdemServico extends Model
         'motivo_nao_execucao',
         'endereco_id',
         'criada_por_id',
+        'tecnico_responsavel_id'
     ];
 
     protected $casts = [
@@ -54,4 +55,8 @@ class OrdemServico extends Model
     {
         return $this->hasMany(Anexo::class, 'os_id');
     }
+    public function tecnicoResponsavel()
+{
+    return $this->belongsTo(User::class, 'tecnico_responsavel_id');
+}
 }

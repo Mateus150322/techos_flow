@@ -9,6 +9,7 @@ import { useTheme } from "@/shared/hooks/useTheme";
 type FormularioOSData = {
   tipoServico: string;
   nomeCliente: string;
+  prioridade: string;
   descricao: string;
   logradouro: string;
   numero: string;
@@ -26,6 +27,7 @@ export default function NovaOrdemPage() {
   const [form, setForm] = useState<FormularioOSData>({
     tipoServico: "",
     nomeCliente: "",
+    prioridade: "2",
     descricao: "",
     logradouro: "",
     numero: "",
@@ -66,6 +68,7 @@ export default function NovaOrdemPage() {
   function validarFormulario() {
     if (!form.tipoServico.trim()) return "Informe o tipo de serviço.";
     if (!form.nomeCliente.trim()) return "Informe o nome do cliente.";
+    if (!form.prioridade.trim()) return "Informe a prioridade.";
     if (!form.descricao.trim()) return "Informe a descrição do serviço.";
     if (!form.logradouro.trim()) return "Informe o logradouro.";
     if (!form.numero.trim()) return "Informe o número.";
@@ -96,6 +99,7 @@ export default function NovaOrdemPage() {
       const ordemCriada = await criarOrdem({
         tipo_servico: form.tipoServico.trim(),
         nome_cliente: form.nomeCliente.trim(),
+        prioridade: Number(form.prioridade),
         descricao: form.descricao.trim(),
         endereco: {
           logradouro: form.logradouro.trim(),
@@ -118,6 +122,7 @@ export default function NovaOrdemPage() {
       setErro(
         errors?.tipo_servico?.[0] ||
           errors?.nome_cliente?.[0] ||
+          errors?.prioridade?.[0] ||
           errors?.descricao?.[0] ||
           errors?.["endereco.logradouro"]?.[0] ||
           errors?.["endereco.numero"]?.[0] ||
@@ -162,7 +167,7 @@ export default function NovaOrdemPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <div>
             <label htmlFor="tipoServico" className={`mb-2 block text-sm font-medium ${titleText}`}>
               Tipo de Serviço *
@@ -183,7 +188,7 @@ export default function NovaOrdemPage() {
             </select>
           </div>
 
-          <div>
+          <div className="md:col-span-2">
             <label htmlFor="nomeCliente" className={`mb-2 block text-sm font-medium ${titleText}`}>
               Nome do Cliente *
             </label>
@@ -196,6 +201,23 @@ export default function NovaOrdemPage() {
               className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
             />
           </div>
+        </div>
+
+        <div className="max-w-sm">
+          <label htmlFor="prioridade" className={`mb-2 block text-sm font-medium ${titleText}`}>
+            Prioridade *
+          </label>
+          <select
+            id="prioridade"
+            value={form.prioridade}
+            onChange={(e) => updateField("prioridade", e.target.value)}
+            disabled={enviando}
+            className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+          >
+            <option value="1">Alta</option>
+            <option value="2">Média</option>
+            <option value="3">Baixa</option>
+          </select>
         </div>
 
         <div>

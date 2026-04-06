@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Eye, ClipboardList } from "lucide-react";
+import { Search, Eye, ClipboardList, ArrowLeft } from "lucide-react";
 
 import { listarOrdens } from "./ordensServico.service";
 import type { OrdemServico } from "./ordensServico.service";
-import {StatusBadge} from "./components/StatusBadge";
-import {PrioridadeBadge} from "./components/PrioridadeBadge";
+import { StatusBadge } from "./components/StatusBadge";
+import { PrioridadeBadge } from "./components/PrioridadeBadge";
 import { useTheme } from "@/shared/hooks/useTheme";
 
 export default function OrdensPage() {
@@ -17,6 +17,7 @@ export default function OrdensPage() {
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState("todos");
+  const [prioridadeFiltro, setPrioridadeFiltro] = useState("todas");
 
   useEffect(() => {
     async function load() {
@@ -51,9 +52,13 @@ export default function OrdensPage() {
       const correspondeStatus =
         statusFiltro === "todos" || ordem.status === statusFiltro;
 
-      return correspondeBusca && correspondeStatus;
+      const correspondePrioridade =
+        prioridadeFiltro === "todas" ||
+        String(ordem.prioridade) === prioridadeFiltro;
+
+      return correspondeBusca && correspondeStatus && correspondePrioridade;
     });
-  }, [ordens, busca, statusFiltro]);
+  }, [ordens, busca, statusFiltro, prioridadeFiltro]);
 
   function formatarData(data?: string | null) {
     if (!data) return "-";
@@ -65,7 +70,6 @@ export default function OrdensPage() {
     });
   }
 
-  const pageBg = isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900";
   const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
   const inputBg = isDark
     ? "bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-500"
@@ -74,147 +78,170 @@ export default function OrdensPage() {
   const titleText = isDark ? "text-white" : "text-slate-900";
   const tableHead = isDark ? "bg-slate-950 text-slate-300" : "bg-slate-100 text-slate-600";
   const rowHover = isDark ? "hover:bg-slate-800/70" : "hover:bg-slate-50";
+  const buttonSecondary = isDark
+    ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
+    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100";
 
   return (
-    <div className={`min-h-screen ${pageBg}`}>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className={`flex items-center gap-3 text-3xl font-bold ${titleText}`}>
-              <ClipboardList className="h-8 w-8" />
-              Ordens de Serviço
-            </h1>
-            <p className={`mt-2 text-sm ${mutedText}`}>
-              Consulte, filtre e acompanhe as ordens de serviço registradas no sistema.
-            </p>
-          </div>
-        </div>
-
-        <div className={`rounded-2xl border p-5 shadow-sm ${cardBg}`}>
-          <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="relative">
-              <Search
-                className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${mutedText}`}
-              />
-              <input
-                type="text"
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar por número, tipo, cliente ou descrição..."
-                className={`w-full rounded-xl border py-3 pl-10 pr-4 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-              />
-            </div>
-
-            <div>
-              <select
-                value={statusFiltro}
-                onChange={(e) => setStatusFiltro(e.target.value)}
-                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-              >
-                <option value="todos">Todos os status</option>
-                <option value="aberta">Aberta</option>
-                <option value="em_execucao">Em execução</option>
-                <option value="finalizada">Finalizada</option>
-                <option value="nao_executada">Não executada</option>
-                <option value="cancelada">Cancelada</option>
-              </select>
-            </div>
-          </div>
-
-          {erro && (
-            <div
-              className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-                isDark
-                  ? "border-red-900 bg-red-950 text-red-300"
-                  : "border-red-200 bg-red-50 text-red-700"
-              }`}
+    <div className={`rounded-2xl border p-5 shadow-sm ${cardBg}`}>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
             >
-              {erro}
-            </div>
-          )}
-
-          <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className={tableHead}>
-                  <tr>
-                    <th className="p-4 text-left font-semibold">Número</th>
-                    <th className="p-4 text-left font-semibold">Cliente</th>
-                    <th className="p-4 text-left font-semibold">Tipo</th>
-                    <th className="p-4 text-left font-semibold">Status</th>
-                    <th className="p-4 text-left font-semibold">Prioridade</th>
-                    <th className="p-4 text-left font-semibold">Data de abertura</th>
-                    <th className="p-4 text-right font-semibold">Ação</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {loading && (
-                    <tr>
-                      <td colSpan={7} className="p-6 text-center">
-                        <span className={mutedText}>Carregando ordens de serviço...</span>
-                      </td>
-                    </tr>
-                  )}
-
-                  {!loading && ordensFiltradas.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="p-6 text-center">
-                        <span className={mutedText}>
-                          Nenhuma ordem de serviço encontrada com os filtros informados.
-                        </span>
-                      </td>
-                    </tr>
-                  )}
-
-                  {!loading &&
-                    ordensFiltradas.map((ordem) => (
-                      <tr
-                        key={ordem.id}
-                        className={`cursor-pointer border-t border-slate-200 transition dark:border-slate-800 ${rowHover}`}
-                        onClick={() => navigate(`/ordens-servico/${ordem.id}`)}
-                      >
-                        <td className="p-4 font-medium">{ordem.numero}</td>
-                        <td className="p-4">{ordem.nome_cliente || "-"}</td>
-                        <td className="p-4 capitalize">{ordem.tipo}</td>
-                        <td className="p-4">
-                          <StatusBadge status={ordem.status} />
-                        </td>
-                        <td className="p-4">
-                          <PrioridadeBadge prioridade={ordem.prioridade} />
-                        </td>
-                        <td className="p-4">{formatarData(ordem.data_abertura)}</td>
-                        <td className="p-4 text-right">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/ordens-servico/${ordem.id}`);
-                            }}
-                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                              isDark
-                                ? "bg-slate-800 text-slate-100 hover:bg-slate-700"
-                                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                            }`}
-                          >
-                            <Eye className="h-4 w-4" />
-                            Ver
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </button>
           </div>
 
-          {!loading && ordens.length > 0 && (
-            <div className={`mt-4 text-sm ${mutedText}`}>
-              Exibindo {ordensFiltradas.length} de {ordens.length} ordens de serviço.
-            </div>
-          )}
+          <h1 className={`flex items-center gap-3 text-3xl font-bold ${titleText}`}>
+            <ClipboardList className="h-8 w-8" />
+            Ordens de Serviço
+          </h1>
+          <p className={`mt-2 text-sm ${mutedText}`}>
+            Consulte, filtre e acompanhe as ordens de serviço registradas no sistema.
+          </p>
         </div>
       </div>
+
+      <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="relative lg:col-span-1">
+          <Search
+            className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${mutedText}`}
+          />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por número, tipo, cliente ou descrição..."
+            className={`w-full rounded-xl border py-3 pl-10 pr-4 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+          />
+        </div>
+
+        <div>
+          <select
+            value={statusFiltro}
+            onChange={(e) => setStatusFiltro(e.target.value)}
+            className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+          >
+            <option value="todos">Todos os status</option>
+            <option value="aberta">Aberta</option>
+            <option value="em_execucao">Em execução</option>
+            <option value="finalizada">Finalizada</option>
+            <option value="nao_executada">Não executada</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+        </div>
+
+        <div>
+          <select
+            value={prioridadeFiltro}
+            onChange={(e) => setPrioridadeFiltro(e.target.value)}
+            className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+          >
+            <option value="todas">Todas as prioridades</option>
+            <option value="1">Alta</option>
+            <option value="2">Média</option>
+            <option value="3">Baixa</option>
+          </select>
+        </div>
+      </div>
+
+      {erro && (
+        <div
+          className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+            isDark
+              ? "border-red-900 bg-red-950 text-red-300"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {erro}
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead className={tableHead}>
+              <tr>
+                <th className="p-4 text-left font-semibold">Número</th>
+                <th className="p-4 text-left font-semibold">Cliente</th>
+                <th className="p-4 text-left font-semibold">Tipo</th>
+                <th className="p-4 text-left font-semibold">Status</th>
+                <th className="p-4 text-left font-semibold">Prioridade</th>
+                <th className="p-4 text-left font-semibold">Data de abertura</th>
+                <th className="p-4 text-right font-semibold">Ação</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center">
+                    <span className={mutedText}>Carregando ordens de serviço...</span>
+                  </td>
+                </tr>
+              )}
+
+              {!loading && ordensFiltradas.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center">
+                    <span className={mutedText}>
+                      Nenhuma ordem de serviço encontrada com os filtros informados.
+                    </span>
+                  </td>
+                </tr>
+              )}
+
+              {!loading &&
+                ordensFiltradas.map((ordem) => (
+                  <tr
+                    key={ordem.id}
+                    className={`cursor-pointer border-t border-slate-200 transition dark:border-slate-800 ${rowHover}`}
+                    onClick={() => navigate(`/ordens-servico/${ordem.id}`)}
+                  >
+                    <td className="p-4 font-medium">{ordem.numero}</td>
+                    <td className="p-4">{ordem.nome_cliente || "-"}</td>
+                    <td className="p-4 capitalize">{ordem.tipo}</td>
+                    <td className="p-4">
+                      <StatusBadge status={ordem.status} />
+                    </td>
+                    <td className="p-4">
+                      <PrioridadeBadge prioridade={ordem.prioridade} />
+                    </td>
+                    <td className="p-4">{formatarData(ordem.data_abertura)}</td>
+                    <td className="p-4 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/ordens-servico/${ordem.id}`);
+                        }}
+                        className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                          isDark
+                            ? "bg-slate-800 text-slate-100 hover:bg-slate-700"
+                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        }`}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Ver
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {!loading && ordens.length > 0 && (
+        <div className={`mt-4 text-sm ${mutedText}`}>
+          Exibindo {ordensFiltradas.length} de {ordens.length} ordens de serviço.
+        </div>
+      )}
     </div>
   );
 }

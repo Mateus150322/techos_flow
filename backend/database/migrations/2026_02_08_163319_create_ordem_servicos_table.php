@@ -49,13 +49,16 @@ return new class extends Migration
             // Motivo quando não executada
             $table->text('motivo_nao_execucao')->nullable();
 
-            // Relacionamentos
+            // 🔥 RELACIONAMENTOS
             $table->uuid('endereco_id');
             $table->uuid('criada_por_id');
 
+            // 👉 NOVO CAMPO (TÉCNICO RESPONSÁVEL)
+            $table->uuid('tecnico_responsavel_id')->nullable();
+
             $table->timestamps();
 
-            // Foreign Keys
+            // 🔗 FOREIGN KEYS
             $table->foreign('endereco_id')
                 ->references('id')
                 ->on('enderecos')
@@ -65,10 +68,16 @@ return new class extends Migration
                 ->references('id')
                 ->on('users');
 
-            // Índices para performance
+            $table->foreign('tecnico_responsavel_id')
+                ->references('id')
+                ->on('users')
+                ->nullOnDelete();
+
+            // ⚡ ÍNDICES
             $table->index(['status', 'tipo', 'data_abertura']);
             $table->index('endereco_id');
             $table->index('criada_por_id');
+            $table->index('tecnico_responsavel_id');
         });
     }
 
