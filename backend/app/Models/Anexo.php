@@ -15,6 +15,11 @@ class Anexo extends Model
         'os_id',
         'caminho',
         'tipo',
+        'latitude',
+        'longitude',
+        'precisao_metros',
+        'geolocalizacao_capturada_em',
+        'endereco_capturado',
         'submetido_por_id',
         'criado_em',
     ];
@@ -22,6 +27,13 @@ class Anexo extends Model
     public $timestamps = true;
 
     protected $appends = ['url'];
+
+    protected $casts = [
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'precisao_metros' => 'float',
+        'geolocalizacao_capturada_em' => 'datetime',
+    ];
 
     public function getUrlAttribute()
     {

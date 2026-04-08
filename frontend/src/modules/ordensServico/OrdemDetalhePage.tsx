@@ -1,234 +1,119 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  CheckCircle2,
   FileText,
   MapPin,
+  Moon,
   Paperclip,
+  PlayCircle,
+  Sun,
+  Upload,
   UserCircle2,
   Wrench,
-  PlayCircle,
-  CheckCircle2,
-  Upload,
 } from "lucide-react";
 
 import {
-  buscarOrdem,
-  enviarAnexo,
-  finalizarExecucao,
-  iniciarExecucao,
-  marcarNaoExecutada,
-  type OrdemServicoDetalhe,
-} from "./ordensServico.service";
-import { StatusBadge } from "./components/StatusBadge";
+  formatarCoordenada,
+  formatarDataHora,
+  formatarStatus,
+  getTiposAceitosAnexo,
+} from "./ordemServicoDetalhe.utils";
+import { useOrdemServicoDetalhe } from "./useOrdemServicoDetalhe";
 import { PrioridadeBadge } from "./components/PrioridadeBadge";
+import { StatusBadge } from "./components/StatusBadge";
 import { useTheme } from "@/shared/hooks/useTheme";
-
-type CurrentUser = {
-  id?: string;
-  name: string;
-  email?: string;
-  role: "administrador" | "tecnico" | "atendente";
-};
+import { getGoogleMapsUrl } from "@/shared/utils/geolocalizacao";
 
 export default function OrdemDetalhePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isDark } = useTheme();
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [os, setOs] = useState<OrdemServicoDetalhe | null>(null);
+  const { isDark, toggleTheme } = useTheme();
 
   const [observacaoInicio, setObservacaoInicio] = useState("");
   const [observacaoFim, setObservacaoFim] = useState("");
   const [motivoNaoExecucao, setMotivoNaoExecucao] = useState("");
-  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
-  const [tipoAnexo, setTipoAnexo] = useState("foto");
-  const [processandoAcao, setProcessandoAcao] = useState(false);
-
-  const currentUser: CurrentUser = useMemo(() => {
-    const raw = localStorage.getItem("user");
-
-    if (raw) {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return {
-          name: "Usuário",
-          role: "atendente",
-        };
-      }
-    }
-
-    return {
-      name: "Usuário",
-      role: "atendente",
-    };
-  }, []);
-
-  async function carregarOrdem() {
-    try {
-      setLoading(true);
-      setError(null);
-
-      if (!id) {
-        throw new Error("ID não informado.");
-      }
-
-      const data = await buscarOrdem(id, [
-        "endereco",
-        "criadaPor",
-        "execucoes",
-        "execucoes.tecnico",
-        "anexos",
-      ]);
-
-      setOs(data);
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? "Erro ao carregar OS.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    carregarOrdem();
-  }, [id]);
-
-  function formatarDataHora(valor?: string | null) {
-    if (!valor) return "—";
-
-    return new Date(valor).toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
-  function formatarStatus(status: string) {
-    return status.replaceAll("_", " ");
-  }
-
-  const ultimaExecucaoAberta = useMemo(() => {
-    if (!os?.execucoes?.length) return null;
-    return os.execucoes.find((execucao) => !execucao.data_fim) ?? null;
-  }, [os]);
-
-  const podeIniciarExecucao =
-    currentUser.role === "tecnico" && os?.status === "aberta";
-
-  const podeFinalizarExecucao =
-    currentUser.role === "tecnico" &&
-    os?.status === "em_execucao" &&
-    !!ultimaExecucaoAberta;
-
-  const podeMarcarNaoExecutada =
-    currentUser.role === "tecnico" &&
-    (os?.status === "aberta" || os?.status === "em_execucao");
-
-  const podeEnviarAnexo =
-    currentUser.role === "tecnico" || currentUser.role === "administrador";
+  const {
+    loading,
+    error,
+    setError,
+    os,
+    criadaPor,
+    tecnicoResponsavel,
+    ultimaExecucaoAberta,
+    osEhDeOutroTecnico,
+    podeIniciarExecucao,
+    podeFinalizarExecucao,
+    podeMarcarNaoExecutada,
+    podeEnviarAnexo,
+    processandoAcao,
+    arquivoSelecionado,
+    setArquivoSelecionado,
+    tipoAnexo,
+    selecionarTipoAnexo,
+    incluirGeolocalizacao,
+    alternarIncluirGeolocalizacao,
+    processandoGeolocalizacao,
+    geolocalizacaoCapturada,
+    atualizarEnderecoCapturado,
+    iniciar,
+    finalizar,
+    marcarComoNaoExecutada,
+    capturarGeolocalizacao,
+    enviarEvidencia,
+  } = useOrdemServicoDetalhe({ ordemId: id });
 
   async function handleIniciarExecucao() {
-    if (!os?.id) return;
-
-    try {
-      setProcessandoAcao(true);
-      setError(null);
-
-      await iniciarExecucao(os.id, {
+    const iniciou = await iniciar({
         observacao: observacaoInicio.trim() || undefined,
       });
 
+    if (iniciou) {
       setObservacaoInicio("");
-      await carregarOrdem();
-    } catch (e: any) {
-      setError(
-        e?.response?.data?.message ??
-          "Não foi possível iniciar a execução."
-      );
-    } finally {
-      setProcessandoAcao(false);
     }
   }
 
   async function handleFinalizarExecucao() {
-    if (!os?.id || !ultimaExecucaoAberta?.id) return;
+    if (!os?.id || !ultimaExecucaoAberta?.id) {
+      return;
+    }
 
-    try {
-      setProcessandoAcao(true);
-      setError(null);
-
-      await finalizarExecucao(os.id, {
+    const finalizou = await finalizar({
         execucao_id: ultimaExecucaoAberta.id,
         observacao: observacaoFim.trim() || undefined,
       });
 
+    if (finalizou) {
       setObservacaoFim("");
-      await carregarOrdem();
-    } catch (e: any) {
-      setError(
-        e?.response?.data?.message ??
-          "Não foi possível finalizar a execução."
-      );
-    } finally {
-      setProcessandoAcao(false);
     }
   }
 
   async function handleMarcarNaoExecutada() {
-    if (!os?.id) return;
-
-    if (!motivoNaoExecucao.trim()) {
-      setError("Informe o motivo da não execução.");
+    if (!os?.id) {
       return;
     }
 
-    try {
-      setProcessandoAcao(true);
-      setError(null);
+    if (!motivoNaoExecucao.trim()) {
+      setError("Informe o motivo da nao execucao.");
+      return;
+    }
 
-      await marcarNaoExecutada(os.id, {
+    const marcou = await marcarComoNaoExecutada({
         motivo_nao_execucao: motivoNaoExecucao.trim(),
       });
 
+    if (marcou) {
       setMotivoNaoExecucao("");
-      await carregarOrdem();
-    } catch (e: any) {
-      setError(
-        e?.response?.data?.message ??
-          "Não foi possível marcar a OS como não executada."
-      );
-    } finally {
-      setProcessandoAcao(false);
     }
   }
 
+  async function handleCapturarGeolocalizacao() {
+    await capturarGeolocalizacao();
+  }
+
   async function handleEnviarAnexo() {
-    if (!os?.id || !arquivoSelecionado) {
-      setError("Selecione um arquivo para enviar.");
-      return;
-    }
-
-    try {
-      setProcessandoAcao(true);
-      setError(null);
-
-      await enviarAnexo(os.id, arquivoSelecionado, tipoAnexo);
-
-      setArquivoSelecionado(null);
-      await carregarOrdem();
-    } catch (e: any) {
-      setError(
-        e?.response?.data?.message ??
-          "Não foi possível enviar o anexo."
-      );
-    } finally {
-      setProcessandoAcao(false);
-    }
+    await enviarEvidencia();
   }
 
   const pageBg = isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900";
@@ -247,8 +132,10 @@ export default function OrdemDetalhePage() {
   if (loading) {
     return (
       <div className={`min-h-screen ${pageBg}`}>
-        <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
-          <p className={`text-sm ${mutedText}`}>Carregando detalhes...</p>
+        <div className="mx-auto max-w-7xl px-4 py-6">
+          <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
+            <p className={`text-sm ${mutedText}`}>Carregando detalhes...</p>
+          </div>
         </div>
       </div>
     );
@@ -257,17 +144,19 @@ export default function OrdemDetalhePage() {
   if (error && !os) {
     return (
       <div className={`min-h-screen ${pageBg}`}>
-        <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
-          <p className="text-sm text-red-500">{error}</p>
+        <div className="mx-auto max-w-7xl px-4 py-6">
+          <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
+            <p className="text-sm text-red-500">{error}</p>
 
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className={`mt-4 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </button>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className={`mt-4 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -276,17 +165,19 @@ export default function OrdemDetalhePage() {
   if (!os) {
     return (
       <div className={`min-h-screen ${pageBg}`}>
-        <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
-          <p className={`text-sm ${mutedText}`}>Ordem de serviço não encontrada.</p>
+        <div className="mx-auto max-w-7xl px-4 py-6">
+          <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
+            <p className={`text-sm ${mutedText}`}>Ordem de servico nao encontrada.</p>
 
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className={`mt-4 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </button>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className={`mt-4 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -294,171 +185,174 @@ export default function OrdemDetalhePage() {
 
   return (
     <div className={`min-h-screen ${pageBg}`}>
-      <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className={`text-3xl font-bold ${titleText}`}>{os.numero}</h1>
+      <div className="mx-auto max-w-7xl px-4 py-6">
+        <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <StatusBadge status={os.status} />
+                <PrioridadeBadge prioridade={os.prioridade} />
+              </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span className={`text-sm capitalize ${bodyText}`}>{os.tipo}</span>
-              <StatusBadge status={os.status} />
-              <PrioridadeBadge prioridade={os.prioridade} />
+              <h1 className={`mt-3 text-3xl font-bold ${titleText}`}>{os.numero}</h1>
+              <p className={`mt-2 text-sm ${mutedText}`}>
+                {os.tipo}
+                {os.nome_cliente ? ` • ${os.nome_cliente}` : ""}
+              </p>
+              <p className={`mt-2 text-sm capitalize ${bodyText}`}>
+                Status atual: {formatarStatus(os.status)}
+              </p>
             </div>
 
-            <p className={`mt-3 text-sm ${mutedText}`}>
-              Status atual: {formatarStatus(os.status)}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </button>
-        </div>
-
-        {error && (
-          <div
-            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-              isDark
-                ? "border-red-900 bg-red-950 text-red-300"
-                : "border-red-200 bg-red-50 text-red-700"
-            }`}
-          >
-            {error}
-          </div>
-        )}
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="space-y-4 lg:col-span-2">
-            <Section
-              title="Descrição"
-              icon={<FileText className="h-4 w-4" />}
-              cardBg={cardBg}
-            >
-              <p className={`text-sm ${bodyText}`}>{os.descricao}</p>
-            </Section>
-
-            {podeIniciarExecucao && (
-              <Section
-                title="Iniciar execução"
-                icon={<PlayCircle className="h-4 w-4" />}
-                cardBg={cardBg}
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
               >
-                <div className="space-y-4">
-                  <div>
-                    <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                      Observação inicial
-                    </label>
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {isDark ? "Modo claro" : "Modo escuro"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div
+              className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                isDark
+                  ? "border-red-900 bg-red-950 text-red-300"
+                  : "border-red-200 bg-red-50 text-red-700"
+              }`}
+            >
+              {error}
+            </div>
+          )}
+
+          {osEhDeOutroTecnico && (
+            <div
+              className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                isDark
+                  ? "border-amber-900 bg-amber-950 text-amber-200"
+                  : "border-amber-200 bg-amber-50 text-amber-700"
+              }`}
+            >
+              Esta OS esta atribuida a {tecnicoResponsavel?.name || "outro tecnico"}.
+            </div>
+          )}
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              <Section title="Descricao" icon={<FileText className="h-4 w-4" />} cardBg={cardBg}>
+                <p className={`whitespace-pre-wrap text-sm ${bodyText}`}>{os.descricao}</p>
+              </Section>
+
+              {podeIniciarExecucao && (
+                <Section
+                  title="Iniciar execucao"
+                  icon={<PlayCircle className="h-4 w-4" />}
+                  cardBg={cardBg}
+                >
+                  <div className="space-y-4">
                     <textarea
                       rows={4}
                       value={observacaoInicio}
-                      onChange={(e) => setObservacaoInicio(e.target.value)}
-                      placeholder="Observação opcional ao iniciar a execução"
+                      onChange={(event) => setObservacaoInicio(event.target.value)}
+                      placeholder="Observacao opcional ao iniciar a execucao"
                       disabled={processandoAcao}
                       className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
                     />
+
+                    <button
+                      type="button"
+                      onClick={handleIniciarExecucao}
+                      disabled={processandoAcao}
+                      className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      {processandoAcao ? "Iniciando..." : "Iniciar execucao"}
+                    </button>
                   </div>
+                </Section>
+              )}
 
-                  <button
-                    type="button"
-                    onClick={handleIniciarExecucao}
-                    disabled={processandoAcao}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <PlayCircle className="h-4 w-4" />
-                    {processandoAcao ? "Iniciando..." : "Iniciar execução"}
-                  </button>
-                </div>
-              </Section>
-            )}
-
-            {podeFinalizarExecucao && (
-              <Section
-                title="Finalizar execução"
-                icon={<CheckCircle2 className="h-4 w-4" />}
-                cardBg={cardBg}
-              >
-                <div className="space-y-4">
-                  <div>
-                    <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                      Observação final
-                    </label>
+              {podeFinalizarExecucao && (
+                <Section
+                  title="Finalizar execucao"
+                  icon={<CheckCircle2 className="h-4 w-4" />}
+                  cardBg={cardBg}
+                >
+                  <div className="space-y-4">
                     <textarea
                       rows={4}
                       value={observacaoFim}
-                      onChange={(e) => setObservacaoFim(e.target.value)}
-                      placeholder="Observação opcional ao finalizar a execução"
+                      onChange={(event) => setObservacaoFim(event.target.value)}
+                      placeholder="Observacao opcional ao finalizar a execucao"
                       disabled={processandoAcao}
                       className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
                     />
+
+                    <button
+                      type="button"
+                      onClick={handleFinalizarExecucao}
+                      disabled={processandoAcao}
+                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      {processandoAcao ? "Finalizando..." : "Finalizar execucao"}
+                    </button>
                   </div>
+                </Section>
+              )}
 
-                  <button
-                    type="button"
-                    onClick={handleFinalizarExecucao}
-                    disabled={processandoAcao}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    {processandoAcao ? "Finalizando..." : "Finalizar execução"}
-                  </button>
-                </div>
-              </Section>
-            )}
-
-            {podeMarcarNaoExecutada && (
-              <Section
-                title="Marcar como não executada"
-                icon={<FileText className="h-4 w-4" />}
-                cardBg={cardBg}
-              >
-                <div className="space-y-4">
-                  <div>
-                    <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                      Justificativa *
-                    </label>
+              {podeMarcarNaoExecutada && (
+                <Section
+                  title="Marcar como nao executada"
+                  icon={<FileText className="h-4 w-4" />}
+                  cardBg={cardBg}
+                >
+                  <div className="space-y-4">
                     <textarea
                       rows={4}
                       value={motivoNaoExecucao}
-                      onChange={(e) => setMotivoNaoExecucao(e.target.value)}
-                      placeholder="Informe o motivo pelo qual a OS não foi executada"
+                      onChange={(event) => setMotivoNaoExecucao(event.target.value)}
+                      placeholder="Informe o motivo pelo qual a OS nao foi executada"
                       disabled={processandoAcao}
                       className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-red-500 disabled:opacity-60 ${inputBg}`}
                     />
+
+                    <button
+                      type="button"
+                      onClick={handleMarcarNaoExecutada}
+                      disabled={processandoAcao}
+                      className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <FileText className="h-4 w-4" />
+                      {processandoAcao ? "Salvando..." : "Marcar como nao executada"}
+                    </button>
                   </div>
+                </Section>
+              )}
 
-                  <button
-                    type="button"
-                    onClick={handleMarcarNaoExecutada}
-                    disabled={processandoAcao}
-                    className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <FileText className="h-4 w-4" />
-                    {processandoAcao ? "Salvando..." : "Marcar como não executada"}
-                  </button>
-                </div>
-              </Section>
-            )}
-
-            {podeEnviarAnexo && (
-              <Section
-                title="Enviar evidência"
-                icon={<Upload className="h-4 w-4" />}
-                cardBg={cardBg}
-              >
-                <div className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                        Tipo do anexo
-                      </label>
+              {podeEnviarAnexo && (
+                <Section
+                  title="Enviar evidencia"
+                  icon={<Upload className="h-4 w-4" />}
+                  cardBg={cardBg}
+                >
+                  <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <select
                         value={tipoAnexo}
-                        onChange={(e) => setTipoAnexo(e.target.value)}
+                        onChange={(event) => selecionarTipoAnexo(event.target.value)}
                         disabled={processandoAcao}
                         className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
                       >
@@ -466,147 +360,242 @@ export default function OrdemDetalhePage() {
                         <option value="pdf">PDF</option>
                         <option value="arquivo">Arquivo</option>
                       </select>
-                    </div>
 
-                    <div>
-                      <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                        Arquivo
-                      </label>
                       <input
                         type="file"
-                        accept=".jpg,.jpeg,.png,.pdf"
+                        accept={getTiposAceitosAnexo(tipoAnexo)}
                         disabled={processandoAcao}
-                        onChange={(e) =>
-                          setArquivoSelecionado(e.target.files?.[0] ?? null)
+                        onChange={(event) =>
+                          setArquivoSelecionado(event.target.files?.[0] ?? null)
                         }
                         className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
                       />
                     </div>
+
+                    {tipoAnexo === "foto" && (
+                      <div className={`rounded-2xl border p-4 ${innerCardBg}`}>
+                        <label className={`flex items-start gap-3 text-sm ${bodyText}`}>
+                          <input
+                            type="checkbox"
+                            checked={incluirGeolocalizacao}
+                            disabled={processandoAcao || processandoGeolocalizacao}
+                            onChange={(event) =>
+                              alternarIncluirGeolocalizacao(event.target.checked)
+                            }
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
+                          />
+                          <span>Incluir geolocalizacao e endereco aproximado junto com a foto.</span>
+                        </label>
+
+                        {incluirGeolocalizacao && (
+                          <div className="mt-4 space-y-3">
+                            <button
+                              type="button"
+                              onClick={handleCapturarGeolocalizacao}
+                              disabled={processandoAcao || processandoGeolocalizacao}
+                              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition disabled:opacity-60 ${buttonSecondary}`}
+                            >
+                              <MapPin className="h-4 w-4" />
+                              {processandoGeolocalizacao
+                                ? "Capturando localizacao..."
+                                : geolocalizacaoCapturada
+                                  ? "Atualizar localizacao"
+                                  : "Capturar localizacao"}
+                            </button>
+
+                            {geolocalizacaoCapturada ? (
+                              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                                <p className="font-semibold">Localizacao pronta para envio</p>
+                                <p className="mt-2">
+                                  Latitude: {formatarCoordenada(geolocalizacaoCapturada.latitude)}
+                                </p>
+                                <p>
+                                  Longitude: {formatarCoordenada(geolocalizacaoCapturada.longitude)}
+                                </p>
+                                <p>
+                                  Precisao:{" "}
+                                  {typeof geolocalizacaoCapturada.precisaoMetros === "number"
+                                    ? `${Math.round(geolocalizacaoCapturada.precisaoMetros)} m`
+                                    : "-"}
+                                </p>
+                                <p>
+                                  Capturada em {formatarDataHora(geolocalizacaoCapturada.capturadaEm)}
+                                </p>
+
+                                <div className="mt-3">
+                                  <label className="mb-2 block text-sm font-medium text-emerald-800">
+                                    Endereco da evidencia
+                                  </label>
+                                  <textarea
+                                    rows={3}
+                                    value={geolocalizacaoCapturada.endereco ?? ""}
+                                    onChange={(event) =>
+                                      atualizarEnderecoCapturado(event.target.value)
+                                    }
+                                    placeholder="Endereco aproximado capturado automaticamente. Ajuste se necessario."
+                                    className="w-full rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <p className={`text-sm ${mutedText}`}>
+                                A localizacao atual e o endereco aproximado serao vinculados a foto no envio da evidencia.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {arquivoSelecionado && (
+                      <p className={`text-sm ${mutedText}`}>
+                        Arquivo selecionado: {arquivoSelecionado.name}
+                      </p>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleEnviarAnexo}
+                      disabled={processandoAcao || !arquivoSelecionado}
+                      className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Upload className="h-4 w-4" />
+                      {processandoAcao ? "Enviando..." : "Enviar evidencia"}
+                    </button>
                   </div>
+                </Section>
+              )}
 
-                  {arquivoSelecionado && (
-                    <p className={`text-sm ${mutedText}`}>
-                      Arquivo selecionado: {arquivoSelecionado.name}
-                    </p>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={handleEnviarAnexo}
-                    disabled={processandoAcao || !arquivoSelecionado}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Upload className="h-4 w-4" />
-                    {processandoAcao ? "Enviando..." : "Enviar evidência"}
-                  </button>
-                </div>
+              <Section title="Execucoes" icon={<Wrench className="h-4 w-4" />} cardBg={cardBg}>
+                {os.execucoes?.length ? (
+                  <div className="space-y-3">
+                    {os.execucoes.map((execucao) => (
+                      <div
+                        key={execucao.id}
+                        className={`rounded-xl border px-4 py-3 ${innerCardBg}`}
+                      >
+                        <p className={`text-sm ${bodyText}`}>
+                          <span className={mutedText}>Tecnico:</span>{" "}
+                          {execucao.tecnico?.name ?? "-"}
+                        </p>
+                        <p className={`mt-1 text-sm ${bodyText}`}>
+                          <span className={mutedText}>Inicio:</span>{" "}
+                          {formatarDataHora(execucao.data_inicio)}
+                        </p>
+                        <p className={`mt-1 text-sm ${bodyText}`}>
+                          <span className={mutedText}>Fim:</span>{" "}
+                          {formatarDataHora(execucao.data_fim)}
+                        </p>
+                        <p className={`mt-3 text-sm ${bodyText}`}>
+                          {execucao.observacao ?? "Sem observacoes registradas."}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={`text-sm ${mutedText}`}>Nenhuma execucao registrada.</p>
+                )}
               </Section>
-            )}
+            </div>
 
-            <Section
-              title="Execuções"
-              icon={<Wrench className="h-4 w-4" />}
-              cardBg={cardBg}
-            >
-              {os.execucoes?.length ? (
-                <div className="space-y-3">
-                  {os.execucoes.map((execucao) => (
-                    <div
-                      key={execucao.id}
-                      className={`rounded-xl border px-4 py-3 ${innerCardBg}`}
-                    >
-                      <p className={`text-sm ${bodyText}`}>
-                        <span className={mutedText}>Técnico:</span>{" "}
-                        {execucao.tecnico?.name ?? "—"}
-                      </p>
+            <div className="space-y-4">
+              <Section title="Endereco" icon={<MapPin className="h-4 w-4" />} cardBg={cardBg}>
+                {os.endereco ? (
+                  <div className={`space-y-1 text-sm ${bodyText}`}>
+                    <p>
+                      {os.endereco.rua}, {os.endereco.numero}
+                    </p>
+                    {os.endereco.complemento ? <p>{os.endereco.complemento}</p> : null}
+                    <p>{os.endereco.bairro}</p>
+                    <p>
+                      {os.endereco.cidade} - {os.endereco.estado}
+                    </p>
+                    <p>CEP: {os.endereco.cep}</p>
+                  </div>
+                ) : (
+                  <p className={`text-sm ${mutedText}`}>Endereco nao informado.</p>
+                )}
+              </Section>
 
-                      <p className={`mt-1 text-sm ${bodyText}`}>
-                        <span className={mutedText}>Início:</span>{" "}
-                        {formatarDataHora(execucao.data_inicio)}
-                      </p>
+              <Section
+                title="Criada por"
+                icon={<UserCircle2 className="h-4 w-4" />}
+                cardBg={cardBg}
+              >
+                <p className={`text-sm ${bodyText}`}>{criadaPor?.name ?? "-"}</p>
+                <p className={`mt-1 text-xs ${mutedText}`}>{criadaPor?.email ?? ""}</p>
+              </Section>
 
-                      <p className={`mt-1 text-sm ${bodyText}`}>
-                        <span className={mutedText}>Fim:</span>{" "}
-                        {formatarDataHora(execucao.data_fim)}
-                      </p>
+              <Section title="Anexos" icon={<Paperclip className="h-4 w-4" />} cardBg={cardBg}>
+                {os.anexos?.length ? (
+                  <ul className="space-y-2">
+                    {os.anexos.map((anexo) => (
+                      <li
+                        key={anexo.id}
+                        className={`rounded-lg border px-3 py-3 text-sm ${innerCardBg} ${bodyText}`}
+                      >
+                        {anexo.url ? (
+                          <a
+                            href={anexo.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {anexo.caminho ? anexo.caminho.split("/").pop() : anexo.id}
+                          </a>
+                        ) : (
+                          anexo.caminho?.split("/").pop() ?? anexo.id
+                        )}
 
-                      <p className={`mt-3 text-sm ${bodyText}`}>
-                        {execucao.observacao ?? "Sem observações registradas."}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className={`text-sm ${mutedText}`}>Nenhuma execução registrada.</p>
-              )}
-            </Section>
-          </div>
-
-          <div className="space-y-4">
-            <Section
-              title="Endereço"
-              icon={<MapPin className="h-4 w-4" />}
-              cardBg={cardBg}
-            >
-              {os.endereco ? (
-                <div className={`space-y-1 text-sm ${bodyText}`}>
-                  <p>
-                    {os.endereco.rua}, {os.endereco.numero}
-                  </p>
-                  {os.endereco.complemento ? <p>{os.endereco.complemento}</p> : null}
-                  <p>{os.endereco.bairro}</p>
-                  <p>
-                    {os.endereco.cidade} - {os.endereco.estado}
-                  </p>
-                  <p>CEP: {os.endereco.cep}</p>
-                </div>
-              ) : (
-                <p className={`text-sm ${mutedText}`}>Endereço não informado.</p>
-              )}
-            </Section>
-
-            <Section
-              title="Criada por"
-              icon={<UserCircle2 className="h-4 w-4" />}
-              cardBg={cardBg}
-            >
-              <p className={`text-sm ${bodyText}`}>{os.criadaPor?.name ?? "—"}</p>
-              <p className={`mt-1 text-xs ${mutedText}`}>{os.criadaPor?.email ?? ""}</p>
-            </Section>
-
-            <Section
-              title="Anexos"
-              icon={<Paperclip className="h-4 w-4" />}
-              cardBg={cardBg}
-            >
-              {os.anexos?.length ? (
-                <ul className="space-y-2">
-                  {os.anexos.map((anexo) => (
-                    <li
-                      key={anexo.id}
-                      className={`rounded-lg border px-3 py-2 text-sm ${innerCardBg} ${bodyText}`}
-                    >
-                      {anexo.url ? (
-                        <a
-                          href={anexo.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {anexo.caminho ? anexo.caminho.split("/").pop() : anexo.id}
-                        </a>
-                      ) : anexo.caminho ? (
-                        anexo.caminho.split("/").pop()
-                      ) : (
-                        anexo.id
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={`text-sm ${mutedText}`}>Sem anexos.</p>
-              )}
-            </Section>
+                        {typeof anexo.latitude === "number" &&
+                          typeof anexo.longitude === "number" && (
+                            <div
+                              className={`mt-3 rounded-xl border px-3 py-3 text-sm ${innerCardBg}`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <MapPin className="mt-0.5 h-4 w-4 text-blue-600" />
+                                <div className="space-y-1">
+                                  <p>
+                                    Lat {formatarCoordenada(anexo.latitude)} | Lon{" "}
+                                    {formatarCoordenada(anexo.longitude)}
+                                  </p>
+                                  <p>
+                                    Precisao:{" "}
+                                    {typeof anexo.precisao_metros === "number"
+                                      ? `${Math.round(anexo.precisao_metros)} m`
+                                      : "-"}
+                                  </p>
+                                  {anexo.geolocalizacao_capturada_em && (
+                                    <p>
+                                      Capturada em{" "}
+                                      {formatarDataHora(anexo.geolocalizacao_capturada_em)}
+                                    </p>
+                                  )}
+                                  {anexo.endereco_capturado && (
+                                    <p className="whitespace-pre-wrap">
+                                      Endereco: {anexo.endereco_capturado}
+                                    </p>
+                                  )}
+                                  <a
+                                    href={getGoogleMapsUrl(anexo.latitude, anexo.longitude)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-block text-blue-600 hover:underline"
+                                  >
+                                    Abrir no mapa
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={`text-sm ${mutedText}`}>Sem anexos.</p>
+                )}
+              </Section>
+            </div>
           </div>
         </div>
       </div>

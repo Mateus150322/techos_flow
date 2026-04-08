@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Eye, ClipboardList, ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  Eye,
+  Search,
+} from "lucide-react";
 
-import { listarOrdens } from "./ordensServico.service";
-import type { OrdemServico } from "./ordensServico.service";
-import { StatusBadge } from "./components/StatusBadge";
-import { PrioridadeBadge } from "./components/PrioridadeBadge";
+import { AdminShell } from "@/modules/admin/AdminShell";
+import { useCurrentUser } from "@/shared/auth/session";
 import { useTheme } from "@/shared/hooks/useTheme";
+import {
+  getTecnicoResponsavel,
+  listarTodasOrdens,
+  type OrdemServico,
+} from "./ordensServico.service";
+import { StatusBadge } from "./components/StatusBadge";
 
 export default function OrdensPage() {
   const navigate = useNavigate();
@@ -17,7 +25,8 @@ export default function OrdensPage() {
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState("todos");
-  const [prioridadeFiltro, setPrioridadeFiltro] = useState("todas");
+  const [tipoFiltro, setTipoFiltro] = useState("todos");
+  const currentUser = useCurrentUser();
 
   useEffect(() => {
     async function load() {
@@ -25,7 +34,7 @@ export default function OrdensPage() {
         setLoading(true);
         setErro("");
 
-        const res = await listarOrdens();
+        const res = await listarTodasOrdens({ include: "tecnicoResponsavel" });
         setOrdens(res.data);
       } catch (error) {
         console.error("Erro ao carregar ordens:", error);
@@ -37,6 +46,12 @@ export default function OrdensPage() {
 
     load();
   }, []);
+
+  const tipos = useMemo(() => {
+    return Array.from(new Set(ordens.map((ordem) => ordem.tipo).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [ordens]);
 
   const ordensFiltradas = useMemo(() => {
     return ordens.filter((ordem) => {
@@ -52,24 +67,13 @@ export default function OrdensPage() {
       const correspondeStatus =
         statusFiltro === "todos" || ordem.status === statusFiltro;
 
-      const correspondePrioridade =
-        prioridadeFiltro === "todas" ||
-        String(ordem.prioridade) === prioridadeFiltro;
+      const correspondeTipo = tipoFiltro === "todos" || ordem.tipo === tipoFiltro;
 
-      return correspondeBusca && correspondeStatus && correspondePrioridade;
+      return correspondeBusca && correspondeStatus && correspondeTipo;
     });
-  }, [ordens, busca, statusFiltro, prioridadeFiltro]);
+  }, [ordens, busca, statusFiltro, tipoFiltro]);
 
-  function formatarData(data?: string | null) {
-    if (!data) return "-";
-
-    return new Date(data).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  }
-
+  const pageBg = isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900";
   const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
   const inputBg = isDark
     ? "bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-500"
@@ -82,33 +86,17 @@ export default function OrdensPage() {
     ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
     : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100";
 
-  return (
-    <div className={`rounded-2xl border p-5 shadow-sm ${cardBg}`}>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="mb-4">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
-            </button>
-          </div>
-
-          <h1 className={`flex items-center gap-3 text-3xl font-bold ${titleText}`}>
-            <ClipboardList className="h-8 w-8" />
-            Ordens de Serviço
-          </h1>
-          <p className={`mt-2 text-sm ${mutedText}`}>
-            Consulte, filtre e acompanhe as ordens de serviço registradas no sistema.
-          </p>
-        </div>
+  const content = (
+    <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+      <div className="mb-5">
+        <h2 className={`text-2xl font-semibold ${titleText}`}>Ordens de Serviço</h2>
+        <p className={`mt-1 text-sm ${mutedText}`}>
+          Consulte e gerencie as ordens de serviço cadastradas.
+        </p>
       </div>
 
-      <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="relative lg:col-span-1">
+      <div className="mb-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr_0.8fr]">
+        <label className="relative block">
           <Search
             className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${mutedText}`}
           />
@@ -116,43 +104,41 @@ export default function OrdensPage() {
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por número, tipo, cliente ou descrição..."
-            className={`w-full rounded-xl border py-3 pl-10 pr-4 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+            placeholder="Buscar por número, cliente..."
+            className={`w-full rounded-2xl border py-3 pl-10 pr-4 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
           />
-        </div>
+        </label>
 
-        <div>
-          <select
-            value={statusFiltro}
-            onChange={(e) => setStatusFiltro(e.target.value)}
-            className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-          >
-            <option value="todos">Todos os status</option>
-            <option value="aberta">Aberta</option>
-            <option value="em_execucao">Em execução</option>
-            <option value="finalizada">Finalizada</option>
-            <option value="nao_executada">Não executada</option>
-            <option value="cancelada">Cancelada</option>
-          </select>
-        </div>
+        <select
+          value={statusFiltro}
+          onChange={(e) => setStatusFiltro(e.target.value)}
+          className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+        >
+          <option value="todos">Todos os status</option>
+          <option value="aberta">Aberta</option>
+          <option value="em_execucao">Em Execução</option>
+          <option value="finalizada">Finalizada</option>
+          <option value="nao_executada">Não executada</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
 
-        <div>
-          <select
-            value={prioridadeFiltro}
-            onChange={(e) => setPrioridadeFiltro(e.target.value)}
-            className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-          >
-            <option value="todas">Todas as prioridades</option>
-            <option value="1">Alta</option>
-            <option value="2">Média</option>
-            <option value="3">Baixa</option>
-          </select>
-        </div>
+        <select
+          value={tipoFiltro}
+          onChange={(e) => setTipoFiltro(e.target.value)}
+          className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+        >
+          <option value="todos">Todos os tipos</option>
+          {tipos.map((tipo) => (
+            <option key={tipo} value={tipo}>
+              {tipo}
+            </option>
+          ))}
+        </select>
       </div>
 
       {erro && (
         <div
-          className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+          className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
             isDark
               ? "border-red-900 bg-red-950 text-red-300"
               : "border-red-200 bg-red-50 text-red-700"
@@ -162,31 +148,28 @@ export default function OrdensPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+      <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[980px] text-sm">
             <thead className={tableHead}>
               <tr>
                 <th className="p-4 text-left font-semibold">Número</th>
                 <th className="p-4 text-left font-semibold">Cliente</th>
                 <th className="p-4 text-left font-semibold">Tipo</th>
                 <th className="p-4 text-left font-semibold">Status</th>
-                <th className="p-4 text-left font-semibold">Prioridade</th>
-                <th className="p-4 text-left font-semibold">Data de abertura</th>
-                <th className="p-4 text-right font-semibold">Ação</th>
+                <th className="p-4 text-left font-semibold">Data Abertura</th>
+                <th className="p-4 text-left font-semibold">Responsável</th>
+                <th className="p-4 text-right font-semibold">Ações</th>
               </tr>
             </thead>
-
             <tbody>
-              {loading && (
+              {loading ? (
                 <tr>
                   <td colSpan={7} className="p-6 text-center">
                     <span className={mutedText}>Carregando ordens de serviço...</span>
                   </td>
                 </tr>
-              )}
-
-              {!loading && ordensFiltradas.length === 0 && (
+              ) : ordensFiltradas.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-6 text-center">
                     <span className={mutedText}>
@@ -194,14 +177,11 @@ export default function OrdensPage() {
                     </span>
                   </td>
                 </tr>
-              )}
-
-              {!loading &&
+              ) : (
                 ordensFiltradas.map((ordem) => (
                   <tr
                     key={ordem.id}
-                    className={`cursor-pointer border-t border-slate-200 transition dark:border-slate-800 ${rowHover}`}
-                    onClick={() => navigate(`/ordens-servico/${ordem.id}`)}
+                    className={`border-t border-slate-200 transition dark:border-slate-800 ${rowHover}`}
                   >
                     <td className="p-4 font-medium">{ordem.numero}</td>
                     <td className="p-4">{ordem.nome_cliente || "-"}</td>
@@ -209,39 +189,67 @@ export default function OrdensPage() {
                     <td className="p-4">
                       <StatusBadge status={ordem.status} />
                     </td>
-                    <td className="p-4">
-                      <PrioridadeBadge prioridade={ordem.prioridade} />
-                    </td>
                     <td className="p-4">{formatarData(ordem.data_abertura)}</td>
+                    <td className="p-4">{getTecnicoResponsavel(ordem)?.name || "-"}</td>
                     <td className="p-4 text-right">
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/ordens-servico/${ordem.id}`);
-                        }}
-                        className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                          isDark
-                            ? "bg-slate-800 text-slate-100 hover:bg-slate-700"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        }`}
+                        onClick={() => navigate(`/ordens-servico/${ordem.id}`)}
+                        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${buttonSecondary}`}
                       >
                         <Eye className="h-4 w-4" />
                         Ver
                       </button>
                     </td>
                   </tr>
-                ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {!loading && ordens.length > 0 && (
-        <div className={`mt-4 text-sm ${mutedText}`}>
+      {!loading && (
+        <p className={`mt-4 text-sm ${mutedText}`}>
           Exibindo {ordensFiltradas.length} de {ordens.length} ordens de serviço.
-        </div>
+        </p>
       )}
+    </section>
+  );
+
+  if (currentUser.role === "administrador") {
+    return (
+      <AdminShell currentUser={currentUser} activeTab="ordens">
+        {content}
+      </AdminShell>
+    );
+  }
+
+  return (
+    <div className={`min-h-screen ${pageBg}`}>
+      <div className="mx-auto max-w-7xl px-4 py-6">
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </button>
+        </div>
+        {content}
+      </div>
     </div>
   );
+}
+
+function formatarData(data?: string | null) {
+  if (!data) return "-";
+
+  return new Date(data).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }

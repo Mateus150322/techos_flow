@@ -27,6 +27,8 @@ export type Usuario = {
   role: "administrador" | "tecnico" | "atendente";
 };
 
+export type OrdemServicoUsuarioRelacionamento = Usuario | null | undefined;
+
 export type Execucao = {
   id: string;
   os_id: string;
@@ -42,6 +44,11 @@ export type Anexo = {
   caminho?: string | null;
   tipo?: string | null;
   url?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  precisao_metros?: number | null;
+  geolocalizacao_capturada_em?: string | null;
+  endereco_capturado?: string | null;
 };
 
 export type OrdemServico = {
@@ -54,16 +61,31 @@ export type OrdemServico = {
   data_abertura: string;
   data_encerramento: string | null;
   descricao: string;
+  motivo_nao_execucao?: string | null;
   endereco?: Endereco | null;
   tecnico_responsavel_id?: string | null;
   tecnicoResponsavel?: Usuario | null;
+  tecnico_responsavel?: Usuario | null;
 };
 
 export type OrdemServicoDetalhe = OrdemServico & {
   criadaPor?: Usuario | null;
+  criada_por?: Usuario | null;
   execucoes?: Execucao[];
   anexos?: Anexo[];
 };
+
+export function getTecnicoResponsavel(
+  ordem?: Partial<OrdemServicoDetalhe> | null
+): OrdemServicoUsuarioRelacionamento {
+  return ordem?.tecnico_responsavel ?? ordem?.tecnicoResponsavel ?? null;
+}
+
+export function getCriadaPor(
+  ordem?: Partial<OrdemServicoDetalhe> | null
+): OrdemServicoUsuarioRelacionamento {
+  return ordem?.criada_por ?? ordem?.criadaPor ?? null;
+}
 
 export type Paginated<T> = {
   current_page: number;
@@ -96,6 +118,36 @@ export async function listarOrdens(
     params,
   });
   return data;
+}
+
+export async function listarTodasOrdens(
+  params?: Record<string, string | number | undefined>
+) {
+  const acumuladas: OrdemServico[] = [];
+  let paginaAtual = 1;
+  let ultimaPagina = 1;
+  let total = 0;
+
+  do {
+    const resposta = await listarOrdens({
+      ...params,
+      page: paginaAtual,
+      per_page: 100,
+    });
+
+    acumuladas.push(...resposta.data);
+    ultimaPagina = resposta.last_page || 1;
+    total = resposta.total;
+    paginaAtual += 1;
+  } while (paginaAtual <= ultimaPagina);
+
+  return {
+    current_page: ultimaPagina,
+    data: acumuladas,
+    per_page: 100,
+    total,
+    last_page: ultimaPagina,
+  } satisfies Paginated<OrdemServico>;
 }
 
 export async function buscarOrdem(id: string, include?: string[]) {
@@ -155,12 +207,54 @@ export async function marcarNaoExecutada(
   return data;
 }
 
-export async function enviarAnexo(osId: string, arquivo: File, tipo?: string) {
+export type GeolocalizacaoAnexoPayload = {
+  tipo?: string;
+  latitude?: number;
+  longitude?: number;
+  precisao_metros?: number;
+  geolocalizacao_capturada_em?: string;
+  endereco_capturado?: string;
+};
+
+export async function enviarAnexo(
+  osId: string,
+  arquivo: File,
+  tipoOuPayload?: string | GeolocalizacaoAnexoPayload
+) {
   const formData = new FormData();
   formData.append("arquivo", arquivo);
 
-  if (tipo) {
-    formData.append("tipo", tipo);
+  if (typeof tipoOuPayload === "string") {
+    formData.append("tipo", tipoOuPayload);
+  }
+
+  if (tipoOuPayload && typeof tipoOuPayload !== "string") {
+    if (tipoOuPayload.tipo) {
+      formData.append("tipo", tipoOuPayload.tipo);
+    }
+
+    if (typeof tipoOuPayload.latitude === "number") {
+      formData.append("latitude", String(tipoOuPayload.latitude));
+    }
+
+    if (typeof tipoOuPayload.longitude === "number") {
+      formData.append("longitude", String(tipoOuPayload.longitude));
+    }
+
+    if (typeof tipoOuPayload.precisao_metros === "number") {
+      formData.append("precisao_metros", String(tipoOuPayload.precisao_metros));
+    }
+
+    if (tipoOuPayload.geolocalizacao_capturada_em) {
+      formData.append(
+        "geolocalizacao_capturada_em",
+        tipoOuPayload.geolocalizacao_capturada_em
+      );
+    }
+
+    if (tipoOuPayload.endereco_capturado) {
+      formData.append("endereco_capturado", tipoOuPayload.endereco_capturado);
+    }
   }
 
   const { data } = await api.post(`/ordens-servico/${osId}/anexos`, formData, {

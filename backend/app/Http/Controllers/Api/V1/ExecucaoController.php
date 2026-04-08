@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\EnsuresTecnicoResponsavel;
 use App\Http\Controllers\Controller;
 use App\Models\Execucao;
 use App\Models\OrdemServico;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 
 class ExecucaoController extends Controller
 {
+    use EnsuresTecnicoResponsavel;
+
     /**
      * Iniciar execução (cria uma execução e muda OS para em_execucao se estiver aberta)
      */
@@ -20,12 +23,28 @@ class ExecucaoController extends Controller
             'observacao' => 'nullable|string',
         ]);
 
-        $os = OrdemServico::where('id', $id)->firstOrFail();
+        $user = $request->user();
+        $os = OrdemServico::query()->findOrFail($id);
 
-        // regra: só inicia se não estiver finalizada/cancelada
-        if (in_array($os->status, ['finalizada', 'cancelada'], true)) {
+        if ($response = $this->ensureTecnicoResponsavel($user, $os)) {
+            return $response;
+        }
+
+        if (in_array($os->status, ['finalizada', 'cancelada', 'nao_executada'], true)) {
             return response()->json([
-                'message' => 'Não é possível iniciar execução para OS finalizada/cancelada.'
+                'message' => 'Não é possível iniciar execução para OS já encerrada.',
+            ], 422);
+        }
+
+        $execucaoAberta = Execucao::query()
+            ->where('os_id', $os->id)
+            ->whereNull('data_fim')
+            ->first();
+
+        if ($execucaoAberta) {
+            return response()->json([
+                'message' => 'Já existe uma execução em andamento para esta OS.',
+                'execucao' => $execucaoAberta,
             ], 422);
         }
 
@@ -36,7 +55,6 @@ class ExecucaoController extends Controller
             'observacao' => $data['observacao'] ?? null,
         ]);
 
-        // se estiver aberta, vira em_execucao automaticamente
         if ($os->status === 'aberta') {
             $os->status = 'em_execucao';
             $os->save();
@@ -59,21 +77,39 @@ class ExecucaoController extends Controller
             'observacao' => 'nullable|string',
         ]);
 
-        $os = OrdemServico::where('id', $id)->firstOrFail();
+        $user = $request->user();
+        $os = OrdemServico::query()->findOrFail($id);
 
-        // busca execução
-        $execucao = Execucao::where('id', $data['execucao_id'])
+        if ($response = $this->ensureTecnicoResponsavel($user, $os)) {
+            return $response;
+        }
+
+        if ($os->status !== 'em_execucao') {
+            return response()->json([
+                'message' => 'A OS precisa estar em execução para ser finalizada.',
+            ], 422);
+        }
+
+        $execucao = Execucao::query()
+            ->where('id', $data['execucao_id'])
             ->where('os_id', $os->id)
+            ->where('tecnico_id', $user->id)
             ->firstOrFail();
 
-        // marca fim
+        if ($execucao->data_fim) {
+            return response()->json([
+                'message' => 'Esta execução já foi finalizada.',
+            ], 422);
+        }
+
         $execucao->data_fim = $data['data_fim'] ?? now();
+
         if (!empty($data['observacao'])) {
             $execucao->observacao = $data['observacao'];
         }
+
         $execucao->save();
 
-        // finaliza OS
         $os->status = 'finalizada';
         $os->data_encerramento = now();
         $os->save();

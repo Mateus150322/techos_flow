@@ -1,52 +1,76 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { Loader2, PlusCircle } from "lucide-react";
+
 import { useTheme } from "@/shared/hooks/useTheme";
+import { getApiErrorMessage } from "@/shared/utils/apiError";
 import { criarOrdem } from "../ordensServico.service";
 
 type UnidadeType = "CR" | "ETA" | "EEE" | "ETE" | "CAPITACAO";
 type MaintenanceType = "preventiva" | "corretiva";
 
-export default function FormularioETAETETecnico() {
+type Props = {
+  onCriada?: () => void;
+};
+
+const initialForm = {
+  dataChamada: new Date().toISOString().split("T")[0],
+  horaInicio: "",
+  horaFim: "",
+  dataFinal: "",
+  unidade: "" as UnidadeType | "",
+  local: "",
+  setorRequisitante: "",
+  encarregado: "",
+  equipe: "",
+  tipoManutencao: "" as MaintenanceType | "",
+  servico: "",
+  equipamento: "",
+  diagnostico: "",
+  procedimento: "",
+  materialUtilizado: "",
+};
+
+export default function FormularioETAETETecnico({ onCriada }: Props) {
   const { isDark } = useTheme();
 
-  const [formData, setFormData] = useState({
-    dataChamada: new Date().toISOString().split("T")[0],
-    horaInicio: "",
-    horaFim: "",
-    dataFinal: "",
-    unidade: "" as UnidadeType | "",
-    local: "",
-    setorRequisitante: "",
-    encarregado: "",
-    equipe: "",
-    tipoManutencao: "" as MaintenanceType | "",
-    servico: "",
-    equipamento: "",
-    diagnostico: "",
-    procedimento: "",
-    materialUtilizado: "",
-    assignedTo: "",
-  });
+  const [formData, setFormData] = useState(initialForm);
+  const [erro, setErro] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  function updateField<K extends keyof typeof initialForm>(
+    field: K,
+    value: (typeof initialForm)[K]
+  ) {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setErro("");
 
     try {
-      const payload = {
+      setEnviando(true);
+
+      await criarOrdem({
         tipo_servico: "Manutenção ETA/ETE",
         nome_cliente: formData.local || "ETA/ETE",
         prioridade: 2,
         descricao: `
+Data Chamada: ${formData.dataChamada}
+Hora Inicio: ${formData.horaInicio || "-"}
+Hora Fim: ${formData.horaFim || "-"}
+Data Final: ${formData.dataFinal || "-"}
 Unidade: ${formData.unidade}
 Local: ${formData.local}
 Setor: ${formData.setorRequisitante}
 Encarregado: ${formData.encarregado}
 Equipe: ${formData.equipe}
 
-Tipo Manutenção: ${formData.tipoManutencao}
-Serviço: ${formData.servico}
+Tipo Manutencao: ${formData.tipoManutencao}
+Servico: ${formData.servico}
 Equipamento: ${formData.equipamento}
 
-Diagnóstico: ${formData.diagnostico}
+Diagnostico: ${formData.diagnostico}
 Procedimento: ${formData.procedimento}
 Material: ${formData.materialUtilizado}
         `.trim(),
@@ -58,19 +82,15 @@ Material: ${formData.materialUtilizado}
           estado: "AC",
           cep: "69900000",
         },
-      };
+      });
 
-      await criarOrdem(payload);
-
-      alert("OS criada com sucesso!");
-      window.location.reload();
-    } catch (error: any) {
+      setFormData(initialForm);
+      onCriada?.();
+    } catch (error) {
       console.error(error);
-
-      const message =
-        error?.response?.data?.message || "Não foi possível criar a OS.";
-
-      alert(message);
+      setErro(getApiErrorMessage(error, "Nao foi possivel criar a OS."));
+    } finally {
+      setEnviando(false);
     }
   }
 
@@ -85,65 +105,81 @@ Material: ${formData.materialUtilizado}
     <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
       <div className="mb-6">
         <h2 className={`text-2xl font-semibold ${titleText}`}>
-          Ordem de Serviço - Manutenção ETA/ETE
+          Ordem de Servico - Manutencao ETA/ETE
         </h2>
         <p className={`mt-2 text-sm ${mutedText}`}>
-          Formulário específico para serviços de manutenção em estações
+          Formulario especifico para manutencao em unidades operacionais.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {erro && (
+          <div
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              isDark
+                ? "border-red-900 bg-red-950 text-red-300"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            {erro}
+          </div>
+        )}
+
         <div className="space-y-4">
-          <h3 className={`text-xl font-semibold ${titleText}`}>Solicitação</h3>
+          <h3 className={`text-xl font-semibold ${titleText}`}>Solicitacao</h3>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div>
-              <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Data da Chamada *
-              </label>
-              <input
-                type="date"
-                value={formData.dataChamada}
-                onChange={(e) => setFormData({ ...formData, dataChamada: e.target.value })}
-                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-              />
-            </div>
+            <Campo
+              label="Data da Chamada *"
+              titleText={titleText}
+              input={
+                <input
+                  type="date"
+                  value={formData.dataChamada}
+                  onChange={(e) => updateField("dataChamada", e.target.value)}
+                  className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+                />
+              }
+            />
 
-            <div>
-              <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Hora Início
-              </label>
-              <input
-                type="time"
-                value={formData.horaInicio}
-                onChange={(e) => setFormData({ ...formData, horaInicio: e.target.value })}
-                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-              />
-            </div>
+            <Campo
+              label="Hora Inicio"
+              titleText={titleText}
+              input={
+                <input
+                  type="time"
+                  value={formData.horaInicio}
+                  onChange={(e) => updateField("horaInicio", e.target.value)}
+                  className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+                />
+              }
+            />
 
-            <div>
-              <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Hora Fim
-              </label>
-              <input
-                type="time"
-                value={formData.horaFim}
-                onChange={(e) => setFormData({ ...formData, horaFim: e.target.value })}
-                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-              />
-            </div>
+            <Campo
+              label="Hora Fim"
+              titleText={titleText}
+              input={
+                <input
+                  type="time"
+                  value={formData.horaFim}
+                  onChange={(e) => updateField("horaFim", e.target.value)}
+                  className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+                />
+              }
+            />
 
-            <div>
-              <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Data Final (opcional)
-              </label>
-              <input
-                type="date"
-                value={formData.dataFinal}
-                onChange={(e) => setFormData({ ...formData, dataFinal: e.target.value })}
-                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-              />
-            </div>
+            <Campo
+              label="Data Final"
+              titleText={titleText}
+              input={
+                <input
+                  type="date"
+                  value={formData.dataFinal}
+                  onChange={(e) => updateField("dataFinal", e.target.value)}
+                  className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+                />
+              }
+            />
           </div>
         </div>
 
@@ -152,25 +188,21 @@ Material: ${formData.materialUtilizado}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Unidade *
-              </label>
+              <label className={`mb-2 block text-sm font-medium ${titleText}`}>Unidade *</label>
               <div className="flex flex-wrap gap-6 pt-2">
                 {[
                   { value: "CR", label: "CR" },
                   { value: "ETA", label: "ETA" },
                   { value: "EEE", label: "E.E.E" },
                   { value: "ETE", label: "ETE" },
-                  { value: "CAPITACAO", label: "Captação" },
+                  { value: "CAPITACAO", label: "Captacao" },
                 ].map((item) => (
                   <label key={item.value} className="inline-flex items-center gap-2">
                     <input
                       type="radio"
                       name="unidade"
                       checked={formData.unidade === item.value}
-                      onChange={() =>
-                        setFormData({ ...formData, unidade: item.value as UnidadeType })
-                      }
+                      onChange={() => updateField("unidade", item.value as UnidadeType)}
                     />
                     <span>{item.label}</span>
                   </label>
@@ -178,72 +210,76 @@ Material: ${formData.materialUtilizado}
               </div>
             </div>
 
-            <div>
-              <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Local *
-              </label>
-              <input
-                type="text"
-                value={formData.local}
-                onChange={(e) => setFormData({ ...formData, local: e.target.value })}
-                placeholder="Especifique o local"
-                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-              />
-            </div>
+            <Campo
+              label="Local *"
+              titleText={titleText}
+              input={
+                <input
+                  type="text"
+                  value={formData.local}
+                  onChange={(e) => updateField("local", e.target.value)}
+                  placeholder="Especifique o local"
+                  className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+                />
+              }
+            />
           </div>
         </div>
 
         <div className="space-y-4">
-          <h3 className={`text-xl font-semibold ${titleText}`}>Responsáveis</h3>
+          <h3 className={`text-xl font-semibold ${titleText}`}>Responsaveis</h3>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Setor Requisitante *
-              </label>
-              <input
-                type="text"
-                value={formData.setorRequisitante}
-                onChange={(e) =>
-                  setFormData({ ...formData, setorRequisitante: e.target.value })
-                }
-                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-              />
-            </div>
+            <Campo
+              label="Setor Requisitante *"
+              titleText={titleText}
+              input={
+                <input
+                  type="text"
+                  value={formData.setorRequisitante}
+                  onChange={(e) => updateField("setorRequisitante", e.target.value)}
+                  className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+                />
+              }
+            />
 
-            <div>
-              <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Encarregado *
-              </label>
-              <input
-                type="text"
-                value={formData.encarregado}
-                onChange={(e) => setFormData({ ...formData, encarregado: e.target.value })}
-                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-              />
-            </div>
+            <Campo
+              label="Encarregado *"
+              titleText={titleText}
+              input={
+                <input
+                  type="text"
+                  value={formData.encarregado}
+                  onChange={(e) => updateField("encarregado", e.target.value)}
+                  className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+                />
+              }
+            />
 
             <div className="md:col-span-2">
-              <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Equipe *
-              </label>
-              <input
-                type="text"
-                value={formData.equipe}
-                onChange={(e) => setFormData({ ...formData, equipe: e.target.value })}
-                placeholder="Nome dos membros da equipe"
-                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+              <Campo
+                label="Equipe *"
+                titleText={titleText}
+                input={
+                  <input
+                    type="text"
+                    value={formData.equipe}
+                    onChange={(e) => updateField("equipe", e.target.value)}
+                    placeholder="Nome dos membros da equipe"
+                    className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+                  />
+                }
               />
             </div>
           </div>
         </div>
 
         <div className="space-y-4">
-          <h3 className={`text-xl font-semibold ${titleText}`}>Manutenção</h3>
+          <h3 className={`text-xl font-semibold ${titleText}`}>Manutencao</h3>
 
           <div>
             <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Tipo de Manutenção *
+              Tipo de Manutencao *
             </label>
             <div className="flex gap-8 pt-2">
               <label className="inline-flex items-center gap-2">
@@ -251,9 +287,7 @@ Material: ${formData.materialUtilizado}
                   type="radio"
                   name="tipo_manutencao"
                   checked={formData.tipoManutencao === "preventiva"}
-                  onChange={() =>
-                    setFormData({ ...formData, tipoManutencao: "preventiva" })
-                  }
+                  onChange={() => updateField("tipoManutencao", "preventiva")}
                 />
                 <span>Preventiva</span>
               </label>
@@ -263,109 +297,123 @@ Material: ${formData.materialUtilizado}
                   type="radio"
                   name="tipo_manutencao"
                   checked={formData.tipoManutencao === "corretiva"}
-                  onChange={() =>
-                    setFormData({ ...formData, tipoManutencao: "corretiva" })
-                  }
+                  onChange={() => updateField("tipoManutencao", "corretiva")}
                 />
                 <span>Corretiva</span>
               </label>
             </div>
           </div>
 
-          <div>
-            <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Serviço *
-            </label>
-            <textarea
-              rows={3}
-              value={formData.servico}
-              onChange={(e) => setFormData({ ...formData, servico: e.target.value })}
-              placeholder="Descreva o serviço a ser realizado"
-              className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-            />
-          </div>
+          <Campo
+            label="Servico *"
+            titleText={titleText}
+            input={
+              <textarea
+                rows={3}
+                value={formData.servico}
+                onChange={(e) => updateField("servico", e.target.value)}
+                placeholder="Descreva o servico a ser realizado"
+                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+              />
+            }
+          />
 
-          <div>
-            <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Equipamento *
-            </label>
-            <input
-              type="text"
-              value={formData.equipamento}
-              onChange={(e) => setFormData({ ...formData, equipamento: e.target.value })}
-              placeholder="Equipamento relacionado ao serviço"
-              className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-            />
-          </div>
+          <Campo
+            label="Equipamento *"
+            titleText={titleText}
+            input={
+              <input
+                type="text"
+                value={formData.equipamento}
+                onChange={(e) => updateField("equipamento", e.target.value)}
+                placeholder="Equipamento relacionado ao servico"
+                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+              />
+            }
+          />
         </div>
 
         <div className="space-y-4">
-          <h3 className={`text-xl font-semibold ${titleText}`}>Execução</h3>
+          <h3 className={`text-xl font-semibold ${titleText}`}>Execucao</h3>
 
-          <div>
-            <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Diagnóstico
-            </label>
-            <textarea
-              rows={3}
-              value={formData.diagnostico}
-              onChange={(e) => setFormData({ ...formData, diagnostico: e.target.value })}
-              placeholder="Diagnóstico do problema"
-              className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-            />
-          </div>
+          <Campo
+            label="Diagnostico"
+            titleText={titleText}
+            input={
+              <textarea
+                rows={3}
+                value={formData.diagnostico}
+                onChange={(e) => updateField("diagnostico", e.target.value)}
+                placeholder="Diagnostico do problema"
+                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+              />
+            }
+          />
 
-          <div>
-            <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Procedimento
-            </label>
-            <textarea
-              rows={3}
-              value={formData.procedimento}
-              onChange={(e) => setFormData({ ...formData, procedimento: e.target.value })}
-              placeholder="Procedimentos realizados"
-              className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-            />
-          </div>
+          <Campo
+            label="Procedimento"
+            titleText={titleText}
+            input={
+              <textarea
+                rows={3}
+                value={formData.procedimento}
+                onChange={(e) => updateField("procedimento", e.target.value)}
+                placeholder="Procedimentos realizados"
+                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+              />
+            }
+          />
 
-          <div>
-            <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Material Utilizado
-            </label>
-            <textarea
-              rows={2}
-              value={formData.materialUtilizado}
-              onChange={(e) =>
-                setFormData({ ...formData, materialUtilizado: e.target.value })
-              }
-              placeholder="Liste os materiais utilizados"
-              className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-            Atribuir a Técnico
-          </label>
-          <select
-            value={formData.assignedTo}
-            onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-            className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
-          >
-            <option value="">Selecione um técnico (opcional)</option>
-            <option value="João Santos">João Santos</option>
-            <option value="Ana Costa">Ana Costa</option>
-          </select>
+          <Campo
+            label="Material Utilizado"
+            titleText={titleText}
+            input={
+              <textarea
+                rows={2}
+                value={formData.materialUtilizado}
+                onChange={(e) => updateField("materialUtilizado", e.target.value)}
+                placeholder="Liste os materiais utilizados"
+                className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
+              />
+            }
+          />
         </div>
 
         <button
           type="submit"
-          className="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+          disabled={enviando}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Criar Ordem de Serviço ETA/ETE
+          {enviando ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            <>
+              <PlusCircle className="h-4 w-4" />
+              Criar Ordem de Servico ETA/ETE
+            </>
+          )}
         </button>
       </form>
+    </div>
+  );
+}
+
+function Campo({
+  label,
+  titleText,
+  input,
+}: {
+  label: string;
+  titleText: string;
+  input: ReactNode;
+}) {
+  return (
+    <div>
+      <label className={`mb-2 block text-sm font-medium ${titleText}`}>{label}</label>
+      {input}
     </div>
   );
 }

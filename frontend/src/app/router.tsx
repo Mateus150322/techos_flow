@@ -1,11 +1,14 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import LoginPage from "@/modules/auth/LoginPage";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+
 import DashboardPage from "@/modules/DashboardPage";
-import PrivateRoute from "@/shared/auth/PrivateRoute";
-import OrdensPage from "@/modules/ordensServico/OrdensPage";
-import OrdemDetalhePage from "@/modules/ordensServico/OrdemDetalhePage";
+import LoginPage from "@/modules/auth/LoginPage";
+import RelatoriosPage from "@/modules/admin/RelatoriosPage";
+import UsuariosPage from "@/modules/admin/UsuariosPage";
 import NovaOrdemPage from "@/modules/ordensServico/NovaOrdemPage";
+import OrdemDetalhePage from "@/modules/ordensServico/OrdemDetalhePage";
+import OrdensPage from "@/modules/ordensServico/OrdensPage";
 import TecnicoPage from "@/modules/ordensServico/TecnicoPage";
+import PrivateRoute from "@/shared/auth/PrivateRoute";
 
 export default function AppRouter() {
   return (
@@ -49,12 +52,29 @@ export default function AppRouter() {
           }
         />
 
-        {/* ✅ AQUI dentro */}
         <Route
           path="/tecnico"
           element={
             <PrivateRoute>
               <TecnicoPage />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin/relatorios"
+          element={
+            <PrivateRoute>
+              <RelatoriosPage />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin/usuarios"
+          element={
+            <PrivateRoute>
+              <UsuariosPage />
             </PrivateRoute>
           }
         />

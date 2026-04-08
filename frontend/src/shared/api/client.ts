@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getStoredToken } from "@/shared/auth/session";
 
 const api = axios.create({
   baseURL: "http://backend-flow.test/api/v1",
@@ -8,7 +9,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = getStoredToken();
 
   if (token) 
     config.headers.Authorization = `Bearer ${token}`;

@@ -1,79 +1,63 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   CheckCircle2,
   ClipboardList,
+  FilePlus2,
   LogOut,
   Moon,
-  PackageOpen,
-  PlusCircle,
+  PlayCircle,
   Search,
   Sun,
-  Wrench,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { logout as logoutSession } from "@/modules/auth/auth.service";
-import { useCurrentUser } from "@/shared/auth/session";
-import { useTheme } from "@/shared/hooks/useTheme";
+import FormularioOSGeral from "@/modules/ordensServico/components/FormularioOSGeral";
+import { StatusBadge } from "@/modules/ordensServico/components/StatusBadge";
 import {
   getTecnicoResponsavel,
-  listarTodasOrdens,
   type OrdemServico,
-} from "./ordensServico.service";
-import FormularioETAETETecnico from "./components/FormularioETAETETecnico";
-import TecnicoOSDetailsModal from "./components/TecnicoOSDetailsModal";
-import { StatusBadge } from "./components/StatusBadge";
+} from "@/modules/ordensServico/ordensServico.service";
+import { type CurrentUser } from "@/shared/auth/session";
+import { useTheme } from "@/shared/hooks/useTheme";
+
+type AtendenteDashboardContentProps = {
+  currentUser: CurrentUser;
+  orders: OrdemServico[];
+  loading: boolean;
+};
 
 type AbaPrincipal = "criar" | "consultar";
 
-export default function TecnicoPage() {
+export function AtendenteDashboardContent({
+  currentUser,
+  orders,
+  loading,
+}: AtendenteDashboardContentProps) {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
 
   const [abaPrincipal, setAbaPrincipal] = useState<AbaPrincipal>("consultar");
-  const [ordens, setOrdens] = useState<OrdemServico[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
-  const [ordemSelecionadaId, setOrdemSelecionadaId] = useState<string | null>(null);
-
-  const currentUser = useCurrentUser("tecnico");
-
-  async function carregarOrdens() {
-    try {
-      setLoading(true);
-      setErro("");
-
-      const response = await listarTodasOrdens({
-        include: "tecnicoResponsavel",
-      });
-
-      setOrdens(response.data ?? []);
-    } catch (error) {
-      console.error(error);
-      setErro("Não foi possível carregar as ordens de serviço.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    carregarOrdens();
-  }, []);
 
   async function handleLogout() {
     await logoutSession();
     navigate("/login");
   }
 
-  function getResponsavelId(os: OrdemServico) {
-    return os.tecnico_responsavel_id ?? getTecnicoResponsavel(os)?.id ?? null;
+  function formatarData(data?: string | null) {
+    if (!data) return "-";
+    return new Date(data).toLocaleDateString("pt-BR");
+  }
+
+  function nomeResponsavel(os: OrdemServico) {
+    return getTecnicoResponsavel(os)?.name || "Sem responsável";
   }
 
   const ordensFiltradas = useMemo(() => {
     const termo = busca.toLowerCase().trim();
 
-    return ordens.filter((os) => {
+    return orders.filter((os) => {
       if (!termo) return true;
 
       const responsavel = getTecnicoResponsavel(os)?.name?.toLowerCase() ?? "";
@@ -90,38 +74,21 @@ export default function TecnicoPage() {
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(termo));
     });
-  }, [busca, ordens]);
+  }, [busca, orders]);
 
-  const osDisponiveis = useMemo(() => {
-    return ordensFiltradas.filter(
-      (os) => os.status === "aberta" && !getResponsavelId(os)
-    );
+  const ordensAbertas = useMemo(() => {
+    return ordensFiltradas.filter((os) => os.status === "aberta");
   }, [ordensFiltradas]);
 
-  const minhasOS = useMemo(() => {
-    return ordensFiltradas.filter(
-      (os) => !!currentUser.id && getResponsavelId(os) === currentUser.id
+  const ordensEmExecucao = useMemo(() => {
+    return ordensFiltradas.filter((os) => os.status === "em_execucao");
+  }, [ordensFiltradas]);
+
+  const ordensEncerradas = useMemo(() => {
+    return ordensFiltradas.filter((os) =>
+      ["finalizada", "nao_executada", "cancelada"].includes(os.status)
     );
-  }, [currentUser.id, ordensFiltradas]);
-
-  const osEmExecucao = useMemo(() => {
-    return minhasOS.filter((os) => os.status === "em_execucao");
-  }, [minhasOS]);
-
-  const osFinalizadas = useMemo(() => {
-    return minhasOS.filter(
-      (os) => os.status === "finalizada" || os.status === "nao_executada"
-    );
-  }, [minhasOS]);
-
-  function formatarData(data?: string | null) {
-    if (!data) return "-";
-    return new Date(data).toLocaleDateString("pt-BR");
-  }
-
-  function nomeResponsavel(os: OrdemServico) {
-    return getTecnicoResponsavel(os)?.name || "Sem responsável";
-  }
+  }, [ordensFiltradas]);
 
   const pageBg = isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900";
   const headerBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
@@ -141,6 +108,9 @@ export default function TecnicoPage() {
   const inputClass = isDark
     ? "w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pl-11 outline-none transition focus:ring-2 focus:ring-blue-500 placeholder:text-slate-500"
     : "w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 pl-11 outline-none transition focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400";
+  const buttonSecondary = isDark
+    ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
+    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100";
 
   return (
     <div className={`min-h-screen ${pageBg}`}>
@@ -153,24 +123,20 @@ export default function TecnicoPage() {
 
             <div>
               <h1 className={`text-2xl font-semibold ${titleText}`}>TechOS Flow</h1>
-              <p className={`text-sm ${mutedText}`}>Painel operacional do técnico</p>
+              <p className={`text-sm ${mutedText}`}>Painel operacional do atendente</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className={`text-sm font-medium ${titleText}`}>{currentUser.name}</p>
-              <p className={`text-sm ${mutedText}`}>Técnico</p>
+              <p className={`text-sm ${mutedText}`}>Atendente</p>
             </div>
 
             <button
               type="button"
               onClick={toggleTheme}
-              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition ${
-                isDark
-                  ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-              }`}
+              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition ${buttonSecondary}`}
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               {isDark ? "Modo claro" : "Modo escuro"}
@@ -179,11 +145,7 @@ export default function TecnicoPage() {
             <button
               type="button"
               onClick={() => void handleLogout()}
-              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition ${
-                isDark
-                  ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-              }`}
+              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition ${buttonSecondary}`}
             >
               <LogOut className="h-4 w-4" />
               Sair
@@ -201,7 +163,7 @@ export default function TecnicoPage() {
               abaPrincipal === "criar" ? buttonActive : buttonInactive
             }`}
           >
-            <PlusCircle className="h-4 w-4" />
+            <FilePlus2 className="h-4 w-4" />
             Criar OS
           </button>
 
@@ -213,35 +175,34 @@ export default function TecnicoPage() {
             }`}
           >
             <ClipboardList className="h-4 w-4" />
-            Minhas OS
+            Consultar OS
           </button>
         </div>
 
         {abaPrincipal === "criar" && (
-          <>
-            <div className={`mb-6 rounded-2xl border p-4 text-sm ${cardBg}`}>
-              <p className={titleText}>Abertura técnica restrita a Manutenção ETA/ETE.</p>
+          <div className="space-y-6">
+            <div className={`rounded-2xl border p-4 text-sm ${cardBg}`}>
+              <p className={titleText}>Abertura geral sob responsabilidade do atendente.</p>
               <p className={`mt-2 ${mutedText}`}>
-                A criação de OS geral permanece com atendente.
+                Use este painel para registrar novas ordens e acompanhar o andamento da operação.
               </p>
             </div>
 
-            <FormularioETAETETecnico
-              onCriada={() => {
-                setAbaPrincipal("consultar");
-                carregarOrdens();
-              }}
+            <FormularioOSGeral
+              titulo="Nova OS geral"
+              descricao="Abra uma nova ordem de serviço com cliente, prioridade, descrição e endereço."
+              onCriada={(ordemCriada) => navigate(`/ordens-servico/${ordemCriada.id}`)}
             />
-          </>
+          </div>
         )}
 
         {abaPrincipal === "consultar" && (
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <ResumoCard
-                titulo="OS Disponíveis"
-                valor={osDisponiveis.length}
-                icone={<PackageOpen className="h-5 w-5 text-blue-600" />}
+                titulo="Total de OS"
+                valor={orders.length}
+                icone={<ClipboardList className="h-5 w-5 text-blue-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
                 mutedText={mutedText}
@@ -249,9 +210,9 @@ export default function TecnicoPage() {
               />
 
               <ResumoCard
-                titulo="Minhas OS"
-                valor={minhasOS.length}
-                icone={<ClipboardList className="h-5 w-5 text-indigo-600" />}
+                titulo="Abertas"
+                valor={ordensAbertas.length}
+                icone={<FilePlus2 className="h-5 w-5 text-sky-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
                 mutedText={mutedText}
@@ -259,9 +220,9 @@ export default function TecnicoPage() {
               />
 
               <ResumoCard
-                titulo="Em Execução"
-                valor={osEmExecucao.length}
-                icone={<Wrench className="h-5 w-5 text-amber-600" />}
+                titulo="Em execução"
+                valor={ordensEmExecucao.length}
+                icone={<PlayCircle className="h-5 w-5 text-amber-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
                 mutedText={mutedText}
@@ -269,8 +230,8 @@ export default function TecnicoPage() {
               />
 
               <ResumoCard
-                titulo="Concluídas"
-                valor={osFinalizadas.length}
+                titulo="Encerradas"
+                valor={ordensEncerradas.length}
                 icone={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
@@ -284,7 +245,7 @@ export default function TecnicoPage() {
                 <div>
                   <h2 className={`text-2xl font-semibold ${titleText}`}>Ordens de Serviço</h2>
                   <p className={`mt-2 text-sm ${mutedText}`}>
-                    Consulte, aceite e acompanhe as ordens disponíveis e atribuídas a você.
+                    Consulte o andamento das ordens abertas pelo atendimento e pela operação.
                   </p>
                 </div>
 
@@ -294,7 +255,7 @@ export default function TecnicoPage() {
                     <input
                       type="text"
                       value={busca}
-                      onChange={(e) => setBusca(e.target.value)}
+                      onChange={(event) => setBusca(event.target.value)}
                       placeholder="Buscar por número, cliente, tipo, status ou responsável..."
                       className={inputClass}
                     />
@@ -302,22 +263,10 @@ export default function TecnicoPage() {
                 </div>
               </div>
 
-              {erro && (
-                <div
-                  className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-                    isDark
-                      ? "border-red-900 bg-red-950 text-red-300"
-                      : "border-red-200 bg-red-50 text-red-700"
-                  }`}
-                >
-                  {erro}
-                </div>
-              )}
-
               <SecaoTabela
-                titulo="OS Disponíveis"
-                descricao="Ordens abertas e ainda sem responsável técnico."
-                ordens={osDisponiveis}
+                titulo="Abertas"
+                descricao="Ordens aguardando aceite ou início da execução."
+                ordens={ordensAbertas}
                 loading={loading}
                 isDark={isDark}
                 mutedText={mutedText}
@@ -325,15 +274,15 @@ export default function TecnicoPage() {
                 tableHead={tableHead}
                 rowHover={rowHover}
                 tableBorder={tableBorder}
-                onVer={(id) => setOrdemSelecionadaId(id)}
+                onVer={(id) => navigate(`/ordens-servico/${id}`)}
                 formatarData={formatarData}
                 nomeResponsavel={nomeResponsavel}
               />
 
               <SecaoTabela
-                titulo="Minhas OS"
-                descricao="Ordens já atribuídas a você, independentemente do status."
-                ordens={minhasOS}
+                titulo="Em execução"
+                descricao="Ordens atualmente em andamento com a equipe técnica."
+                ordens={ordensEmExecucao}
                 loading={loading}
                 isDark={isDark}
                 mutedText={mutedText}
@@ -341,15 +290,15 @@ export default function TecnicoPage() {
                 tableHead={tableHead}
                 rowHover={rowHover}
                 tableBorder={tableBorder}
-                onVer={(id) => setOrdemSelecionadaId(id)}
+                onVer={(id) => navigate(`/ordens-servico/${id}`)}
                 formatarData={formatarData}
                 nomeResponsavel={nomeResponsavel}
               />
 
               <SecaoTabela
-                titulo="Em Execução"
-                descricao="Ordens em andamento sob sua responsabilidade."
-                ordens={osEmExecucao}
+                titulo="Encerradas"
+                descricao="Ordens concluídas, não executadas ou canceladas."
+                ordens={ordensEncerradas}
                 loading={loading}
                 isDark={isDark}
                 mutedText={mutedText}
@@ -357,43 +306,20 @@ export default function TecnicoPage() {
                 tableHead={tableHead}
                 rowHover={rowHover}
                 tableBorder={tableBorder}
-                onVer={(id) => setOrdemSelecionadaId(id)}
-                formatarData={formatarData}
-                nomeResponsavel={nomeResponsavel}
-              />
-
-              <SecaoTabela
-                titulo="Finalizadas"
-                descricao="Ordens encerradas como finalizadas ou não executadas."
-                ordens={osFinalizadas}
-                loading={loading}
-                isDark={isDark}
-                mutedText={mutedText}
-                titleText={titleText}
-                tableHead={tableHead}
-                rowHover={rowHover}
-                tableBorder={tableBorder}
-                onVer={(id) => setOrdemSelecionadaId(id)}
+                onVer={(id) => navigate(`/ordens-servico/${id}`)}
                 formatarData={formatarData}
                 nomeResponsavel={nomeResponsavel}
               />
 
               {!loading && (
                 <div className={`mt-4 text-sm ${mutedText}`}>
-                  Exibindo {ordensFiltradas.length} de {ordens.length} ordens de serviço.
+                  Exibindo {ordensFiltradas.length} de {orders.length} ordens de serviço.
                 </div>
               )}
             </div>
           </div>
         )}
       </main>
-
-      <TecnicoOSDetailsModal
-        ordemId={ordemSelecionadaId}
-        open={!!ordemSelecionadaId}
-        onClose={() => setOrdemSelecionadaId(null)}
-        onAtualizou={carregarOrdens}
-      />
     </div>
   );
 }

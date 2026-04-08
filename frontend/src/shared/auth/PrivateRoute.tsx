@@ -1,11 +1,12 @@
+import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+
 import { me } from "@/modules/auth/auth.service";
+import { clearSession, getStoredToken } from "./session";
 
 export default function PrivateRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const token = localStorage.getItem("token");
+  const token = getStoredToken();
 
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
@@ -15,28 +16,41 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
 
     async function check() {
       if (!token) {
-        if (!alive) return;
+        if (!alive) {
+          return;
+        }
+
         setAllowed(false);
         setChecking(false);
         return;
       }
 
       try {
-        await me(); // valida token no backend
-        if (!alive) return;
+        await me();
+
+        if (!alive) {
+          return;
+        }
+
         setAllowed(true);
       } catch {
-        // token inválido/expirado
-        localStorage.removeItem("token");
-        if (!alive) return;
+        clearSession();
+
+        if (!alive) {
+          return;
+        }
+
         setAllowed(false);
-      } finally {
-        if (!alive) return;
-        setChecking(false);
       }
+
+      if (!alive) {
+        return;
+      }
+
+      setChecking(false);
     }
 
-    check();
+    void check();
 
     return () => {
       alive = false;
@@ -49,8 +63,8 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-        <div className="text-sm text-zinc-400">Verificando sessão...</div>
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-100">
+        <div className="text-sm text-zinc-400">Verificando sessao...</div>
       </div>
     );
   }
@@ -60,5 +74,4 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
   }
 
   return <>{children}</>;
-  
 }

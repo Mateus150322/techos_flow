@@ -1,20 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
-  X,
-  Calendar,
-  User as UserIcon,
-  ClipboardList,
-  Wrench,
   CheckCircle2,
+  ClipboardList,
+  FileText,
+  MapPin,
+  Upload,
+  User as UserIcon,
+  Wrench,
+  X,
 } from "lucide-react";
+
 import {
-  aceitarOrdem,
-  buscarOrdem,
-  finalizarExecucao,
-  iniciarExecucao,
-  marcarNaoExecutada,
-  type OrdemServicoDetalhe,
-} from "../ordensServico.service";
+  formatarCoordenada,
+  formatarDataHora,
+  formatarStatus,
+  getTiposAceitosAnexo,
+} from "../ordemServicoDetalhe.utils";
+import { useOrdemServicoDetalhe } from "../useOrdemServicoDetalhe";
+import { getGoogleMapsUrl } from "@/shared/utils/geolocalizacao";
 
 type Props = {
   ordemId: string | null;
@@ -23,53 +26,28 @@ type Props = {
   onAtualizou?: () => void;
 };
 
-type DadosTecnicos = {
-  dataChamada?: string;
-  horaInicio?: string;
-  horaFim?: string;
-  dataFinal?: string;
-  unidade?: string;
-  local?: string;
-  setorRequisitante?: string;
-  encarregado?: string;
-  equipe?: string;
-  tipoManutencao?: string;
-  servico?: string;
-  equipamento?: string;
-  diagnostico?: string;
-  procedimento?: string;
-  materialUtilizado?: string;
-  resolucao?: boolean;
-  motivoNaoResolucao?: string;
-};
-
-type UsuarioLogado = {
-  id?: string;
-  name?: string;
-  email?: string;
-  role?: "administrador" | "tecnico" | "atendente";
-};
-
 function badgeClass(status?: string) {
   switch (status) {
     case "aberta":
-      return "bg-blue-100 text-blue-700";
+      return "border-blue-200 bg-blue-50 text-blue-700";
     case "em_execucao":
-      return "bg-yellow-100 text-yellow-700";
+      return "border-amber-200 bg-amber-50 text-amber-700";
     case "finalizada":
-      return "bg-green-100 text-green-700";
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
     case "nao_executada":
-      return "bg-red-100 text-red-700";
-    case "cancelada":
-      return "bg-slate-200 text-slate-700";
+      return "border-red-200 bg-red-50 text-red-700";
     default:
-      return "bg-slate-100 text-slate-700";
+      return "border-slate-200 bg-slate-100 text-slate-700";
   }
 }
 
-function formatarStatus(status?: string) {
-  if (!status) return "-";
-  return status.replaceAll("_", " ");
+function extrairCampo(descricao: string | undefined, label: string) {
+  if (!descricao) {
+    return "";
+  }
+
+  const match = descricao.match(new RegExp(`${label}:\\s*(.*)`));
+  return match?.[1]?.trim() ?? "";
 }
 
 export default function TecnicoOSDetailsModal({
@@ -78,428 +56,206 @@ export default function TecnicoOSDetailsModal({
   onClose,
   onAtualizou,
 }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState("");
-  const [os, setOs] = useState<OrdemServicoDetalhe | null>(null);
-  const [processando, setProcessando] = useState(false);
   const [novoStatus, setNovoStatus] = useState("");
   const [motivoNaoExecucao, setMotivoNaoExecucao] = useState("");
+  const {
+    loading,
+    error: erro,
+    setError,
+    os,
+    criadaPor,
+    tecnicoResponsavel,
+    ultimaExecucaoAberta: execucaoAberta,
+    osSemResponsavel,
+    osEhMinha,
+    osEhDeOutroTecnico,
+    podeAceitar,
+    podeIniciarExecucao,
+    podeFinalizarExecucao,
+    podeMarcarNaoExecutada,
+    podeEnviarAnexo,
+    processandoAcao,
+    arquivoSelecionado,
+    setArquivoSelecionado,
+    tipoAnexo,
+    selecionarTipoAnexo,
+    incluirGeolocalizacao,
+    alternarIncluirGeolocalizacao,
+    processandoGeolocalizacao,
+    geolocalizacaoCapturada,
+    atualizarEnderecoCapturado,
+    aceitar,
+    iniciar,
+    finalizar,
+    marcarComoNaoExecutada,
+    capturarGeolocalizacao,
+    enviarEvidencia,
+  } = useOrdemServicoDetalhe({
+    ordemId,
+    enabled: open,
+    fallbackRole: "tecnico",
+  });
 
-  const usuarioLogado: UsuarioLogado = useMemo(() => {
-    const raw = localStorage.getItem("user");
-
-    if (!raw) return {};
-
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return {};
-    }
-  }, []);
-
-  const criadoPor = useMemo(() => {
-    return (os as any)?.criada_por ?? (os as any)?.criadaPor ?? null;
-  }, [os]);
-
-  const tecnicoResponsavel = useMemo(() => {
-    return (os as any)?.tecnico_responsavel ?? (os as any)?.tecnicoResponsavel ?? null;
-  }, [os]);
-
-  const dadosTecnicos = useMemo(() => {
-    const descricao = os?.descricao ?? "";
-
-    function extrair(label: string) {
-      const regex = new RegExp(`${label}:\\s*(.*)`);
-      const match = descricao.match(regex);
-      return match?.[1]?.trim() || "";
-    }
-
-    const unidade = extrair("Unidade");
-    const local = extrair("Local");
-    const setorRequisitante = extrair("Setor");
-    const encarregado = extrair("Encarregado");
-    const equipe = extrair("Equipe");
-    const tipoManutencao = extrair("Tipo Manutenção");
-    const servico = extrair("Serviço");
-    const equipamento = extrair("Equipamento");
-    const diagnostico = extrair("Diagnóstico");
-    const procedimento = extrair("Procedimento");
-    const materialUtilizado = extrair("Material");
-    const resolvido = extrair("Resolvido");
-    const motivo = extrair("Motivo");
-
-    return {
-      unidade,
-      local,
-      setorRequisitante,
-      encarregado,
-      equipe,
-      tipoManutencao,
-      servico,
-      equipamento,
-      diagnostico,
-      procedimento,
-      materialUtilizado,
-      resolucao: resolvido === "SIM",
-      motivoNaoResolucao: motivo,
-    } as DadosTecnicos;
-  }, [os]);
-
-  const execucaoAberta = useMemo(() => {
-    return os?.execucoes?.find((item) => !item.data_fim) ?? null;
-  }, [os]);
-
-  const tecnicoResponsavelId =
-    (os as any)?.tecnico_responsavel_id ?? tecnicoResponsavel?.id ?? null;
-
-  const osSemResponsavel = !tecnicoResponsavelId;
-  const osEhMinha = !!tecnicoResponsavelId && tecnicoResponsavelId === usuarioLogado.id;
-  const osEhDeOutroTecnico =
-    !!tecnicoResponsavelId && tecnicoResponsavelId !== usuarioLogado.id;
-
-  const podeAceitar = os?.status === "aberta" && osSemResponsavel;
-  const podeIniciarExecucao = !!os && os.status === "aberta" && osEhMinha;
   const podeAtualizarStatus =
-    !!os && osEhMinha && (os.status === "aberta" || os.status === "em_execucao");
+    !!os && osEhMinha && (podeFinalizarExecucao || podeMarcarNaoExecutada);
 
-  async function carregar() {
-    if (!ordemId) return;
+  const resumo = useMemo(
+    () => ({
+      unidade: extrairCampo(os?.descricao, "Unidade"),
+      local: extrairCampo(os?.descricao, "Local"),
+      servico: extrairCampo(os?.descricao, "Servico") || extrairCampo(os?.descricao, "Serviço"),
+      equipamento:
+        extrairCampo(os?.descricao, "Equipamento") || extrairCampo(os?.descricao, "Equipamento"),
+    }),
+    [os?.descricao]
+  );
 
-    try {
-      setLoading(true);
-      setErro("");
+  async function executarAcao(fn: () => Promise<boolean>) {
+    const ok = await fn();
 
-      const data = await buscarOrdem(ordemId, [
-        "endereco",
-        "criadaPor",
-        "tecnicoResponsavel",
-        "execucoes",
-        "execucoes.tecnico",
-        "anexos",
-      ]);
-
-      setOs(data);
-    } catch (error: any) {
-      console.error(error);
-      setErro(error?.response?.data?.message || "Não foi possível carregar a OS.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (open && ordemId) {
-      carregar();
-    }
-  }, [open, ordemId]);
-
-  async function handleAceitarOS() {
-    if (!os?.id) return;
-
-    try {
-      setProcessando(true);
-      setErro("");
-
-      await aceitarOrdem(os.id);
-
-      await carregar();
+    if (ok) {
       onAtualizou?.();
-    } catch (error: any) {
-      console.error(error);
-      setErro(error?.response?.data?.message || "Não foi possível aceitar a OS.");
-    } finally {
-      setProcessando(false);
     }
   }
 
-  async function handleRegistrarExecucao() {
-    if (!os?.id) return;
-
-    try {
-      setProcessando(true);
-      setErro("");
-
-      await iniciarExecucao(os.id, {});
-      await carregar();
-      onAtualizou?.();
-    } catch (error: any) {
-      console.error(error);
-      setErro(error?.response?.data?.message || "Não foi possível iniciar a execução.");
-    } finally {
-      setProcessando(false);
-    }
+  async function handleCapturarGeolocalizacao() {
+    await capturarGeolocalizacao();
   }
 
-  async function handleAtualizarStatus() {
-    if (!os?.id || !novoStatus) return;
-
-    try {
-      setProcessando(true);
-      setErro("");
-
-      if (novoStatus === "nao_executada") {
-        if (!motivoNaoExecucao.trim()) {
-          setErro("Informe o motivo da não execução.");
-          setProcessando(false);
-          return;
-        }
-
-        await marcarNaoExecutada(os.id, {
-          motivo_nao_execucao: motivoNaoExecucao,
-        });
-      } else if (novoStatus === "finalizada") {
-        if (!execucaoAberta?.id) {
-          setErro("Nenhuma execução em andamento para finalizar.");
-          setProcessando(false);
-          return;
-        }
-
-        await finalizarExecucao(os.id, {
-          execucao_id: execucaoAberta.id,
-        });
-      }
-
-      setNovoStatus("");
-      setMotivoNaoExecucao("");
-      await carregar();
-      onAtualizou?.();
-    } catch (error: any) {
-      console.error(error);
-      setErro(error?.response?.data?.message || "Não foi possível atualizar o status.");
-    } finally {
-      setProcessando(false);
-    }
-  }
-
-  function formatarDataHora(valor?: string | null) {
-    if (!valor) return "-";
-    return new Date(valor).toLocaleString("pt-BR");
+  async function handleEnviarAnexo() {
+    await executarAcao(() => enviarEvidencia());
   }
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="relative max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-5 top-5 text-slate-500 hover:text-slate-700"
-        >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6">
+      <div className="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[28px] bg-white shadow-2xl">
+        <button type="button" onClick={onClose} className="absolute right-5 top-5 z-10 rounded-full bg-white/90 p-2 text-slate-500 shadow-sm hover:text-slate-700">
           <X className="h-5 w-5" />
         </button>
 
-        {loading && <p className="text-sm text-slate-500">Carregando...</p>}
-
-        {!loading && erro && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {erro}
-          </div>
-        )}
+        {loading && <p className="p-6 text-sm text-slate-500">Carregando...</p>}
+        {!loading && erro && <div className="m-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
 
         {!loading && os && (
-          <div className="space-y-6">
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <h2 className="text-2xl font-semibold">
-                  Ordem de Serviço {os.numero}
-                </h2>
-
-                <span
-                  className={`rounded-full px-3 py-1 text-sm font-medium capitalize ${badgeClass(
-                    os.status
-                  )}`}
-                >
-                  {formatarStatus(os.status)}
-                </span>
-              </div>
-
-              <p className="text-sm text-slate-500">
-                Detalhes e informações da ordem de serviço
-              </p>
-            </div>
-
-            <section className="space-y-4">
-              <h3 className="text-xl font-semibold">Informações da OS ETA/ETE</h3>
-
-              <div className="grid grid-cols-2 gap-6 text-sm">
-                <Info label="Tipo de Serviço" value="Manutenção ETA/ETE" />
-                <Info label="Unidade" value={dadosTecnicos.unidade} />
-                <Info label="Local" value={dadosTecnicos.local} />
-                <Info label="Tipo de Manutenção" value={dadosTecnicos.tipoManutencao} />
-              </div>
-            </section>
-
-            <hr />
-
-            <section className="space-y-4">
-              <h3 className="text-xl font-semibold">Responsáveis</h3>
-
-              <div className="grid grid-cols-2 gap-6 text-sm">
-                <Info
-                  label="Setor Requisitante"
-                  value={dadosTecnicos.setorRequisitante}
-                />
-                <Info label="Encarregado" value={dadosTecnicos.encarregado} />
-                <Info label="Equipe" value={dadosTecnicos.equipe} />
-              </div>
-            </section>
-
-            <hr />
-
-            <section className="space-y-4">
-              <h3 className="text-xl font-semibold">Detalhes do Serviço</h3>
-
-              <div className="grid grid-cols-1 gap-4 text-sm">
-                <Info label="Serviço" value={dadosTecnicos.servico} />
-                <Info label="Equipamento" value={dadosTecnicos.equipamento} />
-                <Info label="Diagnóstico" value={dadosTecnicos.diagnostico} />
-                <Info label="Procedimento" value={dadosTecnicos.procedimento} />
-                <Info label="Material Utilizado" value={dadosTecnicos.materialUtilizado} />
-              </div>
-            </section>
-
-            <hr />
-
-            <section className="space-y-4">
-              <h3 className="text-xl font-semibold">Resolução</h3>
-
-              <div className="text-sm">
-                <p className="text-slate-500">Problema Resolvido</p>
-                <p className={dadosTecnicos.resolucao ? "text-green-600" : "text-red-600"}>
-                  {dadosTecnicos.resolucao ? "SIM" : "NÃO"}
-                </p>
-                {!dadosTecnicos.resolucao && dadosTecnicos.motivoNaoResolucao && (
-                  <p className="mt-2 text-slate-600">
-                    Motivo: {dadosTecnicos.motivoNaoResolucao}
-                  </p>
-                )}
-              </div>
-            </section>
-
-            <hr />
-
-            <section className="space-y-4">
-              <h3 className="text-xl font-semibold">Controle</h3>
-
-              <div className="grid grid-cols-2 gap-6 text-sm">
-                <div className="flex items-start gap-3">
-                  <Calendar className="mt-1 h-4 w-4 text-slate-500" />
-                  <div>
-                    <p className="text-slate-500">Data de Abertura</p>
-                    <p>{formatarDataHora(os.data_abertura)}</p>
+          <div>
+            <section className="border-b border-slate-200 bg-slate-950 px-6 py-6 text-white">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-slate-200">Ordem de Servico</span>
+                    <span className={`rounded-full border px-3 py-1 text-sm font-medium capitalize ${badgeClass(os.status)}`}>{formatarStatus(os.status)}</span>
                   </div>
+                  <h2 className="mt-4 text-3xl font-semibold">{os.numero}</h2>
+                  <p className="mt-2 text-sm text-slate-300">{os.tipo}{os.nome_cliente ? ` • ${os.nome_cliente}` : ""}</p>
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <UserIcon className="mt-1 h-4 w-4 text-slate-500" />
-                  <div>
-                    <p className="text-slate-500">Aberto por</p>
-                    <p>{criadoPor?.name || "-"}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <UserIcon className="mt-1 h-4 w-4 text-slate-500" />
-                  <div>
-                    <p className="text-slate-500">Responsável</p>
-                    <p>{tecnicoResponsavel?.name || "-"}</p>
-                  </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <TopoCard label="Aberta em" value={formatarDataHora(os.data_abertura)} icon={<ClipboardList className="h-4 w-4" />} />
+                  <TopoCard label="Responsavel" value={tecnicoResponsavel?.name || "Nao atribuido"} icon={<UserIcon className="h-4 w-4" />} />
+                  <TopoCard label="Execucao" value={execucaoAberta ? "Em andamento" : "Sem execucao aberta"} icon={<Wrench className="h-4 w-4" />} />
                 </div>
               </div>
             </section>
 
-            <hr />
+            <div className="grid gap-6 p-6 lg:grid-cols-[1.3fr,1fr]">
+              <section className="space-y-6">
+                <CardSection titulo="Resumo da OS" icone={<FileText className="h-5 w-5" />}>
+                  <Info label="Unidade" value={resumo.unidade} />
+                  <Info label="Local" value={resumo.local} />
+                  <Info label="Servico" value={resumo.servico} />
+                  <Info label="Equipamento" value={resumo.equipamento} />
+                  <Info label="Aberto por" value={criadaPor?.name} />
+                  <Info label="Responsavel atual" value={tecnicoResponsavel?.name} />
+                  <Info label="Descricao" value={os.descricao} full />
+                </CardSection>
 
-            {osEhDeOutroTecnico && (
-              <>
-                <section className="space-y-2">
-                  <h3 className="text-xl font-semibold">Ações do Técnico</h3>
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                    Esta OS já foi aceita por outro técnico.
+                <CardSection titulo="Resolucao e acoes" icone={<CheckCircle2 className="h-5 w-5" />}>
+                  <div className={`rounded-2xl border px-4 py-4 ${badgeClass(os.status)}`}>
+                    <p className="text-sm font-semibold">
+                      {os.status === "aberta" && "Pendente de execucao"}
+                      {os.status === "em_execucao" && "Em execucao"}
+                      {os.status === "finalizada" && "Resolvido"}
+                      {os.status === "nao_executada" && "Nao resolvido"}
+                      {os.status === "cancelada" && "Cancelada"}
+                    </p>
                   </div>
-                </section>
-                <hr />
-              </>
-            )}
 
-            {(podeAceitar || podeIniciarExecucao) && (
-              <>
-                <section className="space-y-4">
-                  <h3 className="text-xl font-semibold">Ações do Técnico</h3>
+                  {osEhDeOutroTecnico && <Aviso tone="amber" mensagem={`Esta OS ja pertence a ${tecnicoResponsavel?.name || "outro tecnico"}.`} />}
+                  {osSemResponsavel && <Aviso tone="blue" mensagem="Esta OS ainda nao possui responsavel tecnico. Voce pode aceita-la." />}
+                  {osEhMinha && <Aviso tone="emerald" mensagem="Esta OS esta sob sua responsabilidade." />}
 
-                  {podeAceitar && (
-                    <button
-                      type="button"
-                      onClick={handleAceitarOS}
-                      disabled={processando}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <ClipboardList className="h-4 w-4" />
-                      {processando ? "Processando..." : "Aceitar Ordem de Serviço"}
-                    </button>
+                  {podeAceitar && <button type="button" onClick={() => void executarAcao(() => aceitar())} disabled={processandoAcao} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"><ClipboardList className="h-4 w-4" />{processandoAcao ? "Processando..." : "Aceitar Ordem de Servico"}</button>}
+                  {podeIniciarExecucao && <button type="button" onClick={() => void executarAcao(() => iniciar({}))} disabled={processandoAcao} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"><Wrench className="h-4 w-4" />{processandoAcao ? "Processando..." : "Iniciar Execucao"}</button>}
+
+                  {podeAtualizarStatus && (
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <select value={novoStatus} onChange={(event) => setNovoStatus(event.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900">
+                        <option value="">Selecione uma acao</option>
+                        {os.status === "em_execucao" && <option value="finalizada">Finalizar OS</option>}
+                        {(os.status === "aberta" || os.status === "em_execucao") && <option value="nao_executada">Marcar como nao executada</option>}
+                      </select>
+                      {novoStatus === "nao_executada" && <textarea rows={4} value={motivoNaoExecucao} onChange={(event) => setMotivoNaoExecucao(event.target.value)} placeholder="Informe o motivo da nao execucao" className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" />}
+                      <button type="button" onClick={() => void executarAcao(async () => { if (novoStatus === "nao_executada") { if (!motivoNaoExecucao.trim()) { setError("Informe o motivo da nao execucao."); return false; } const marcou = await marcarComoNaoExecutada({ motivo_nao_execucao: motivoNaoExecucao.trim() }); if (!marcou) { return false; } } if (novoStatus === "finalizada") { if (!execucaoAberta?.id) { setError("Nenhuma execucao em andamento para finalizar."); return false; } const finalizou = await finalizar({ execucao_id: execucaoAberta.id }); if (!finalizou) { return false; } } setNovoStatus(""); setMotivoNaoExecucao(""); return true; })} disabled={!novoStatus || processandoAcao} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"><CheckCircle2 className="h-4 w-4" />{processandoAcao ? "Salvando..." : "Confirmar atualizacao"}</button>
+                    </div>
                   )}
-
-                  {podeIniciarExecucao && (
-                    <button
-                      type="button"
-                      onClick={handleRegistrarExecucao}
-                      disabled={processando}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <Wrench className="h-4 w-4" />
-                      {processando ? "Processando..." : "Registrar Execução"}
-                    </button>
-                  )}
-                </section>
-
-                <hr />
-              </>
-            )}
-
-            {podeAtualizarStatus && (
-              <section className="space-y-4">
-                <h3 className="text-xl font-semibold">Atualizar Status</h3>
-
-                <div className="flex gap-3">
-                  <select
-                    value={novoStatus}
-                    onChange={(e) => setNovoStatus(e.target.value)}
-                    className="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-4 py-3"
-                  >
-                    <option value="">Selecione novo status</option>
-
-                    {os.status === "em_execucao" && (
-                      <option value="finalizada">Finalizada</option>
-                    )}
-
-                    {(os.status === "aberta" || os.status === "em_execucao") && (
-                      <option value="nao_executada">Não Executada</option>
-                    )}
-                  </select>
-
-                  <button
-                    type="button"
-                    onClick={handleAtualizarStatus}
-                    disabled={!novoStatus || processando}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-400 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Atualizar
-                  </button>
-                </div>
-
-                {novoStatus === "nao_executada" && (
-                  <textarea
-                    rows={3}
-                    value={motivoNaoExecucao}
-                    onChange={(e) => setMotivoNaoExecucao(e.target.value)}
-                    placeholder="Informe o motivo da não execução"
-                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3"
-                  />
-                )}
+                </CardSection>
               </section>
-            )}
+
+              <section className="space-y-6">
+                <CardSection titulo="Endereco e evidencias" icone={<MapPin className="h-5 w-5" />}>
+                  <Info label="Endereco" value={os.endereco ? `${os.endereco.rua}, ${os.endereco.numero} - ${os.endereco.bairro}, ${os.endereco.cidade}/${os.endereco.estado}` : "-"} full />
+
+                  {podeEnviarAnexo && (
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">Enviar evidencia</p>
+                      <select value={tipoAnexo} onChange={(event) => selecionarTipoAnexo(event.target.value)} disabled={processandoAcao} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900"><option value="foto">Foto</option><option value="pdf">PDF</option><option value="arquivo">Arquivo</option></select>
+                      <input type="file" accept={getTiposAceitosAnexo(tipoAnexo)} disabled={processandoAcao} onChange={(event) => setArquivoSelecionado(event.target.files?.[0] ?? null)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" />
+
+                      {tipoAnexo === "foto" && (
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <label className="flex items-start gap-3">
+                            <input type="checkbox" checked={incluirGeolocalizacao} disabled={processandoAcao || processandoGeolocalizacao} onChange={(event) => alternarIncluirGeolocalizacao(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600" />
+                            <span className="text-sm text-slate-700">Incluir geolocalizacao e endereco aproximado junto com a foto.</span>
+                          </label>
+                          {incluirGeolocalizacao && (
+                            <div className="mt-4 space-y-3">
+                              <button type="button" onClick={handleCapturarGeolocalizacao} disabled={processandoAcao || processandoGeolocalizacao} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"><MapPin className="h-4 w-4" />{processandoGeolocalizacao ? "Capturando localizacao..." : geolocalizacaoCapturada ? "Atualizar localizacao" : "Capturar localizacao"}</button>
+                              {geolocalizacaoCapturada ? (
+                                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                                  <p>Latitude: {formatarCoordenada(geolocalizacaoCapturada.latitude)}</p>
+                                  <p>Longitude: {formatarCoordenada(geolocalizacaoCapturada.longitude)}</p>
+                                  <p>Precisao: {typeof geolocalizacaoCapturada.precisaoMetros === "number" ? `${Math.round(geolocalizacaoCapturada.precisaoMetros)} m` : "-"}</p>
+                                  <textarea rows={3} value={geolocalizacaoCapturada.endereco ?? ""} onChange={(event) => atualizarEnderecoCapturado(event.target.value)} placeholder="Endereco aproximado capturado automaticamente. Ajuste se necessario." className="mt-3 w-full rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-slate-900" />
+                                </div>
+                              ) : <p className="text-sm text-slate-500">A localizacao atual e o endereco aproximado serao vinculados a foto no envio da evidencia.</p>}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {arquivoSelecionado && <p className="text-sm text-slate-500">Arquivo selecionado: {arquivoSelecionado.name}</p>}
+                      <button type="button" onClick={() => void handleEnviarAnexo()} disabled={processandoAcao || !arquivoSelecionado} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"><Upload className="h-4 w-4" />{processandoAcao ? "Enviando..." : "Enviar evidencia"}</button>
+                    </div>
+                  )}
+
+                  {os.anexos?.map((anexo) => (
+                    <div key={anexo.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                      <p className="font-medium">{anexo.tipo || "Arquivo"}</p>
+                      {anexo.url ? <a href={anexo.url} target="_blank" rel="noreferrer" className="mt-1 block break-all text-blue-600 hover:underline">{anexo.caminho ? anexo.caminho.split("/").pop() : anexo.id}</a> : <p className="mt-1 break-all text-slate-500">{anexo.caminho || "-"}</p>}
+                      {typeof anexo.latitude === "number" && typeof anexo.longitude === "number" && (
+                        <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-slate-600">
+                          <p>Lat {formatarCoordenada(anexo.latitude)} | Lon {formatarCoordenada(anexo.longitude)}</p>
+                          <p>Precisao: {typeof anexo.precisao_metros === "number" ? `${Math.round(anexo.precisao_metros)} m` : "-"}</p>
+                          {anexo.endereco_capturado && <p className="whitespace-pre-wrap">Endereco: {anexo.endereco_capturado}</p>}
+                          <a href={getGoogleMapsUrl(anexo.latitude, anexo.longitude)} target="_blank" rel="noreferrer" className="inline-block text-blue-600 hover:underline">Abrir no mapa</a>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardSection>
+              </section>
+            </div>
           </div>
         )}
       </div>
@@ -507,17 +263,41 @@ export default function TecnicoOSDetailsModal({
   );
 }
 
-function Info({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string | null | boolean;
-}) {
+function TopoCard({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
-    <div>
-      <p className="text-slate-500">{label}</p>
-      <p className="text-slate-900">{String(value ?? "-")}</p>
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-slate-400">{icon}<span>{label}</span></div>
+      <p className="mt-2 text-sm font-medium text-slate-100">{value}</p>
     </div>
   );
+}
+
+function CardSection({ titulo, icone, children }: { titulo: string; icone: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="rounded-xl bg-slate-100 p-2 text-slate-700">{icone}</div>
+        <h3 className="text-lg font-semibold text-slate-900">{titulo}</h3>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function Info({ label, value, full }: { label: string; value?: string | null; full?: boolean }) {
+  return (
+    <div className={full ? "sm:col-span-2" : undefined}>
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">{label}</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-900">{value || "-"}</p>
+    </div>
+  );
+}
+
+function Aviso({ mensagem, tone }: { mensagem: string; tone: "blue" | "amber" | "emerald" }) {
+  const classes = {
+    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  };
+  return <div className={`rounded-2xl border px-4 py-3 text-sm ${classes[tone]}`}>{mensagem}</div>;
 }
