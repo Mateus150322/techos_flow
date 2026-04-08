@@ -41,48 +41,8 @@ async function obterPosicaoAtual(): Promise<GeolocationPosition> {
   });
 }
 
-async function resolverEnderecoPorCoordenadas(latitude: number, longitude: number) {
-  try {
-    const params = new URLSearchParams({
-      format: "jsonv2",
-      lat: String(latitude),
-      lon: String(longitude),
-      zoom: "18",
-      addressdetails: "1",
-      "accept-language": "pt-BR",
-    });
-
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?${params.toString()}`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = (await response.json()) as { display_name?: string };
-
-    if (typeof data.display_name === "string" && data.display_name.trim()) {
-      return data.display_name.trim();
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
 export async function capturarGeolocalizacaoAtual(): Promise<GeolocalizacaoCapturada> {
   const position = await obterPosicaoAtual();
-  const endereco = await resolverEnderecoPorCoordenadas(
-    position.coords.latitude,
-    position.coords.longitude
-  );
 
   return {
     latitude: position.coords.latitude,
@@ -91,10 +51,15 @@ export async function capturarGeolocalizacaoAtual(): Promise<GeolocalizacaoCaptu
       ? position.coords.accuracy
       : undefined,
     capturadaEm: new Date(position.timestamp).toISOString(),
-    endereco,
+    endereco: null,
   };
 }
 
 export function getGoogleMapsUrl(latitude: number, longitude: number) {
-  return `https://www.google.com/maps?q=${latitude},${longitude}`;
+  const params = new URLSearchParams({
+    api: "1",
+    query: `${latitude},${longitude}`,
+  });
+
+  return `https://www.google.com/maps/search/?${params.toString()}`;
 }

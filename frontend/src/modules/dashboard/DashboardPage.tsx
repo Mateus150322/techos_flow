@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 
-import { AdminDashboardContent } from "@/modules/dashboard/AdminDashboardContent";
-import { AtendenteDashboardContent } from "@/modules/dashboard/AtendenteDashboardContent";
-import {
-  listarTodasOrdens,
-  type OrdemServico,
-} from "@/modules/ordensServico/ordensServico.service";
+import { listarTodasOrdens, type OrdemServico } from "@/modules/ordensServico/ordensServico.service";
 import { useCurrentUser } from "@/shared/auth/session";
+import { AdminDashboardContent } from "./AdminDashboardContent";
+import { AtendenteDashboardContent } from "./AtendenteDashboardContent";
 
 export default function DashboardPage() {
   const [orders, setOrders] = useState<OrdemServico[]>([]);
@@ -21,8 +18,8 @@ export default function DashboardPage() {
 
         const response = await listarTodasOrdens({ include: "tecnicoResponsavel" });
         setOrders(response.data ?? []);
-      } catch (error) {
-        console.error("Erro ao carregar ordens:", error);
+      } catch {
+        setOrders([]);
       } finally {
         setLoading(false);
       }

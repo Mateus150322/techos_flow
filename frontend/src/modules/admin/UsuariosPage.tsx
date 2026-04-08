@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Pencil, PlusCircle, Search, UserPlus, X } from "lucide-react";
+import { Pencil, Search, ShieldAlert, UserPlus, X } from "lucide-react";
 
 import { AdminShell } from "./AdminShell";
+import { AdminMetricCard } from "./components/AdminMetricCard";
 import {
   atualizarUsuario,
   criarUsuario,
-  listarTodosUsuarios,
+  listarUsuarios,
   type PerfilUsuario,
   type UsuarioAdmin,
 } from "./usuarios.service";
 import { useCurrentUser } from "@/shared/auth/session";
 import { useTheme } from "@/shared/hooks/useTheme";
+import {
+  getApiErrorMessage,
+  getFirstApiValidationMessage,
+} from "@/shared/utils/apiError";
 
 type FormState = {
   name: string;
@@ -40,28 +45,48 @@ export default function UsuariosPage() {
   const [sucesso, setSucesso] = useState("");
   const [busca, setBusca] = useState("");
   const [perfilFiltro, setPerfilFiltro] = useState<PerfilUsuario | "todos">("todos");
+  const [statusFiltro, setStatusFiltro] = useState<"todos" | "ativos" | "inativos">("todos");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [ultimaPagina, setUltimaPagina] = useState(1);
+  const [totalUsuarios, setTotalUsuarios] = useState(0);
+  const [processandoStatusId, setProcessandoStatusId] = useState<string | null>(null);
+  const [stats, setStats] = useState({
+    total: 0,
+    ativos: 0,
+    inativos: 0,
+    administradores: 0,
+    tecnicos: 0,
+    atendentes: 0,
+    ultimos_7_dias: 0,
+  });
 
   const carregarUsuarios = useCallback(async () => {
     try {
       setLoading(true);
       setErro("");
 
-      const response = await listarTodosUsuarios({
+      const response = await listarUsuarios({
         q: busca,
         role: perfilFiltro,
+        status: statusFiltro,
+        page: paginaAtual,
+        per_page: 10,
       });
 
       setUsuarios(response.data ?? []);
+      setPaginaAtual(response.current_page ?? 1);
+      setUltimaPagina(response.last_page ?? 1);
+      setTotalUsuarios(response.total ?? 0);
+      setStats(response.stats);
     } catch (error) {
-      console.error("Erro ao carregar usuarios:", error);
-      setErro("Nao foi possivel carregar os usuarios.");
+      setErro(getApiErrorMessage(error, "Não foi possível carregar os usuários."));
     } finally {
       setLoading(false);
     }
-  }, [busca, perfilFiltro]);
+  }, [busca, paginaAtual, perfilFiltro, statusFiltro]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -71,12 +96,29 @@ export default function UsuariosPage() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [busca, perfilFiltro, carregarUsuarios]);
+  }, [busca, perfilFiltro, statusFiltro, paginaAtual, carregarUsuarios]);
+
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [busca, perfilFiltro, statusFiltro]);
 
   function resetForm() {
     setForm(INITIAL_FORM);
     setEditingUserId(null);
     setShowForm(false);
+  }
+
+  function toggleForm() {
+    if (showForm) {
+      resetForm();
+      return;
+    }
+
+    setEditingUserId(null);
+    setForm(INITIAL_FORM);
+    setShowForm(true);
+    setErro("");
+    setSucesso("");
   }
 
   function startEditing(usuario: UsuarioAdmin) {
@@ -102,8 +144,7 @@ export default function UsuariosPage() {
       setSucesso("");
 
       if (!editingUserId && form.password !== form.passwordConfirmation) {
-        setErro("A confirmacao de senha precisa ser igual a senha informada.");
-        setSaving(false);
+        setErro("A confirmação de senha precisa ser igual à senha informada.");
         return;
       }
 
@@ -116,38 +157,65 @@ export default function UsuariosPage() {
 
       if (editingUserId) {
         await atualizarUsuario(editingUserId, payload);
-        setSucesso("Usuario atualizado com sucesso.");
+        setSucesso("Usuário atualizado com sucesso.");
       } else {
         await criarUsuario({
           ...payload,
           password: payload.password ?? "",
         });
-        setSucesso("Usuario criado com sucesso.");
+        setSucesso("Usuário criado com sucesso.");
       }
 
       resetForm();
       await carregarUsuarios();
     } catch (error) {
-      console.error("Erro ao salvar usuario:", error);
-      setErro("Nao foi possivel salvar o usuario.");
+      const validationMessage = getFirstApiValidationMessage(error, [
+        "name",
+        "email",
+        "role",
+        "password",
+      ]);
+
+      setErro(
+        validationMessage ??
+          getApiErrorMessage(error, "Não foi possível salvar o usuário.")
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  const totalAdmins = usuarios.filter((usuario) => usuario.role === "administrador").length;
-  const totalTecnicos = usuarios.filter((usuario) => usuario.role === "tecnico").length;
-  const totalAtendentes = usuarios.filter((usuario) => usuario.role === "atendente").length;
-  const cadastrosRecentes = usuarios.filter((usuario) => {
-    if (!usuario.created_at) {
-      return false;
+  async function alternarStatusUsuario(usuario: UsuarioAdmin) {
+    if (usuario.id === currentUser.id && usuario.is_active) {
+      setErro("Você não pode inativar seu próprio usuário.");
+      setSucesso("");
+      return;
     }
 
-    const criadoEm = new Date(usuario.created_at).getTime();
-    const limite = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    try {
+      setProcessandoStatusId(usuario.id);
+      setErro("");
+      setSucesso("");
 
-    return Number.isFinite(criadoEm) && criadoEm >= limite;
-  }).length;
+      const atualizado = await atualizarUsuario(usuario.id, {
+        is_active: !usuario.is_active,
+      });
+
+      setSucesso(
+        atualizado.is_active
+          ? "Usuário reativado com sucesso."
+          : "Usuário inativado com sucesso."
+      );
+
+      await carregarUsuarios();
+    } catch (error) {
+      setErro(
+        getApiErrorMessage(error, "Não foi possível atualizar o status do usuário.")
+      );
+    } finally {
+      setProcessandoStatusId(null);
+    }
+  }
 
   const cardBg = isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-slate-200";
   const softBg = isDark ? "bg-zinc-950/70 border-zinc-800" : "bg-slate-50 border-slate-200";
@@ -163,6 +231,9 @@ export default function UsuariosPage() {
     ? "border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100";
   const rowHover = isDark ? "hover:bg-zinc-950/80" : "hover:bg-slate-50";
+  const infoBox = isDark
+    ? "border-amber-900 bg-amber-950/60 text-amber-200"
+    : "border-amber-200 bg-amber-50 text-amber-800";
 
   if (currentUser.role === "tecnico") {
     return <Navigate to="/tecnico" replace />;
@@ -174,92 +245,118 @@ export default function UsuariosPage() {
 
   return (
     <AdminShell currentUser={currentUser} activeTab="usuarios">
-      <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <MetricCard
-          value={usuarios.length}
-          label="Cadastros exibidos"
+      <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <AdminMetricCard
+          value={stats.total}
+          label="Total filtrado"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          accent="text-slate-900 dark:text-zinc-50"
+          accentClass="text-slate-900 dark:text-zinc-50"
+          hint="Usuários conforme busca e filtros"
         />
-        <MetricCard
-          value={totalAdmins}
+        <AdminMetricCard
+          value={stats.ativos}
+          label="Ativos"
+          cardBg={cardBg}
+          titleText={titleText}
+          mutedText={mutedText}
+          accentClass="text-emerald-500"
+          hint="Usuários com acesso liberado"
+        />
+        <AdminMetricCard
+          value={stats.inativos}
+          label="Inativos"
+          cardBg={cardBg}
+          titleText={titleText}
+          mutedText={mutedText}
+          accentClass="text-rose-500"
+          hint="Usuários com acesso bloqueado"
+        />
+        <AdminMetricCard
+          value={stats.administradores}
           label="Administradores"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          accent="text-violet-500"
+          accentClass="text-violet-500"
+          hint="Acesso gerencial do sistema"
         />
-        <MetricCard
-          value={totalTecnicos}
-          label="Tecnicos"
+        <AdminMetricCard
+          value={stats.tecnicos}
+          label="Técnicos"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          accent="text-blue-500"
+          accentClass="text-blue-500"
+          hint="Equipe operacional de campo"
         />
-        <MetricCard
-          value={totalAtendentes}
+        <AdminMetricCard
+          value={stats.atendentes}
           label="Atendentes"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          accent="text-amber-500"
-        />
-        <MetricCard
-          value={cadastrosRecentes}
-          label="Ultimos 7 dias"
-          cardBg={cardBg}
-          titleText={titleText}
-          mutedText={mutedText}
-          accent="text-emerald-500"
+          accentClass="text-amber-500"
+          hint="Equipe de abertura e consulta"
         />
       </section>
 
       <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
         <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerenciar usuarios</h2>
+            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerenciar usuários</h2>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Adicione, edite e acompanhe os usuarios do sistema.
+              Adicione, edite, inative e reative os usuários do sistema.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => {
-              setShowForm((prev) => !prev);
-
-              if (showForm) {
-                resetForm();
-              } else {
-                setEditingUserId(null);
-                setForm(INITIAL_FORM);
-              }
-            }}
+            onClick={toggleForm}
             className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition ${primaryButton}`}
           >
             <UserPlus className="h-4 w-4" />
-            {showForm ? "Fechar formulario" : "Novo usuario"}
+            {showForm ? "Fechar formulário" : "Novo usuário"}
           </button>
         </div>
 
-        {showForm && (
+        {erro ? (
+          <div
+            className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
+              isDark
+                ? "border-red-900 bg-red-950 text-red-300"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            {erro}
+          </div>
+        ) : null}
+
+        {sucesso ? (
+          <div
+            className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
+              isDark
+                ? "border-emerald-900 bg-emerald-950 text-emerald-300"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            {sucesso}
+          </div>
+        ) : null}
+
+        {showForm ? (
           <div className={`mb-6 rounded-3xl border p-5 ${softBg}`}>
             <div className="mb-4 flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <PlusCircle className="h-5 w-5 text-blue-500" />
-                <div>
-                  <h3 className={`text-lg font-semibold ${titleText}`}>
-                    {editingUserId ? "Editar usuario" : "Novo usuario"}
-                  </h3>
-                  <p className={`text-sm ${mutedText}`}>
-                    {editingUserId
-                      ? "Atualize os dados do usuario selecionado."
-                      : "Cadastre um novo acesso para a operacao."}
-                  </p>
-                </div>
+              <div>
+                <h3 className={`text-lg font-semibold ${titleText}`}>
+                  {editingUserId ? "Editar usuário" : "Novo usuário"}
+                </h3>
+                <p className={`text-sm ${mutedText}`}>
+                  {editingUserId
+                    ? "Atualize os dados do usuário selecionado."
+                    : "Cadastre um novo acesso para a operação."}
+                </p>
               </div>
 
               <button
@@ -272,7 +369,7 @@ export default function UsuariosPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-2">
+            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
               <input
                 type="text"
                 placeholder="Nome"
@@ -304,7 +401,7 @@ export default function UsuariosPage() {
                 className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
               >
                 <option value="administrador">Administrador</option>
-                <option value="tecnico">Tecnico</option>
+                <option value="tecnico">Técnico</option>
                 <option value="atendente">Atendente</option>
               </select>
 
@@ -318,7 +415,7 @@ export default function UsuariosPage() {
                 className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
               />
 
-              {!editingUserId && (
+              {!editingUserId ? (
                 <input
                   type="password"
                   placeholder="Confirmar senha"
@@ -331,34 +428,21 @@ export default function UsuariosPage() {
                   }
                   className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
                 />
-              )}
+              ) : null}
 
-              <div className="lg:col-span-2">
-                {erro && (
-                  <div
-                    className={`mb-3 rounded-2xl border px-4 py-3 text-sm ${
-                      isDark
-                        ? "border-red-900 bg-red-950 text-red-300"
-                        : "border-red-200 bg-red-50 text-red-700"
-                    }`}
-                  >
-                    {erro}
-                  </div>
-                )}
+              <div
+                className={`rounded-2xl border px-4 py-3 text-sm md:col-span-2 ${
+                  isDark
+                    ? "border-blue-900 bg-blue-950/50 text-blue-200"
+                    : "border-blue-200 bg-blue-50 text-blue-800"
+                }`}
+              >
+                A senha inicial deve seguir os padrões fortes do sistema. No primeiro acesso, o
+                usuário será obrigado a definir uma nova senha antes de continuar.
+              </div>
 
-                {sucesso && (
-                  <div
-                    className={`mb-3 rounded-2xl border px-4 py-3 text-sm ${
-                      isDark
-                        ? "border-emerald-900 bg-emerald-950 text-emerald-300"
-                        : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    }`}
-                  >
-                    {sucesso}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-3">
+              <div className="md:col-span-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <button
                     type="submit"
                     disabled={saving}
@@ -367,26 +451,26 @@ export default function UsuariosPage() {
                     {saving
                       ? "Salvando..."
                       : editingUserId
-                        ? "Salvar alteracoes"
-                        : "Criar usuario"}
+                        ? "Salvar alterações"
+                        : "Criar usuário"}
                   </button>
 
-                  {editingUserId && (
+                  {editingUserId ? (
                     <button
                       type="button"
                       onClick={resetForm}
                       className={`inline-flex items-center justify-center rounded-2xl border px-5 py-3 text-sm font-medium transition ${secondaryButton}`}
                     >
-                      Cancelar edicao
+                      Cancelar edição
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </form>
           </div>
-        )}
+        ) : null}
 
-        <div className="mb-5 grid gap-4 md:grid-cols-[1fr_240px]">
+        <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_240px_220px]">
           <label className="relative block">
             <Search
               className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${mutedText}`}
@@ -395,7 +479,7 @@ export default function UsuariosPage() {
               type="text"
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
-              placeholder="Buscar usuarios..."
+              placeholder="Buscar usuários..."
               className={`w-full rounded-2xl border py-3 pl-11 pr-4 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
             />
           </label>
@@ -409,103 +493,176 @@ export default function UsuariosPage() {
           >
             <option value="todos">Todos os perfis</option>
             <option value="administrador">Administrador</option>
-            <option value="tecnico">Tecnico</option>
+            <option value="tecnico">Técnico</option>
             <option value="atendente">Atendente</option>
           </select>
+
+          <select
+            value={statusFiltro}
+            onChange={(event) =>
+              setStatusFiltro(event.target.value as "todos" | "ativos" | "inativos")
+            }
+            className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+          >
+            <option value="todos">Todos os status</option>
+            <option value="ativos">Apenas ativos</option>
+            <option value="inativos">Apenas inativos</option>
+          </select>
+        </div>
+
+        <div className={`mb-5 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${infoBox}`}>
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            Usuários inativos perdem acesso imediatamente ao sistema. A reativação libera o
+            login novamente, sem apagar o histórico das ordens de serviço.
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-zinc-800">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
               <thead className={isDark ? "bg-zinc-950 text-zinc-300" : "bg-slate-50 text-slate-600"}>
                 <tr>
                   <th className="p-4 text-left font-semibold">Nome</th>
                   <th className="p-4 text-left font-semibold">Email</th>
                   <th className="p-4 text-left font-semibold">Perfil</th>
-                  <th className="p-4 text-left font-semibold">Data de criacao</th>
+                  <th className="p-4 text-left font-semibold">Status</th>
+                  <th className="p-4 text-left font-semibold">Data de criação</th>
                   <th className="p-4 text-left font-semibold">Atualizado em</th>
-                  <th className="p-4 text-right font-semibold">Acoes</th>
+                  <th className="p-4 text-right font-semibold">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center">
-                      <span className={mutedText}>Carregando usuarios...</span>
+                    <td colSpan={7} className="p-6 text-center">
+                      <span className={mutedText}>Carregando usuários...</span>
                     </td>
                   </tr>
                 ) : usuarios.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center">
-                      <span className={mutedText}>Nenhum usuario encontrado.</span>
+                    <td colSpan={7} className="p-6 text-center">
+                      <span className={mutedText}>Nenhum usuário encontrado.</span>
                     </td>
                   </tr>
                 ) : (
-                  usuarios.map((usuario) => (
-                    <tr
-                      key={usuario.id}
-                      className={`border-t border-slate-200 transition dark:border-zinc-800 ${rowHover}`}
-                    >
-                      <td className="p-4 font-medium">{usuario.name}</td>
-                      <td className="p-4">{usuario.email}</td>
-                      <td className="p-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${roleBadge(usuario.role)}`}
-                        >
-                          {roleLabel(usuario.role)}
-                        </span>
-                      </td>
-                      <td className="p-4">{formatDate(usuario.created_at)}</td>
-                      <td className="p-4">{formatDate(usuario.updated_at)}</td>
-                      <td className="p-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => startEditing(usuario)}
-                          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${secondaryButton}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                          Editar
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  usuarios.map((usuario) => {
+                    const isCurrentUser = usuario.id === currentUser.id;
+                    const statusEmProcessamento = processandoStatusId === usuario.id;
+
+                    return (
+                      <tr
+                        key={usuario.id}
+                        className={`border-t border-slate-200 transition dark:border-zinc-800 ${rowHover}`}
+                      >
+                        <td className="p-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            <span>{usuario.name}</span>
+                            {isCurrentUser ? (
+                              <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+                                Atual
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="p-4">{usuario.email}</td>
+                        <td className="p-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${roleBadge(usuario.role)}`}
+                          >
+                            {roleLabel(usuario.role)}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              usuario.is_active
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-rose-100 text-rose-700"
+                            }`}
+                          >
+                            {usuario.is_active ? "Ativo" : "Inativo"}
+                          </span>
+                        </td>
+                        <td className="p-4">{formatDate(usuario.created_at)}</td>
+                        <td className="p-4">{formatDate(usuario.updated_at)}</td>
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => startEditing(usuario)}
+                              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${secondaryButton}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Editar
+                            </button>
+
+                            <button
+                              type="button"
+                              title={
+                                isCurrentUser && usuario.is_active
+                                  ? "Seu próprio usuário não pode ser inativado."
+                                  : undefined
+                              }
+                              disabled={statusEmProcessamento || (isCurrentUser && usuario.is_active)}
+                              onClick={() => void alternarStatusUsuario(usuario)}
+                              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                usuario.is_active
+                                  ? "bg-rose-600 hover:bg-rose-700"
+                                  : "bg-emerald-600 hover:bg-emerald-700"
+                              }`}
+                            >
+                              {statusEmProcessamento
+                                ? "Salvando..."
+                                : isCurrentUser && usuario.is_active
+                                  ? "Seu acesso"
+                                  : usuario.is_active
+                                    ? "Inativar"
+                                    : "Reativar"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {!loading && (
-          <p className={`mt-4 text-sm ${mutedText}`}>
-            Exibindo {usuarios.length} {usuarios.length === 1 ? "usuario" : "usuarios"}.
-          </p>
-        )}
+        {!loading ? (
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className={`text-sm ${mutedText}`}>
+              Exibindo {usuarios.length} de {totalUsuarios}{" "}
+              {totalUsuarios === 1 ? "usuário" : "usuários"}.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={paginaAtual <= 1 || loading}
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                className={`inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
+              >
+                Anterior
+              </button>
+              <span className={`text-sm ${mutedText}`}>
+                Página {paginaAtual} de {ultimaPagina}
+              </span>
+              <button
+                type="button"
+                disabled={paginaAtual >= ultimaPagina || loading}
+                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, ultimaPagina))}
+                className={`inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
     </AdminShell>
-  );
-}
-
-function MetricCard({
-  value,
-  label,
-  cardBg,
-  titleText,
-  mutedText,
-  accent,
-}: {
-  value: number;
-  label: string;
-  cardBg: string;
-  titleText: string;
-  mutedText: string;
-  accent: string;
-}) {
-  return (
-    <div className={`rounded-3xl border p-5 shadow-sm ${cardBg}`}>
-      <p className={`text-4xl font-semibold ${accent}`}>{value}</p>
-      <p className={`mt-1 text-sm ${mutedText}`}>{label}</p>
-      <p className={`mt-4 text-sm ${titleText}`}>Painel administrativo</p>
-    </div>
   );
 }
 
@@ -517,7 +674,7 @@ function roleBadge(role: PerfilUsuario) {
 
 function roleLabel(role: PerfilUsuario) {
   if (role === "administrador") return "Administrador";
-  if (role === "tecnico") return "Tecnico";
+  if (role === "tecnico") return "Técnico";
   return "Atendente";
 }
 

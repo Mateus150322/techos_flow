@@ -106,7 +106,7 @@ class OrdemServicoController extends Controller
         $dir = $data['dir'] ?? 'desc';
 
         $include = collect(explode(',', $data['include'] ?? ''))
-            ->map(fn ($s) => trim($s))
+            ->map(fn ($value) => trim($value))
             ->filter()
             ->values()
             ->all();
@@ -136,8 +136,8 @@ class OrdemServicoController extends Controller
         if (!empty($data['q'])) {
             $q = mb_strtolower($data['q']);
 
-            $query->where(function ($w) use ($q) {
-                $w->where(QueryBuilder::raw('LOWER(numero)'), 'like', "%{$q}%")
+            $query->where(function ($where) use ($q) {
+                $where->where(QueryBuilder::raw('LOWER(numero)'), 'like', "%{$q}%")
                     ->orWhere(QueryBuilder::raw('LOWER(descricao)'), 'like', "%{$q}%")
                     ->orWhere(QueryBuilder::raw('LOWER(nome_cliente)'), 'like', "%{$q}%");
             });
@@ -157,7 +157,7 @@ class OrdemServicoController extends Controller
         ]);
 
         $include = collect(explode(',', $data['include'] ?? ''))
-            ->map(fn ($s) => trim($s))
+            ->map(fn ($value) => trim($value))
             ->filter()
             ->values()
             ->all();

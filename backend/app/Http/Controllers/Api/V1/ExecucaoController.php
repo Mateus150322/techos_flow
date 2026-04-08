@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Execucao;
 use App\Models\OrdemServico;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class ExecucaoController extends Controller
 {
@@ -50,7 +49,7 @@ class ExecucaoController extends Controller
 
         $execucao = Execucao::create([
             'os_id' => $os->id,
-            'tecnico_id' => Auth::id(),
+            'tecnico_id' => $user->id,
             'data_inicio' => $data['data_inicio'] ?? now(),
             'observacao' => $data['observacao'] ?? null,
         ]);

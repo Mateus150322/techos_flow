@@ -2,7 +2,17 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import { me } from "@/modules/auth/auth.service";
-import { clearSession, getStoredToken } from "./session";
+import {
+  clearSession,
+  getDefaultRouteForRole,
+  getStoredToken,
+} from "./session";
+import { getApiErrorMessage } from "@/shared/utils/apiError";
+
+type RedirectState = {
+  from?: ReturnType<typeof useLocation>;
+  authMessage?: string;
+};
 
 export default function PrivateRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -10,6 +20,8 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
 
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  const [redirectState, setRedirectState] = useState<RedirectState | null>(null);
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -21,19 +33,35 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
         }
 
         setAllowed(false);
+        setRedirectTo(null);
+        setRedirectState(null);
         setChecking(false);
         return;
       }
 
       try {
-        await me();
+        const user = await me();
 
         if (!alive) {
           return;
         }
 
-        setAllowed(true);
-      } catch {
+        if (user.must_change_password && location.pathname !== "/primeiro-acesso") {
+          setAllowed(false);
+          setRedirectTo("/primeiro-acesso");
+          setRedirectState({ from: location });
+        } else if (!user.must_change_password && location.pathname === "/primeiro-acesso") {
+          setAllowed(false);
+          setRedirectTo(getDefaultRouteForRole(user.role));
+          setRedirectState(null);
+        } else {
+          setAllowed(true);
+          setRedirectTo(null);
+          setRedirectState(null);
+        }
+      } catch (error) {
+        const message = getApiErrorMessage(error, "");
+
         clearSession();
 
         if (!alive) {
@@ -41,6 +69,11 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
         }
 
         setAllowed(false);
+        setRedirectTo("/login");
+        setRedirectState({
+          from: location,
+          authMessage: message || undefined,
+        });
       }
 
       if (!alive) {
@@ -55,7 +88,7 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [location, token]);
 
   if (!token) {
     return <Navigate to="/login" replace state={{ from: location }} />;
@@ -64,13 +97,17 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-100">
-        <div className="text-sm text-zinc-400">Verificando sessao...</div>
+        <div className="text-sm text-zinc-400">Verificando sessão...</div>
       </div>
     );
   }
 
+  if (redirectTo) {
+    return <Navigate to={redirectTo} replace state={redirectState ?? undefined} />;
+  }
+
   if (!allowed) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace state={redirectState ?? { from: location }} />;
   }
 
   return <>{children}</>;

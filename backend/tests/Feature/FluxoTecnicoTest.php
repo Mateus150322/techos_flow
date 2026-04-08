@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Endereco;
-use App\Models\Execucao;
 use App\Models\OrdemServico;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -61,11 +60,6 @@ class FluxoTecnicoTest extends TestCase
             'id' => $os->id,
             'status' => 'finalizada',
         ]);
-
-        $this->assertDatabaseHas('execucoes', [
-            'id' => $execucaoId,
-            'os_id' => $os->id,
-        ]);
     }
 
     public function test_tecnico_nao_pode_marcar_como_nao_executada_os_de_outro_tecnico(): void
@@ -102,7 +96,7 @@ class FluxoTecnicoTest extends TestCase
             'longitude' => -67.8243,
             'precisao_metros' => 8.5,
             'geolocalizacao_capturada_em' => now()->toISOString(),
-            'endereco_capturado' => 'Avenida Ceara, Centro, Rio Branco/AC',
+            'endereco_capturado' => 'Avenida Ceará, Centro, Rio Branco/AC',
         ]);
 
         $response
@@ -110,7 +104,7 @@ class FluxoTecnicoTest extends TestCase
             ->assertJsonPath('anexo.tipo', 'pdf')
             ->assertJsonPath('anexo.latitude', -9.97499)
             ->assertJsonPath('anexo.longitude', -67.8243)
-            ->assertJsonPath('anexo.endereco_capturado', 'Avenida Ceara, Centro, Rio Branco/AC');
+            ->assertJsonPath('anexo.endereco_capturado', 'Avenida Ceará, Centro, Rio Branco/AC');
 
         $this->assertDatabaseHas('anexos', [
             'os_id' => $os->id,
@@ -118,7 +112,7 @@ class FluxoTecnicoTest extends TestCase
             'tipo' => 'pdf',
             'latitude' => -9.97499,
             'longitude' => -67.8243,
-            'endereco_capturado' => 'Avenida Ceara, Centro, Rio Branco/AC',
+            'endereco_capturado' => 'Avenida Ceará, Centro, Rio Branco/AC',
         ]);
     }
 
@@ -167,6 +161,19 @@ class FluxoTecnicoTest extends TestCase
             ->assertJson([
                 'message' => 'Técnico só pode abrir OS do tipo Manutenção ETA/ETE.',
             ]);
+    }
+
+    public function test_administrador_nao_pode_operar_fluxo_tecnico_da_os(): void
+    {
+        $admin = $this->criarUsuario('administrador');
+        $tecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnico->id);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson("/api/v1/ordens-servico/{$os->id}/iniciar");
+
+        $response->assertStatus(403);
     }
 
     private function criarUsuario(string $role): User

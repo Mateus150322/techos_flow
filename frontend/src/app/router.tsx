@@ -1,7 +1,8 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-import DashboardPage from "@/modules/DashboardPage";
 import LoginPage from "@/modules/auth/LoginPage";
+import PrimeiroAcessoPage from "@/modules/auth/PrimeiroAcessoPage";
+import DashboardPage from "@/modules/dashboard/DashboardPage";
 import RelatoriosPage from "@/modules/admin/RelatoriosPage";
 import UsuariosPage from "@/modules/admin/UsuariosPage";
 import NovaOrdemPage from "@/modules/ordensServico/NovaOrdemPage";
@@ -15,6 +16,15 @@ export default function AppRouter() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+
+        <Route
+          path="/primeiro-acesso"
+          element={
+            <PrivateRoute>
+              <PrimeiroAcessoPage />
+            </PrivateRoute>
+          }
+        />
 
         <Route
           path="/"

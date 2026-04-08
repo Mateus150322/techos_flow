@@ -1,8 +1,12 @@
 import axios from "axios";
 import { getStoredToken } from "@/shared/auth/session";
 
+const apiBaseUrl =
+  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, "") ||
+  "http://backend-flow.test/api/v1";
+
 const api = axios.create({
-  baseURL: "http://backend-flow.test/api/v1",
+  baseURL: apiBaseUrl,
   headers: {
     Accept: "application/json",
   },
@@ -11,9 +15,9 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = getStoredToken();
 
-  if (token) 
+  if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  
+  }
 
   return config;
 });

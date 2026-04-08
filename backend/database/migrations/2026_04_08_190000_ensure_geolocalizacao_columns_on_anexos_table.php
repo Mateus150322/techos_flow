@@ -6,11 +6,12 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
+        if (!Schema::hasTable('anexos')) {
+            return;
+        }
+
         Schema::table('anexos', function (Blueprint $table) {
             if (!Schema::hasColumn('anexos', 'latitude')) {
                 $table->decimal('latitude', 10, 7)->nullable()->after('tipo');
@@ -27,20 +28,26 @@ return new class extends Migration
             if (!Schema::hasColumn('anexos', 'geolocalizacao_capturada_em')) {
                 $table->timestamp('geolocalizacao_capturada_em')->nullable()->after('precisao_metros');
             }
+
+            if (!Schema::hasColumn('anexos', 'endereco_capturado')) {
+                $table->text('endereco_capturado')->nullable()->after('geolocalizacao_capturada_em');
+            }
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
+        if (!Schema::hasTable('anexos')) {
+            return;
+        }
+
         Schema::table('anexos', function (Blueprint $table) {
             $columns = [
-                'latitude',
-                'longitude',
-                'precisao_metros',
+                'endereco_capturado',
                 'geolocalizacao_capturada_em',
+                'precisao_metros',
+                'longitude',
+                'latitude',
             ];
 
             foreach ($columns as $column) {

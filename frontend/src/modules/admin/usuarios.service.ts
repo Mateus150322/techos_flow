@@ -1,12 +1,14 @@
 import { api } from "@/shared/api/client";
+import type { UserRole } from "@/shared/auth/session";
 
-export type PerfilUsuario = "administrador" | "tecnico" | "atendente";
+export type PerfilUsuario = UserRole;
 
 export type UsuarioAdmin = {
   id: string;
   name: string;
   email: string;
   role: PerfilUsuario;
+  is_active: boolean;
   created_at?: string;
   updated_at?: string;
 };
@@ -17,20 +19,38 @@ type Paginated<T> = {
   per_page: number;
   total: number;
   last_page: number;
+  stats: {
+    total: number;
+    ativos: number;
+    inativos: number;
+    administradores: number;
+    tecnicos: number;
+    atendentes: number;
+    ultimos_7_dias: number;
+  };
 };
 
 export type ListarUsuariosParams = {
   q?: string;
   role?: PerfilUsuario | "todos";
+  status?: "todos" | "ativos" | "inativos";
   per_page?: number;
   page?: number;
 };
 
-export type SalvarUsuarioPayload = {
+export type CriarUsuarioPayload = {
   name: string;
   email: string;
   role: PerfilUsuario;
+  password: string;
+};
+
+export type AtualizarUsuarioPayload = {
+  name?: string;
+  email?: string;
+  role?: PerfilUsuario;
   password?: string;
+  is_active?: boolean;
 };
 
 export async function listarUsuarios(params?: ListarUsuariosParams) {
@@ -38,6 +58,7 @@ export async function listarUsuarios(params?: ListarUsuariosParams) {
     params: {
       q: params?.q || undefined,
       role: params?.role && params.role !== "todos" ? params.role : undefined,
+      status: params?.status && params.status !== "todos" ? params.status : undefined,
       per_page: params?.per_page ?? 50,
       page: params?.page,
     },
@@ -46,40 +67,12 @@ export async function listarUsuarios(params?: ListarUsuariosParams) {
   return data;
 }
 
-export async function listarTodosUsuarios(params?: ListarUsuariosParams) {
-  const acumulados: UsuarioAdmin[] = [];
-  let paginaAtual = 1;
-  let ultimaPagina = 1;
-  let total = 0;
-
-  do {
-    const resposta = await listarUsuarios({
-      ...params,
-      page: paginaAtual,
-      per_page: 100,
-    });
-
-    acumulados.push(...resposta.data);
-    ultimaPagina = resposta.last_page || 1;
-    total = resposta.total;
-    paginaAtual += 1;
-  } while (paginaAtual <= ultimaPagina);
-
-  return {
-    current_page: ultimaPagina,
-    data: acumulados,
-    per_page: 100,
-    total,
-    last_page: ultimaPagina,
-  } satisfies Paginated<UsuarioAdmin>;
-}
-
-export async function criarUsuario(payload: SalvarUsuarioPayload) {
+export async function criarUsuario(payload: CriarUsuarioPayload) {
   const { data } = await api.post<UsuarioAdmin>("/usuarios", payload);
   return data;
 }
 
-export async function atualizarUsuario(id: string, payload: SalvarUsuarioPayload) {
+export async function atualizarUsuario(id: string, payload: AtualizarUsuarioPayload) {
   const { data } = await api.put<UsuarioAdmin>(`/usuarios/${id}`, payload);
   return data;
 }

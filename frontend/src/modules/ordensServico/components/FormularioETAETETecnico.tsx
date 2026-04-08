@@ -44,9 +44,30 @@ export default function FormularioETAETETecnico({ onCriada }: Props) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   }
 
+  function validarFormulario() {
+    if (!formData.dataChamada) return "Informe a data da chamada.";
+    if (!formData.unidade) return "Selecione a unidade.";
+    if (!formData.local.trim()) return "Informe o local.";
+    if (!formData.setorRequisitante.trim()) return "Informe o setor requisitante.";
+    if (!formData.encarregado.trim()) return "Informe o encarregado.";
+    if (!formData.equipe.trim()) return "Informe a equipe.";
+    if (!formData.tipoManutencao) return "Selecione o tipo de manutencao.";
+    if (!formData.servico.trim()) return "Descreva o servico.";
+    if (!formData.equipamento.trim()) return "Informe o equipamento.";
+
+    return "";
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setErro("");
+
+    const mensagemErro = validarFormulario();
+
+    if (mensagemErro) {
+      setErro(mensagemErro);
+      return;
+    }
 
     try {
       setEnviando(true);
@@ -87,7 +108,6 @@ Material: ${formData.materialUtilizado}
       setFormData(initialForm);
       onCriada?.();
     } catch (error) {
-      console.error(error);
       setErro(getApiErrorMessage(error, "Nao foi possivel criar a OS."));
     } finally {
       setEnviando(false);
@@ -98,6 +118,9 @@ Material: ${formData.materialUtilizado}
   const inputBg = isDark
     ? "bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-500"
     : "bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400";
+  const sectionCard = isDark
+    ? "rounded-2xl border border-slate-800 bg-slate-950/70 p-5"
+    : "rounded-2xl border border-slate-200 bg-slate-50 p-5";
   const titleText = isDark ? "text-white" : "text-slate-900";
   const mutedText = isDark ? "text-slate-400" : "text-slate-500";
 
@@ -109,6 +132,9 @@ Material: ${formData.materialUtilizado}
         </h2>
         <p className={`mt-2 text-sm ${mutedText}`}>
           Formulario especifico para manutencao em unidades operacionais.
+        </p>
+        <p className={`mt-3 text-xs uppercase tracking-[0.16em] ${mutedText}`}>
+          Campos principais da abertura tecnica
         </p>
       </div>
 
@@ -125,8 +151,13 @@ Material: ${formData.materialUtilizado}
           </div>
         )}
 
-        <div className="space-y-4">
-          <h3 className={`text-xl font-semibold ${titleText}`}>Solicitacao</h3>
+        <section className={sectionCard}>
+          <div className="mb-5">
+            <h3 className={`text-xl font-semibold ${titleText}`}>Solicitacao</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              Registre o horario e a referencia inicial do atendimento.
+            </p>
+          </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <Campo
@@ -181,10 +212,15 @@ Material: ${formData.materialUtilizado}
               }
             />
           </div>
-        </div>
+        </section>
 
-        <div className="space-y-4">
-          <h3 className={`text-xl font-semibold ${titleText}`}>Unidade e Local</h3>
+        <section className={sectionCard}>
+          <div className="mb-5">
+            <h3 className={`text-xl font-semibold ${titleText}`}>Unidade e Local</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              Identifique a unidade operacional e o ponto exato do servico.
+            </p>
+          </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
@@ -224,10 +260,15 @@ Material: ${formData.materialUtilizado}
               }
             />
           </div>
-        </div>
+        </section>
 
-        <div className="space-y-4">
-          <h3 className={`text-xl font-semibold ${titleText}`}>Responsaveis</h3>
+        <section className={sectionCard}>
+          <div className="mb-5">
+            <h3 className={`text-xl font-semibold ${titleText}`}>Responsaveis</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              Informe quem solicitou e quem esta envolvido na equipe.
+            </p>
+          </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Campo
@@ -272,10 +313,15 @@ Material: ${formData.materialUtilizado}
               />
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="space-y-4">
-          <h3 className={`text-xl font-semibold ${titleText}`}>Manutencao</h3>
+        <section className={sectionCard}>
+          <div className="mb-5">
+            <h3 className={`text-xl font-semibold ${titleText}`}>Manutencao</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              Descreva a natureza do servico e o equipamento envolvido.
+            </p>
+          </div>
 
           <div>
             <label className={`mb-2 block text-sm font-medium ${titleText}`}>
@@ -331,10 +377,15 @@ Material: ${formData.materialUtilizado}
               />
             }
           />
-        </div>
+        </section>
 
-        <div className="space-y-4">
-          <h3 className={`text-xl font-semibold ${titleText}`}>Execucao</h3>
+        <section className={sectionCard}>
+          <div className="mb-5">
+            <h3 className={`text-xl font-semibold ${titleText}`}>Execucao</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              Adicione o contexto tecnico inicial para facilitar a continuidade da OS.
+            </p>
+          </div>
 
           <Campo
             label="Diagnostico"
@@ -377,7 +428,7 @@ Material: ${formData.materialUtilizado}
               />
             }
           />
-        </div>
+        </section>
 
         <button
           type="submit"

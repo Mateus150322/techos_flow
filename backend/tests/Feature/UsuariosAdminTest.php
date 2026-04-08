@@ -36,17 +36,19 @@ class UsuariosAdminTest extends TestCase
             'name' => 'Nova Atendente',
             'email' => 'nova.atendente@teste.com',
             'role' => 'atendente',
-            'password' => '123456',
+            'password' => 'Temp123!',
         ]);
 
         $response
             ->assertCreated()
             ->assertJsonPath('email', 'nova.atendente@teste.com')
-            ->assertJsonMissing(['password' => '123456']);
+            ->assertJsonPath('must_change_password', true)
+            ->assertJsonMissing(['password' => 'Temp123!']);
 
         $this->assertDatabaseHas('users', [
             'email' => 'nova.atendente@teste.com',
             'role' => 'atendente',
+            'must_change_password' => true,
         ]);
     }
 
@@ -60,7 +62,7 @@ class UsuariosAdminTest extends TestCase
         $response = $this->putJson("/api/v1/usuarios/{$user->id}", [
             'name' => 'Tecnico Atualizado',
             'role' => 'tecnico',
-            'password' => '654321',
+            'password' => 'Nova123!',
         ]);
 
         $response
@@ -70,7 +72,94 @@ class UsuariosAdminTest extends TestCase
 
         $user->refresh();
 
-        $this->assertTrue(Hash::check('654321', $user->password));
+        $this->assertTrue(Hash::check('Nova123!', $user->password));
+        $this->assertTrue($user->must_change_password);
+    }
+
+    public function test_administrador_pode_inativar_usuario(): void
+    {
+        $admin = $this->criarUsuario('administrador');
+        $user = $this->criarUsuario('tecnico', 'Tecnico Inativado');
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->putJson("/api/v1/usuarios/{$user->id}", [
+            'is_active' => false,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('is_active', false);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'is_active' => false,
+        ]);
+    }
+
+    public function test_administrador_nao_pode_inativar_proprio_usuario(): void
+    {
+        $admin = $this->criarUsuario('administrador');
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->putJson("/api/v1/usuarios/{$admin->id}", [
+            'is_active' => false,
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJson([
+                'message' => 'Você não pode inativar seu próprio usuário.',
+            ]);
+    }
+
+    public function test_nao_e_possivel_remover_ultimo_administrador_ativo(): void
+    {
+        $admin = $this->criarUsuario('administrador');
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->putJson("/api/v1/usuarios/{$admin->id}", [
+            'role' => 'tecnico',
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJson([
+                'message' => 'Não é possível remover o último administrador ativo.',
+            ]);
+    }
+
+    public function test_usuario_inativo_nao_pode_fazer_login(): void
+    {
+        $user = $this->criarUsuario('tecnico', 'Tecnico Inativo', false);
+
+        $response = $this->postJson('/api/v1/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response
+            ->assertStatus(403)
+            ->assertJson([
+                'message' => 'Usuário inativo.',
+            ]);
+    }
+
+    public function test_usuario_inativo_nao_pode_acessar_rotas_protegidas(): void
+    {
+        $user = $this->criarUsuario('tecnico', 'Tecnico Inativo', false);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson('/api/v1/me');
+
+        $response
+            ->assertStatus(403)
+            ->assertJson([
+                'message' => 'Usuário inativo.',
+            ]);
     }
 
     public function test_nao_admin_nao_pode_gerenciar_usuarios(): void
@@ -88,13 +177,14 @@ class UsuariosAdminTest extends TestCase
             ]);
     }
 
-    private function criarUsuario(string $role, ?string $name = null): User
+    private function criarUsuario(string $role, ?string $name = null, bool $isActive = true): User
     {
         return User::query()->create([
             'name' => $name ?? ucfirst($role) . ' Teste',
             'email' => fake()->unique()->safeEmail(),
             'password' => Hash::make('password'),
             'role' => $role,
+            'is_active' => $isActive,
         ]);
     }
 }

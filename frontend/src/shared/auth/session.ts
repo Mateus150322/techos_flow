@@ -7,6 +7,7 @@ export type CurrentUser = {
   name: string;
   email?: string;
   role: UserRole;
+  must_change_password?: boolean;
 };
 
 const TOKEN_STORAGE_KEY = "token";
@@ -17,6 +18,10 @@ function isUserRole(value: unknown): value is UserRole {
   return value === "administrador" || value === "tecnico" || value === "atendente";
 }
 
+export function getDefaultRouteForRole(role: UserRole) {
+  return role === "tecnico" ? "/tecnico" : "/";
+}
+
 export function getStoredToken() {
   return localStorage.getItem(TOKEN_STORAGE_KEY);
 }
@@ -25,6 +30,7 @@ function parseStoredUser(raw: string | null, fallbackRole: UserRole = "atendente
   const fallbackUser: CurrentUser = {
     name: "Usuario",
     role: fallbackRole,
+    must_change_password: false,
   };
 
   if (!raw) {
@@ -39,6 +45,9 @@ function parseStoredUser(raw: string | null, fallbackRole: UserRole = "atendente
       name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : fallbackUser.name,
       email: typeof parsed.email === "string" ? parsed.email : undefined,
       role: isUserRole(parsed.role) ? parsed.role : fallbackRole,
+      must_change_password: typeof parsed.must_change_password === "boolean"
+        ? parsed.must_change_password
+        : false,
     };
   } catch {
     return fallbackUser;
@@ -68,11 +77,7 @@ function subscribeToSession(onStoreChange: () => void) {
 }
 
 export function useCurrentUser(fallbackRole: UserRole = "atendente") {
-  const rawUser = useSyncExternalStore(
-    subscribeToSession,
-    getStoredUserRaw,
-    () => null
-  );
+  const rawUser = useSyncExternalStore(subscribeToSession, getStoredUserRaw, () => null);
 
   return useMemo(() => parseStoredUser(rawUser, fallbackRole), [fallbackRole, rawUser]);
 }

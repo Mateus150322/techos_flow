@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
   CalendarRange,
@@ -10,104 +10,63 @@ import {
 } from "lucide-react";
 
 import { AdminShell } from "./AdminShell";
-import { exportarCsv, exportarExcel, exportarPdf } from "./relatorios.export";
+import { AdminMetricCard } from "./components/AdminMetricCard";
+import {
+  buscarRelatorioOrdens,
+  exportarRelatorioOrdens,
+  type RelatorioExportFormat,
+  type RelatoriosResponse,
+} from "./relatorios.service";
 import {
   INITIAL_FILTERS,
-  buildFiltrosDescricao,
-  buildPeriodoDescricao,
-  buildReportDefinition,
-  calcularAtividadeRecente,
-  calcularProdutividadeTecnicos,
-  calcularResumo,
-  calcularStatusResumo,
-  calcularTiposMaisFrequentes,
-  filtrarOrdens,
   formatDate,
   formatStatus,
-  getTecnicosFromOrdens,
-  getTiposFromOrdens,
   type FiltrosRelatorio,
   type TipoRelatorio,
 } from "./relatorios.utils";
-import {
-  listarTodasOrdens,
-  type OrdemServico,
-  type OrdemStatus,
-} from "@/modules/ordensServico/ordensServico.service";
+import { type OrdemStatus } from "@/modules/ordensServico/ordensServico.service";
 import { useCurrentUser } from "@/shared/auth/session";
 import { useTheme } from "@/shared/hooks/useTheme";
+import { getApiErrorMessage } from "@/shared/utils/apiError";
 
 export default function RelatoriosPage() {
   const { isDark } = useTheme();
   const currentUser = useCurrentUser();
 
-  const [orders, setOrders] = useState<OrdemServico[]>([]);
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
   const [filtros, setFiltros] = useState<FiltrosRelatorio>(INITIAL_FILTERS);
   const [filtrosAplicados, setFiltrosAplicados] =
     useState<FiltrosRelatorio>(INITIAL_FILTERS);
+  const [dadosRelatorio, setDadosRelatorio] = useState<RelatoriosResponse | null>(null);
+  const [exportandoFormato, setExportandoFormato] = useState<RelatorioExportFormat | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
+        setErro("");
 
-        const response = await listarTodasOrdens({ include: "tecnicoResponsavel" });
-        setOrders(response.data ?? []);
+        const response = await buscarRelatorioOrdens({
+          tipoRelatorio: filtrosAplicados.tipoRelatorio,
+          status: filtrosAplicados.status,
+          tipo: filtrosAplicados.tipo,
+          prioridade: filtrosAplicados.prioridade,
+          tecnicoId: filtrosAplicados.tecnicoId,
+          dataInicio: filtrosAplicados.dataInicio,
+          dataFim: filtrosAplicados.dataFim,
+        });
+
+        setDadosRelatorio(response);
       } catch (error) {
-        console.error("Erro ao carregar relatorios:", error);
+        setErro(getApiErrorMessage(error, "Não foi possível carregar os relatórios."));
       } finally {
         setLoading(false);
       }
     }
 
     void load();
-  }, []);
-
-  const tipos = useMemo(() => getTiposFromOrdens(orders), [orders]);
-  const tecnicos = useMemo(() => getTecnicosFromOrdens(orders), [orders]);
-  const ordensFiltradas = useMemo(
-    () => filtrarOrdens(orders, filtrosAplicados),
-    [orders, filtrosAplicados]
-  );
-  const resumo = useMemo(() => calcularResumo(ordensFiltradas), [ordensFiltradas]);
-  const produtividadeTecnicos = useMemo(
-    () => calcularProdutividadeTecnicos(ordensFiltradas),
-    [ordensFiltradas]
-  );
-  const tiposMaisFrequentes = useMemo(
-    () => calcularTiposMaisFrequentes(ordensFiltradas, resumo.total),
-    [ordensFiltradas, resumo.total]
-  );
-  const statusResumo = useMemo(() => calcularStatusResumo(resumo), [resumo]);
-  const atividadeRecente = useMemo(
-    () => calcularAtividadeRecente(ordensFiltradas),
-    [ordensFiltradas]
-  );
-  const reportDefinition = useMemo(
-    () =>
-      buildReportDefinition({
-        filtrosAplicados,
-        ordensFiltradas,
-        produtividadeTecnicos,
-        statusResumo,
-        tiposMaisFrequentes,
-      }),
-    [
-      filtrosAplicados,
-      ordensFiltradas,
-      produtividadeTecnicos,
-      statusResumo,
-      tiposMaisFrequentes,
-    ]
-  );
-
-  const filtrosDescricao = buildFiltrosDescricao(filtrosAplicados, tecnicos);
-  const periodoDescricao = buildPeriodoDescricao(
-    filtrosAplicados.dataInicio,
-    filtrosAplicados.dataFim
-  );
-  const dataEmissao = new Date().toLocaleDateString("pt-BR");
+  }, [filtrosAplicados]);
 
   const cardBg = isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-slate-200";
   const softCard = isDark ? "bg-zinc-950/70 border-zinc-800" : "bg-slate-50 border-slate-200";
@@ -126,7 +85,41 @@ export default function RelatoriosPage() {
   const rowHover = isDark ? "hover:bg-zinc-950/80" : "hover:bg-slate-50";
 
   function aplicarFiltros() {
-    setFiltrosAplicados(filtros);
+    setFiltrosAplicados({ ...filtros });
+  }
+
+  function getLabelExportacao(formato: RelatorioExportFormat, labelPadrao: string) {
+    return exportandoFormato === formato ? `Exportando ${formato.toUpperCase()}...` : labelPadrao;
+  }
+
+  async function handleExportar(formato: RelatorioExportFormat) {
+    try {
+      setExportandoFormato(formato);
+      setErro("");
+
+      const { blob, fileName } = await exportarRelatorioOrdens(formato, {
+        tipoRelatorio: filtrosAplicados.tipoRelatorio,
+        status: filtrosAplicados.status,
+        tipo: filtrosAplicados.tipo,
+        prioridade: filtrosAplicados.prioridade,
+        tecnicoId: filtrosAplicados.tecnicoId,
+        dataInicio: filtrosAplicados.dataInicio,
+        dataFim: filtrosAplicados.dataFim,
+      });
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setErro(getApiErrorMessage(error, "Não foi possível exportar o relatório."));
+    } finally {
+      setExportandoFormato(null);
+    }
   }
 
   if (currentUser.role === "tecnico") {
@@ -137,40 +130,59 @@ export default function RelatoriosPage() {
     return <Navigate to="/" replace />;
   }
 
+  const resumo = dadosRelatorio?.resumo ?? {
+    total: 0,
+    abertas: 0,
+    emExecucao: 0,
+    finalizadas: 0,
+    naoExecutadas: 0,
+    canceladas: 0,
+  };
+
+  const reportDefinition = dadosRelatorio?.reportDefinition ?? {
+    title: "Relatorio",
+    columns: [],
+    rows: [],
+  };
+
   return (
     <AdminShell currentUser={currentUser} activeTab="relatorios">
       <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <TopMetric
+        <AdminMetricCard
           value={resumo.total}
           label="Total de OS"
-          accent="text-blue-500"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
+          accentClass="text-blue-500"
+          hint="Volume consolidado do relatório"
         />
-        <TopMetric
+        <AdminMetricCard
           value={resumo.abertas}
           label="OS abertas"
-          accent="text-blue-500"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
+          accentClass="text-blue-500"
+          hint="Ordens ainda pendentes"
         />
-        <TopMetric
+        <AdminMetricCard
           value={resumo.emExecucao}
-          label="Em execucao"
-          accent="text-amber-500"
+          label="Em execução"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
+          accentClass="text-amber-500"
+          hint="Ordens em andamento"
         />
-        <TopMetric
+        <AdminMetricCard
           value={resumo.finalizadas}
           label="Finalizadas"
-          accent="text-emerald-500"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
+          accentClass="text-emerald-500"
+          hint="Ordens concluídas"
         />
       </section>
 
@@ -180,16 +192,16 @@ export default function RelatoriosPage() {
             <FileText className="h-5 w-5" />
           </div>
           <div>
-            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerar Relatorio</h2>
+            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerar Relatório</h2>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Relatorio geral, por status, produtividade, tipo de servico e periodo.
+              Relatório geral, por status, produtividade, tipo de serviço e período.
             </p>
           </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="block">
-            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tipo de Relatorio</span>
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tipo de Relatório</span>
             <select
               value={filtros.tipoRelatorio}
               onChange={(event) =>
@@ -200,11 +212,11 @@ export default function RelatoriosPage() {
               }
               className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
             >
-              <option value="geral">Relatorio geral de OS</option>
+              <option value="geral">Relatório geral de OS</option>
               <option value="status">Relatorio por status</option>
-              <option value="produtividade">Produtividade dos tecnicos</option>
-              <option value="tipo">Relatorio por tipo de servico</option>
-              <option value="periodo">Relatorio por periodo</option>
+              <option value="produtividade">Produtividade dos técnicos</option>
+              <option value="tipo">Relatório por tipo de serviço</option>
+              <option value="periodo">Relatório por período</option>
             </select>
           </label>
 
@@ -222,9 +234,9 @@ export default function RelatoriosPage() {
             >
               <option value="todos">Todos os status</option>
               <option value="aberta">Aberta</option>
-              <option value="em_execucao">Em execucao</option>
+              <option value="em_execucao">Em execução</option>
               <option value="finalizada">Finalizada</option>
-              <option value="nao_executada">Nao executada</option>
+              <option value="nao_executada">Não executada</option>
               <option value="cancelada">Cancelada</option>
             </select>
           </label>
@@ -237,7 +249,7 @@ export default function RelatoriosPage() {
               className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
             >
               <option value="todos">Todos os tipos</option>
-              {tipos.map((tipo) => (
+              {(dadosRelatorio?.tipos ?? []).map((tipo) => (
                 <option key={tipo} value={tipo}>
                   {tipo}
                 </option>
@@ -262,7 +274,7 @@ export default function RelatoriosPage() {
           </label>
 
           <label className="block">
-            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tecnico Responsavel</span>
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Técnico responsável</span>
             <select
               value={filtros.tecnicoId}
               onChange={(event) =>
@@ -270,8 +282,8 @@ export default function RelatoriosPage() {
               }
               className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
             >
-              <option value="todos">Todos os tecnicos</option>
-              {tecnicos.map((tecnico) => (
+              <option value="todos">Todos os técnicos</option>
+              {(dadosRelatorio?.tecnicos ?? []).map((tecnico) => (
                 <option key={tecnico.id} value={tecnico.id}>
                   {tecnico.name}
                 </option>
@@ -280,7 +292,7 @@ export default function RelatoriosPage() {
           </label>
 
           <div>
-            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Periodo</span>
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Período</span>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="relative block">
                 <CalendarRange
@@ -313,114 +325,79 @@ export default function RelatoriosPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 xl:flex-row">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <button
             type="button"
             onClick={aplicarFiltros}
             className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium transition ${primaryButton}`}
           >
             <Filter className="h-4 w-4" />
-            Gerar Relatorio
+            Gerar Relatório
           </button>
 
           <button
             type="button"
-            onClick={() => exportarCsv(reportDefinition)}
-            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition ${secondaryButton}`}
+            disabled={!dadosRelatorio || exportandoFormato !== null}
+            onClick={() => void handleExportar("csv")}
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
           >
             <Download className="h-4 w-4" />
-            Exportar CSV
+            {getLabelExportacao("csv", "Exportar CSV")}
           </button>
 
           <button
             type="button"
-            onClick={() =>
-              exportarExcel({
-                reportDefinition,
-                resumo,
-                dataEmissao,
-                periodoDescricao,
-                filtrosDescricao,
-              })
-            }
-            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition ${secondaryButton}`}
+            disabled={!dadosRelatorio || exportandoFormato !== null}
+            onClick={() => void handleExportar("xlsx")}
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
           >
             <FileSpreadsheet className="h-4 w-4" />
-            Exportar Excel
+            {getLabelExportacao("xlsx", "Exportar Excel")}
           </button>
 
           <button
             type="button"
-            onClick={() =>
-              exportarPdf({
-                reportDefinition,
-                resumo,
-                dataEmissao,
-                periodoDescricao,
-                filtrosDescricao,
-                responsavelEmissao: currentUser.name,
-              })
-            }
-            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition ${secondaryButton}`}
+            disabled={!dadosRelatorio || exportandoFormato !== null}
+            onClick={() => void handleExportar("pdf")}
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
           >
             <FileDown className="h-4 w-4" />
-            Exportar PDF
+            {getLabelExportacao("pdf", "Exportar PDF")}
           </button>
         </div>
       </section>
+
+      {erro && (
+        <div
+          className={`mb-6 rounded-2xl border px-4 py-3 text-sm ${
+            isDark
+              ? "border-red-900 bg-red-950 text-red-300"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {erro}
+        </div>
+      )}
 
       <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
         <div className="mb-5">
           <h3 className={`text-2xl font-semibold ${titleText}`}>{reportDefinition.title}</h3>
           <p className={`mt-1 text-sm ${mutedText}`}>
-            Data de emissao: {dataEmissao} | Periodo: {periodoDescricao}
+            Data de emissão: {dadosRelatorio?.dataEmissao ?? "-"} | Período:{" "}
+            {dadosRelatorio?.periodoDescricao ?? "-"}
           </p>
-          <p className={`mt-1 text-sm ${mutedText}`}>Filtros aplicados: {filtrosDescricao}</p>
+          <p className={`mt-1 text-sm ${mutedText}`}>
+            Filtros aplicados: {dadosRelatorio?.filtrosDescricao ?? "-"}
+          </p>
         </div>
 
-        <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-          <ResumoCard
-            label="Total de OS"
-            value={resumo.total}
-            cardBg={softCard}
-            titleText={titleText}
-            mutedText={mutedText}
-          />
-          <ResumoCard
-            label="Abertas"
-            value={resumo.abertas}
-            cardBg={softCard}
-            titleText={titleText}
-            mutedText={mutedText}
-          />
-          <ResumoCard
-            label="Em execucao"
-            value={resumo.emExecucao}
-            cardBg={softCard}
-            titleText={titleText}
-            mutedText={mutedText}
-          />
-          <ResumoCard
-            label="Finalizadas"
-            value={resumo.finalizadas}
-            cardBg={softCard}
-            titleText={titleText}
-            mutedText={mutedText}
-          />
-          <ResumoCard
-            label="Nao executadas"
-            value={resumo.naoExecutadas}
-            cardBg={softCard}
-            titleText={titleText}
-            mutedText={mutedText}
-          />
-          <ResumoCard
-            label="Canceladas"
-            value={resumo.canceladas}
-            cardBg={softCard}
-            titleText={titleText}
-            mutedText={mutedText}
-          />
+        <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+          <ResumoCard label="Total de OS" value={resumo.total} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <ResumoCard label="Abertas" value={resumo.abertas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <ResumoCard label="Em execução" value={resumo.emExecucao} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <ResumoCard label="Finalizadas" value={resumo.finalizadas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <ResumoCard label="Não executadas" value={resumo.naoExecutadas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <ResumoCard label="Canceladas" value={resumo.canceladas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
         </div>
 
         <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-zinc-800">
@@ -436,9 +413,15 @@ export default function RelatoriosPage() {
                 </tr>
               </thead>
               <tbody>
-                {reportDefinition.rows.length === 0 ? (
+                {loading ? (
                   <tr>
-                    <td colSpan={reportDefinition.columns.length} className="p-6 text-center">
+                    <td colSpan={Math.max(reportDefinition.columns.length, 1)} className="p-6 text-center">
+                      <span className={mutedText}>Carregando dados do relatorio...</span>
+                    </td>
+                  </tr>
+                ) : reportDefinition.rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={Math.max(reportDefinition.columns.length, 1)} className="p-6 text-center">
                       <span className={mutedText}>
                         Nenhum dado encontrado para os filtros aplicados.
                       </span>
@@ -447,7 +430,7 @@ export default function RelatoriosPage() {
                 ) : (
                   reportDefinition.rows.map((row, index) => (
                     <tr
-                      key={`${index}-${row[reportDefinition.columns[0].key] ?? "linha"}`}
+                      key={`${index}-${row[reportDefinition.columns[0]?.key] ?? "linha"}`}
                       className={`border-t border-slate-200 transition dark:border-zinc-800 ${rowHover}`}
                     >
                       {reportDefinition.columns.map((column) => (
@@ -471,7 +454,7 @@ export default function RelatoriosPage() {
 
       <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
         <div className="mb-5">
-          <h3 className={`text-2xl font-semibold ${titleText}`}>Atividade Recente</h3>
+          <h3 className={`text-2xl font-semibold ${titleText}`}>Atividade recente</h3>
           <p className={`mt-1 text-sm ${mutedText}`}>
             Ultimas ordens de servico atualizadas conforme os filtros aplicados.
           </p>
@@ -481,13 +464,13 @@ export default function RelatoriosPage() {
           <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
             Carregando atividade recente...
           </div>
-        ) : atividadeRecente.length === 0 ? (
+        ) : (dadosRelatorio?.atividadeRecente ?? []).length === 0 ? (
           <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
             Nenhuma atividade encontrada para os filtros selecionados.
           </div>
         ) : (
           <div className="space-y-3">
-            {atividadeRecente.map((ordem) => (
+            {(dadosRelatorio?.atividadeRecente ?? []).map((ordem) => (
               <div
                 key={ordem.id}
                 className={`flex flex-col gap-3 rounded-2xl border p-4 md:flex-row md:items-center md:justify-between ${softCard}`}
@@ -496,7 +479,7 @@ export default function RelatoriosPage() {
                   <p className={`text-lg font-semibold ${titleText}`}>{ordem.numero}</p>
                   <p className={`text-sm ${mutedText}`}>{ordem.nome_cliente || ordem.tipo}</p>
                 </div>
-                <div className="text-right">
+                <div className="flex flex-col items-start gap-2 text-left md:items-end md:text-right">
                   <p className={`text-sm font-medium capitalize ${titleText}`}>
                     {formatStatus(ordem.status)}
                   </p>
@@ -508,31 +491,6 @@ export default function RelatoriosPage() {
         )}
       </section>
     </AdminShell>
-  );
-}
-
-function TopMetric({
-  value,
-  label,
-  accent,
-  cardBg,
-  titleText,
-  mutedText,
-}: {
-  value: number;
-  label: string;
-  accent: string;
-  cardBg: string;
-  titleText: string;
-  mutedText: string;
-}) {
-  return (
-    <div className={`rounded-3xl border p-5 shadow-sm ${cardBg}`}>
-      <p className={`text-4xl font-semibold ${accent}`}>{value}</p>
-      <p className={`mt-1 text-sm ${mutedText}`}>{label}</p>
-      <div className="mt-4 h-px w-full bg-slate-100 dark:bg-zinc-800" />
-      <p className={`mt-3 text-sm ${titleText}`}>Painel consolidado</p>
-    </div>
   );
 }
 

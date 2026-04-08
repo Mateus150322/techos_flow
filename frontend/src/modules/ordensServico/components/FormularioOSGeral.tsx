@@ -130,7 +130,6 @@ export default function FormularioOSGeral({
       setForm(initialForm);
       onCriada?.(ordemCriada);
     } catch (error) {
-      console.error("Erro ao criar OS:", error);
       const errors = getApiValidationErrors(error);
       const message = getApiErrorMessage(error, "");
 
@@ -157,6 +156,9 @@ export default function FormularioOSGeral({
   const inputBg = isDark
     ? "bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-500"
     : "bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400";
+  const sectionCard = isDark
+    ? "rounded-2xl border border-slate-800 bg-slate-950/70 p-5"
+    : "rounded-2xl border border-slate-200 bg-slate-50 p-5";
   const mutedText = isDark ? "text-slate-400" : "text-slate-500";
   const titleText = isDark ? "text-white" : "text-slate-900";
 
@@ -165,6 +167,9 @@ export default function FormularioOSGeral({
       <div className="mb-6">
         <h2 className={`text-2xl font-semibold ${titleText}`}>{titulo}</h2>
         <p className={`mt-2 text-sm ${mutedText}`}>{descricao}</p>
+        <p className={`mt-3 text-xs uppercase tracking-[0.16em] ${mutedText}`}>
+          Campos marcados com * sao obrigatorios
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -180,77 +185,89 @@ export default function FormularioOSGeral({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div>
-            <label htmlFor="tipoServico" className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Tipo de Serviço *
+        <section className={sectionCard}>
+          <div className="mb-5">
+            <h3 className={`text-xl font-semibold ${titleText}`}>Dados da OS</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              Identifique o tipo da solicitacao e o cliente atendido.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div>
+              <label htmlFor="tipoServico" className={`mb-2 block text-sm font-medium ${titleText}`}>
+                Tipo de Serviço *
+              </label>
+              <select
+                id="tipoServico"
+                value={form.tipoServico}
+                onChange={(event) => updateField("tipoServico", event.target.value)}
+                disabled={enviando}
+                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+              >
+                <option value="">Selecione o tipo</option>
+                <option value="manutencao">Manutenção</option>
+                <option value="instalacao">Instalação</option>
+                <option value="vistoria">Vistoria</option>
+                <option value="leitura">Leitura</option>
+                <option value="reparo">Reparo</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="nomeCliente" className={`mb-2 block text-sm font-medium ${titleText}`}>
+                Nome do Cliente *
+              </label>
+              <input
+                id="nomeCliente"
+                type="text"
+                value={form.nomeCliente}
+                onChange={(event) => updateField("nomeCliente", event.target.value)}
+                disabled={enviando}
+                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 max-w-sm">
+            <label htmlFor="prioridade" className={`mb-2 block text-sm font-medium ${titleText}`}>
+              Prioridade *
             </label>
             <select
-              id="tipoServico"
-              value={form.tipoServico}
-              onChange={(event) => updateField("tipoServico", event.target.value)}
+              id="prioridade"
+              value={form.prioridade}
+              onChange={(event) => updateField("prioridade", event.target.value)}
               disabled={enviando}
               className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
             >
-              <option value="">Selecione o tipo</option>
-              <option value="manutencao">Manutenção</option>
-              <option value="instalacao">Instalação</option>
-              <option value="vistoria">Vistoria</option>
-              <option value="leitura">Leitura</option>
-              <option value="reparo">Reparo</option>
+              <option value="1">Alta</option>
+              <option value="2">Média</option>
+              <option value="3">Baixa</option>
             </select>
           </div>
 
-          <div className="md:col-span-2">
-            <label htmlFor="nomeCliente" className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Nome do Cliente *
+          <div className="mt-6">
+            <label htmlFor="descricao" className={`mb-2 block text-sm font-medium ${titleText}`}>
+              Descrição do Serviço *
             </label>
-            <input
-              id="nomeCliente"
-              type="text"
-              value={form.nomeCliente}
-              onChange={(event) => updateField("nomeCliente", event.target.value)}
+            <textarea
+              id="descricao"
+              rows={4}
+              value={form.descricao}
+              onChange={(event) => updateField("descricao", event.target.value)}
+              placeholder="Descreva o serviço a ser realizado"
               disabled={enviando}
               className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
             />
           </div>
-        </div>
+        </section>
 
-        <div className="max-w-sm">
-          <label htmlFor="prioridade" className={`mb-2 block text-sm font-medium ${titleText}`}>
-            Prioridade *
-          </label>
-          <select
-            id="prioridade"
-            value={form.prioridade}
-            onChange={(event) => updateField("prioridade", event.target.value)}
-            disabled={enviando}
-            className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
-          >
-            <option value="1">Alta</option>
-            <option value="2">Média</option>
-            <option value="3">Baixa</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="descricao" className={`mb-2 block text-sm font-medium ${titleText}`}>
-            Descrição do Serviço *
-          </label>
-          <textarea
-            id="descricao"
-            rows={4}
-            value={form.descricao}
-            onChange={(event) => updateField("descricao", event.target.value)}
-            placeholder="Descreva o serviço a ser realizado"
-            disabled={enviando}
-            className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
-          />
-        </div>
-
-        <div className="space-y-5">
-          <div>
-            <h3 className={`text-xl font-semibold ${titleText}`}>Endereço do Cliente</h3>
+        <section className={sectionCard}>
+          <div className="mb-5">
+            <h3 className={`text-xl font-semibold ${titleText}`}>Endereco do cliente</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              Informe o local que sera usado como referencia para atendimento.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -359,7 +376,7 @@ export default function FormularioOSGeral({
               />
             </div>
           </div>
-        </div>
+        </section>
 
         <button
           type="submit"

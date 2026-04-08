@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('anexos', function (Blueprint $table) {
-            $table->text('endereco_capturado')->nullable()->after('geolocalizacao_capturada_em');
+            if (!Schema::hasColumn('anexos', 'endereco_capturado')) {
+                $table->text('endereco_capturado')->nullable()->after('geolocalizacao_capturada_em');
+            }
         });
     }
 
@@ -22,7 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('anexos', function (Blueprint $table) {
-            $table->dropColumn('endereco_capturado');
+            if (Schema::hasColumn('anexos', 'endereco_capturado')) {
+                $table->dropColumn('endereco_capturado');
+            }
         });
     }
 };

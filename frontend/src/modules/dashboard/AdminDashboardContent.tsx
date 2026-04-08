@@ -1,7 +1,8 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import { AlertTriangle, BarChart3, CheckCircle2, Clock3 } from "lucide-react";
 
 import { AdminShell } from "@/modules/admin/AdminShell";
+import { AdminMetricCard } from "@/modules/admin/components/AdminMetricCard";
 import {
   getTecnicoResponsavel,
   type OrdemServico,
@@ -136,43 +137,47 @@ export function AdminDashboardContent({
   return (
     <AdminShell currentUser={currentUser} activeTab="indicadores">
       <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
+        <AdminMetricCard
           label="Total de OS"
           value={orders.length}
           icon={<BarChart3 className="h-6 w-6 text-blue-500" />}
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
+          hint="Panorama geral da operação"
         />
-        <MetricCard
-          label="Taxa de conclusao"
+        <AdminMetricCard
+          label="Taxa de conclusão"
           value={`${orders.length ? Math.round((finalizadas / orders.length) * 100) : 0}%`}
           icon={<CheckCircle2 className="h-6 w-6 text-emerald-500" />}
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
+          hint="Percentual concluido no conjunto atual"
         />
-        <MetricCard
-          label="Tempo medio"
+        <AdminMetricCard
+          label="Tempo médio"
           value={tempoMedioHoras}
           icon={<Clock3 className="h-6 w-6 text-amber-500" />}
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
+          hint="Media entre abertura e encerramento"
         />
-        <MetricCard
+        <AdminMetricCard
           label="Pendentes"
           value={pendentes}
           icon={<AlertTriangle className="h-6 w-6 text-red-500" />}
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
+          hint="Ordens abertas ou em execução"
         />
       </section>
 
       <section className="mb-6 grid gap-6 xl:grid-cols-2">
         <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-          <h2 className={`text-2xl font-semibold ${titleText}`}>Distribuicao por status</h2>
+          <h2 className={`text-2xl font-semibold ${titleText}`}>Distribuição por status</h2>
           <p className={`mt-1 text-sm ${mutedText}`}>
             Visao geral do status das ordens de servico.
           </p>
@@ -219,7 +224,7 @@ export function AdminDashboardContent({
                 mutedText={mutedText}
               />
               <LegendItem
-                label={`Em execucao: ${statusPercentages.emExecucao}%`}
+                label={`Em execução: ${statusPercentages.emExecucao}%`}
                 color="bg-amber-400"
                 mutedText={mutedText}
               />
@@ -229,7 +234,7 @@ export function AdminDashboardContent({
                 mutedText={mutedText}
               />
               <LegendItem
-                label={`Nao executadas: ${statusPercentages.naoExecutadas}%`}
+                label={`Não executadas: ${statusPercentages.naoExecutadas}%`}
                 color="bg-red-500"
                 mutedText={mutedText}
               />
@@ -243,35 +248,39 @@ export function AdminDashboardContent({
         </div>
 
         <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-          <h2 className={`text-2xl font-semibold ${titleText}`}>OS por tipo de servico</h2>
+          <h2 className={`text-2xl font-semibold ${titleText}`}>OS por tipo de serviço</h2>
           <p className={`mt-1 text-sm ${mutedText}`}>Quantidade de ordens por categoria.</p>
 
-          <div className="mt-8 flex min-h-[320px] items-end gap-4">
-            {tiposBreakdown.map((item) => (
-              <div key={item.tipo} className="flex flex-1 flex-col items-center gap-3">
-                <div className={`flex h-72 w-full items-end rounded-2xl ${barTrack}`}>
-                  <div
-                    className="w-full rounded-2xl bg-blue-500"
-                    style={{
-                      height: `${Math.max(
-                        (item.total / Math.max(...tiposBreakdown.map((tipo) => tipo.total), 1)) * 100,
-                        item.total ? 16 : 0
-                      )}%`,
-                    }}
-                  />
+          <div className="mt-8 overflow-x-auto pb-2">
+            <div className="flex min-h-[320px] min-w-[420px] items-end gap-4">
+              {tiposBreakdown.map((item) => (
+                <div key={item.tipo} className="flex flex-1 flex-col items-center gap-3">
+                  <div className={`flex h-72 w-full items-end rounded-2xl ${barTrack}`}>
+                    <div
+                      className="w-full rounded-2xl bg-blue-500"
+                      style={{
+                        height: `${Math.max(
+                          (item.total /
+                            Math.max(...tiposBreakdown.map((tipo) => tipo.total), 1)) *
+                            100,
+                          item.total ? 16 : 0
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="text-center">
+                    <p className={`text-sm font-medium ${titleText}`}>{item.tipo}</p>
+                    <p className={`text-xs ${mutedText}`}>{item.total}</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className={`text-sm font-medium ${titleText}`}>{item.tipo}</p>
-                  <p className={`text-xs ${mutedText}`}>{item.total}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-        <h2 className={`text-2xl font-semibold ${titleText}`}>Produtividade dos tecnicos</h2>
+        <h2 className={`text-2xl font-semibold ${titleText}`}>Produtividade dos técnicos</h2>
         <p className={`mt-1 text-sm ${mutedText}`}>
           Comparacao entre OS atribuidas e finalizadas por tecnico.
         </p>
@@ -328,7 +337,7 @@ export function AdminDashboardContent({
       </section>
 
       <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-        <h2 className={`text-2xl font-semibold ${titleText}`}>Resumo do mes atual</h2>
+        <h2 className={`text-2xl font-semibold ${titleText}`}>Resumo do mês atual</h2>
         <p className={`mt-1 text-sm ${mutedText}`}>Indicadores com base nas OS abertas neste mes.</p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -340,7 +349,7 @@ export function AdminDashboardContent({
             mutedText={mutedText}
           />
           <SoftMetric
-            label="Em execucao"
+            label="Em execução"
             value={ordensDoMesAtual.filter((os) => os.status === "em_execucao").length}
             softBg={softBg}
             titleText={titleText}
@@ -354,7 +363,7 @@ export function AdminDashboardContent({
             mutedText={mutedText}
           />
           <SoftMetric
-            label="Tecnicos ativos"
+            label="Técnicos ativos"
             value={
               new Set(
                 ordensDoMesAtual
@@ -378,6 +387,10 @@ export function AdminDashboardContent({
             <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
               Carregando atividade...
             </div>
+          ) : recentOrders.length === 0 ? (
+            <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
+              Nenhuma atividade recente encontrada.
+            </div>
           ) : (
             recentOrders.map((ordem) => (
               <div
@@ -400,34 +413,6 @@ export function AdminDashboardContent({
         </div>
       </section>
     </AdminShell>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  icon,
-  cardBg,
-  titleText,
-  mutedText,
-}: {
-  label: string;
-  value: string | number;
-  icon: ReactNode;
-  cardBg: string;
-  titleText: string;
-  mutedText: string;
-}) {
-  return (
-    <div className={`rounded-3xl border p-5 shadow-sm ${cardBg}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className={`text-sm ${mutedText}`}>{label}</p>
-          <p className={`mt-3 text-4xl font-semibold ${titleText}`}>{value}</p>
-        </div>
-        {icon}
-      </div>
-    </div>
   );
 }
 
