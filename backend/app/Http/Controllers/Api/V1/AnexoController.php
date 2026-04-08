@@ -8,6 +8,8 @@ use App\Models\Anexo;
 use App\Models\OrdemServico;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 
 class AnexoController extends Controller
 {
@@ -33,7 +35,7 @@ class AnexoController extends Controller
         }
 
         $arquivo = $request->file('arquivo');
-        $caminho = $arquivo->store('anexos', 'public');
+        $caminho = $arquivo->store('anexos', 'local');
 
         $tipo = $request->input('tipo');
 
@@ -64,18 +66,79 @@ class AnexoController extends Controller
 
         return response()->json([
             'message' => 'Anexo enviado com sucesso.',
-            'anexo' => [
-                'id' => $anexo->id,
-                'caminho' => $anexo->caminho,
-                'tipo' => $anexo->tipo,
-                'url' => asset('storage/' . $anexo->caminho),
-                'latitude' => $anexo->latitude,
-                'longitude' => $anexo->longitude,
-                'precisao_metros' => $anexo->precisao_metros,
-                'geolocalizacao_capturada_em' => optional($anexo->geolocalizacao_capturada_em)->toISOString(),
-                'endereco_capturado' => $anexo->endereco_capturado,
-            ],
+            'anexo' => $this->buildAnexoPayload($anexo),
         ], 201);
     }
 
+    public function show(Request $request, string $id)
+    {
+        $user = $request->user();
+        $anexo = Anexo::query()->with('ordemServico')->findOrFail($id);
+        $ordemServico = $anexo->ordemServico;
+
+        if (! $ordemServico) {
+            abort(404);
+        }
+
+        if (! in_array($user->role, ['atendente', 'tecnico', 'administrador'], true)) {
+            return response()->json([
+                'message' => 'Acesso negado ao anexo solicitado.',
+            ], 403);
+        }
+
+        $disk = $this->resolveStorageDisk($anexo->caminho);
+
+        if (! $disk) {
+            abort(404);
+        }
+
+        $fileName = basename((string) $anexo->caminho);
+        $mimeType = Storage::disk($disk)->mimeType($anexo->caminho) ?: 'application/octet-stream';
+        $disposition = str_starts_with($mimeType, 'image/') || $mimeType === 'application/pdf'
+            ? ResponseHeaderBag::DISPOSITION_INLINE
+            : ResponseHeaderBag::DISPOSITION_ATTACHMENT;
+        $headers = new ResponseHeaderBag();
+
+        return response()->file(
+            Storage::disk($disk)->path($anexo->caminho),
+            [
+                'Content-Type' => $mimeType,
+                'Content-Disposition' => $headers->makeDisposition($disposition, $fileName),
+                'Cache-Control' => 'private, no-store, max-age=0',
+                'Pragma' => 'no-cache',
+                'X-Content-Type-Options' => 'nosniff',
+            ]
+        );
+    }
+
+    private function buildAnexoPayload(Anexo $anexo): array
+    {
+        return [
+            'id' => $anexo->id,
+            'caminho' => $anexo->caminho,
+            'tipo' => $anexo->tipo,
+            'latitude' => $anexo->latitude,
+            'longitude' => $anexo->longitude,
+            'precisao_metros' => $anexo->precisao_metros,
+            'geolocalizacao_capturada_em' => optional($anexo->geolocalizacao_capturada_em)->toISOString(),
+            'endereco_capturado' => $anexo->endereco_capturado,
+        ];
+    }
+
+    private function resolveStorageDisk(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (Storage::disk('local')->exists($path)) {
+            return 'local';
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            return 'public';
+        }
+
+        return null;
+    }
 }

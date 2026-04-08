@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -13,31 +13,52 @@ import FormularioOSGeral from "@/modules/ordensServico/components/FormularioOSGe
 import { PainelOperacionalHeader } from "@/modules/ordensServico/components/PainelOperacionalHeader";
 import { ResumoMetricaCard } from "@/modules/ordensServico/components/ResumoMetricaCard";
 import { TabelaOrdensSection } from "@/modules/ordensServico/components/TabelaOrdensSection";
-import {
-  getTecnicoResponsavel,
-  type OrdemServico,
-} from "@/modules/ordensServico/ordensServico.service";
+import { getTecnicoResponsavel, type OrdemServico } from "@/modules/ordensServico/ordensServico.service";
 import { type CurrentUser } from "@/shared/auth/session";
 import { useTheme } from "@/shared/hooks/useTheme";
+import { getApiErrorMessage } from "@/shared/utils/apiError";
+import { buscarDashboardAtendente, type AtendenteDashboardResponse } from "./dashboard.service";
 
 type AtendenteDashboardContentProps = {
   currentUser: CurrentUser;
-  orders: OrdemServico[];
-  loading: boolean;
 };
 
 type AbaPrincipal = "criar" | "consultar";
 
 export function AtendenteDashboardContent({
   currentUser,
-  orders,
-  loading,
 }: AtendenteDashboardContentProps) {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
 
   const [abaPrincipal, setAbaPrincipal] = useState<AbaPrincipal>("consultar");
   const [busca, setBusca] = useState("");
+  const buscaAplicada = useDeferredValue(busca);
+  const [dashboard, setDashboard] = useState<AtendenteDashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    if (abaPrincipal !== "consultar") {
+      return;
+    }
+
+    async function carregarDashboard() {
+      try {
+        setLoading(true);
+        setErro("");
+        const data = await buscarDashboardAtendente(buscaAplicada);
+        setDashboard(data);
+      } catch (error) {
+        setDashboard(null);
+        setErro(getApiErrorMessage(error, "Nao foi possivel carregar as ordens de servico."));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void carregarDashboard();
+  }, [abaPrincipal, buscaAplicada]);
 
   async function handleLogout() {
     await logoutSession();
@@ -50,44 +71,13 @@ export function AtendenteDashboardContent({
   }
 
   function nomeResponsavel(os: OrdemServico) {
-    return getTecnicoResponsavel(os)?.name || "Sem responsável";
+    return getTecnicoResponsavel(os)?.name || "Sem responsavel";
   }
 
-  const ordensFiltradas = useMemo(() => {
-    const termo = busca.toLowerCase().trim();
-
-    return orders.filter((os) => {
-      if (!termo) return true;
-
-      const responsavel = getTecnicoResponsavel(os)?.name?.toLowerCase() ?? "";
-      const status = os.status.replaceAll("_", " ").toLowerCase();
-
-      return [
-        os.numero,
-        os.tipo,
-        os.nome_cliente,
-        os.descricao,
-        responsavel,
-        status,
-      ]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(termo));
-    });
-  }, [busca, orders]);
-
-  const ordensAbertas = useMemo(() => {
-    return ordensFiltradas.filter((os) => os.status === "aberta");
-  }, [ordensFiltradas]);
-
-  const ordensEmExecucao = useMemo(() => {
-    return ordensFiltradas.filter((os) => os.status === "em_execucao");
-  }, [ordensFiltradas]);
-
-  const ordensEncerradas = useMemo(() => {
-    return ordensFiltradas.filter((os) =>
-      ["finalizada", "nao_executada", "cancelada"].includes(os.status)
-    );
-  }, [ordensFiltradas]);
+  const resumo = dashboard?.resumo;
+  const ordensAbertas = dashboard?.secoes.abertas ?? [];
+  const ordensEmExecucao = dashboard?.secoes.em_execucao ?? [];
+  const ordensEncerradas = dashboard?.secoes.encerradas ?? [];
 
   const pageBg = isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900";
   const headerBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
@@ -153,20 +143,11 @@ export function AtendenteDashboardContent({
         </div>
 
         {abaPrincipal === "criar" && (
-          <div className="space-y-6">
-            <div className={`rounded-2xl border p-4 text-sm ${cardBg}`}>
-              <p className={titleText}>Abertura geral sob responsabilidade do atendente.</p>
-              <p className={`mt-2 ${mutedText}`}>
-                Use este painel para registrar novas ordens e acompanhar o andamento da operação.
-              </p>
-            </div>
-
-            <FormularioOSGeral
-              titulo="Nova OS geral"
-              descricao="Abra uma nova ordem de serviço com cliente, prioridade, descrição e endereço."
-              onCriada={(ordemCriada) => navigate(`/ordens-servico/${ordemCriada.id}`)}
-            />
-          </div>
+          <FormularioOSGeral
+            titulo="Nova OS geral"
+            descricao="Abra uma nova ordem de servico com cliente, prioridade, descricao e endereco."
+            onCriada={(ordemCriada) => navigate(`/ordens-servico/${ordemCriada.id}`)}
+          />
         )}
 
         {abaPrincipal === "consultar" && (
@@ -174,7 +155,7 @@ export function AtendenteDashboardContent({
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <ResumoMetricaCard
                 titulo="Total de OS"
-                valor={orders.length}
+                valor={resumo?.total ?? 0}
                 icone={<ClipboardList className="h-5 w-5 text-blue-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
@@ -184,7 +165,7 @@ export function AtendenteDashboardContent({
 
               <ResumoMetricaCard
                 titulo="Abertas"
-                valor={ordensAbertas.length}
+                valor={resumo?.abertas ?? 0}
                 icone={<FilePlus2 className="h-5 w-5 text-sky-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
@@ -193,8 +174,8 @@ export function AtendenteDashboardContent({
               />
 
               <ResumoMetricaCard
-                titulo="Em execução"
-                valor={ordensEmExecucao.length}
+                titulo="Em execucao"
+                valor={resumo?.em_execucao ?? 0}
                 icone={<PlayCircle className="h-5 w-5 text-amber-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
@@ -204,7 +185,7 @@ export function AtendenteDashboardContent({
 
               <ResumoMetricaCard
                 titulo="Encerradas"
-                valor={ordensEncerradas.length}
+                valor={resumo?.encerradas ?? 0}
                 icone={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
@@ -216,9 +197,9 @@ export function AtendenteDashboardContent({
             <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
               <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <h2 className={`text-2xl font-semibold ${titleText}`}>Ordens de Serviço</h2>
+                  <h2 className={`text-2xl font-semibold ${titleText}`}>Ordens de Servico</h2>
                   <p className={`mt-2 text-sm ${mutedText}`}>
-                    Consulte o andamento das ordens abertas pelo atendimento e pela operação.
+                    Consulte o andamento das ordens abertas pelo atendimento e pela operacao.
                   </p>
                 </div>
 
@@ -229,16 +210,28 @@ export function AtendenteDashboardContent({
                       type="text"
                       value={busca}
                       onChange={(event) => setBusca(event.target.value)}
-                      placeholder="Buscar por número, cliente, tipo, status ou responsável..."
+                      placeholder="Buscar por numero, cliente, tipo, status ou responsavel..."
                       className={inputClass}
                     />
                   </div>
                 </div>
               </div>
 
+              {erro ? (
+                <div
+                  className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
+                    isDark
+                      ? "border-red-900 bg-red-950 text-red-300"
+                      : "border-red-200 bg-red-50 text-red-700"
+                  }`}
+                >
+                  {erro}
+                </div>
+              ) : null}
+
               <TabelaOrdensSection
                 titulo="Abertas"
-                descricao="Ordens aguardando aceite ou início da execução."
+                descricao="Ordens aguardando aceite ou inicio da execucao."
                 ordens={ordensAbertas}
                 loading={loading}
                 isDark={isDark}
@@ -253,8 +246,8 @@ export function AtendenteDashboardContent({
               />
 
               <TabelaOrdensSection
-                titulo="Em execução"
-                descricao="Ordens atualmente em andamento com a equipe técnica."
+                titulo="Em execucao"
+                descricao="Ordens atualmente em andamento com a equipe tecnica."
                 ordens={ordensEmExecucao}
                 loading={loading}
                 isDark={isDark}
@@ -270,7 +263,7 @@ export function AtendenteDashboardContent({
 
               <TabelaOrdensSection
                 titulo="Encerradas"
-                descricao="Ordens concluídas, não executadas ou canceladas."
+                descricao="Ordens concluidas, nao executadas ou canceladas."
                 ordens={ordensEncerradas}
                 loading={loading}
                 isDark={isDark}
@@ -286,7 +279,7 @@ export function AtendenteDashboardContent({
 
               {!loading && (
                 <div className={`mt-4 text-sm ${mutedText}`}>
-                  Exibindo {ordensFiltradas.length} de {orders.length} ordens de serviço.
+                  Exibindo ate {ordensAbertas.length + ordensEmExecucao.length + ordensEncerradas.length} ordens no painel consultado.
                 </div>
               )}
             </div>

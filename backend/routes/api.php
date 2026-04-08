@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AnexoController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\ExecucaoController;
 use App\Http\Controllers\Api\V1\OrdemServicoController;
 use App\Http\Controllers\Api\V1\RelatorioController;
@@ -25,6 +26,7 @@ Route::prefix('v1')->group(function () {
                 });
 
                 Route::middleware('role:administrador')->group(function () {
+                    Route::get('/dashboard/admin', [DashboardController::class, 'admin']);
                     Route::get('/relatorios/ordens-servico', [RelatorioController::class, 'ordensServico']);
                     Route::get('/relatorios/ordens-servico/exportar/{format}', [RelatorioController::class, 'exportOrdensServico']);
                     Route::get('/usuarios', [UsuarioController::class, 'index']);
@@ -34,6 +36,7 @@ Route::prefix('v1')->group(function () {
                 });
 
                 Route::middleware('role:tecnico')->group(function () {
+                    Route::get('/dashboard/tecnico', [DashboardController::class, 'tecnico']);
                     Route::post('/ordens-servico/{id}/iniciar', [ExecucaoController::class, 'store']);
                     Route::post('/ordens-servico/{id}/execucoes/finalizar', [ExecucaoController::class, 'finalizar']);
                     Route::post('/ordens-servico/{id}/nao-executada', [OrdemServicoController::class, 'marcarNaoExecutada']);
@@ -41,8 +44,15 @@ Route::prefix('v1')->group(function () {
                     Route::post('/ordens-servico/{id}/aceitar', [OrdemServicoController::class, 'aceitar']);
                 });
 
+                Route::middleware('role:atendente')->group(function () {
+                    Route::get('/dashboard/atendente', [DashboardController::class, 'atendente']);
+                });
+
+                Route::get('/ordens-servico/opcoes-filtro', [OrdemServicoController::class, 'filterOptions']);
+                Route::get('/ordens-servico/resumo', [OrdemServicoController::class, 'summary']);
                 Route::get('/ordens-servico', [OrdemServicoController::class, 'index']);
                 Route::get('/ordens-servico/{id}', [OrdemServicoController::class, 'show']);
+                Route::get('/anexos/{id}/arquivo', [AnexoController::class, 'show']);
             });
         });
     });

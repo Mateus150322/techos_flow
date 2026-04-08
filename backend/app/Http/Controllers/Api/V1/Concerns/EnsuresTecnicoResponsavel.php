@@ -11,19 +11,19 @@ trait EnsuresTecnicoResponsavel
     {
         if ($user->role !== 'tecnico') {
             return response()->json([
-                'message' => 'Apenas técnicos podem executar esta ação.',
+                'message' => 'Apenas tecnicos podem executar esta acao.',
             ], 403);
         }
 
-        if (!$os->tecnico_responsavel_id) {
+        if (! $os->tecnico_responsavel_id) {
             return response()->json([
-                'message' => 'A OS precisa ser aceita por um técnico antes desta ação.',
+                'message' => 'A OS precisa ser aceita por um tecnico antes desta acao.',
             ], 422);
         }
 
         if ($os->tecnico_responsavel_id !== $user->id) {
             return response()->json([
-                'message' => 'Esta OS está atribuída a outro técnico.',
+                'message' => 'Esta OS esta atribuida a outro tecnico.',
             ], 403);
         }
 

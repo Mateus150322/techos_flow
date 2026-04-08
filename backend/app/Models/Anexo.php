@@ -26,19 +26,12 @@ class Anexo extends Model
 
     public $timestamps = true;
 
-    protected $appends = ['url'];
-
     protected $casts = [
         'latitude' => 'float',
         'longitude' => 'float',
         'precisao_metros' => 'float',
         'geolocalizacao_capturada_em' => 'datetime',
     ];
-
-    public function getUrlAttribute()
-    {
-        return asset('storage/' . $this->caminho);
-    }
 
     public function ordemServico()
     {

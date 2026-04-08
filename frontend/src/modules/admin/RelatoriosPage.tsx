@@ -29,6 +29,8 @@ import { useCurrentUser } from "@/shared/auth/session";
 import { useTheme } from "@/shared/hooks/useTheme";
 import { getApiErrorMessage } from "@/shared/utils/apiError";
 
+const REPORTS_PER_PAGE = 20;
+
 export default function RelatoriosPage() {
   const { isDark } = useTheme();
   const currentUser = useCurrentUser();
@@ -38,6 +40,7 @@ export default function RelatoriosPage() {
   const [filtros, setFiltros] = useState<FiltrosRelatorio>(INITIAL_FILTERS);
   const [filtrosAplicados, setFiltrosAplicados] =
     useState<FiltrosRelatorio>(INITIAL_FILTERS);
+  const [paginaAtual, setPaginaAtual] = useState(1);
   const [dadosRelatorio, setDadosRelatorio] = useState<RelatoriosResponse | null>(null);
   const [exportandoFormato, setExportandoFormato] = useState<RelatorioExportFormat | null>(null);
 
@@ -55,18 +58,20 @@ export default function RelatoriosPage() {
           tecnicoId: filtrosAplicados.tecnicoId,
           dataInicio: filtrosAplicados.dataInicio,
           dataFim: filtrosAplicados.dataFim,
+          page: paginaAtual,
+          perPage: REPORTS_PER_PAGE,
         });
 
         setDadosRelatorio(response);
       } catch (error) {
-        setErro(getApiErrorMessage(error, "Não foi possível carregar os relatórios."));
+        setErro(getApiErrorMessage(error, "Nao foi possivel carregar os relatorios."));
       } finally {
         setLoading(false);
       }
     }
 
     void load();
-  }, [filtrosAplicados]);
+  }, [filtrosAplicados, paginaAtual]);
 
   const cardBg = isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-slate-200";
   const softCard = isDark ? "bg-zinc-950/70 border-zinc-800" : "bg-slate-50 border-slate-200";
@@ -86,6 +91,7 @@ export default function RelatoriosPage() {
 
   function aplicarFiltros() {
     setFiltrosAplicados({ ...filtros });
+    setPaginaAtual(1);
   }
 
   function getLabelExportacao(formato: RelatorioExportFormat, labelPadrao: string) {
@@ -116,7 +122,7 @@ export default function RelatoriosPage() {
 
       URL.revokeObjectURL(url);
     } catch (error) {
-      setErro(getApiErrorMessage(error, "Não foi possível exportar o relatório."));
+      setErro(getApiErrorMessage(error, "Nao foi possivel exportar o relatorio."));
     } finally {
       setExportandoFormato(null);
     }
@@ -145,6 +151,13 @@ export default function RelatoriosPage() {
     rows: [],
   };
 
+  const reportPagination = dadosRelatorio?.reportPagination ?? {
+    page: 1,
+    perPage: REPORTS_PER_PAGE,
+    lastPage: 1,
+    total: 0,
+  };
+
   return (
     <AdminShell currentUser={currentUser} activeTab="relatorios">
       <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -155,7 +168,7 @@ export default function RelatoriosPage() {
           titleText={titleText}
           mutedText={mutedText}
           accentClass="text-blue-500"
-          hint="Volume consolidado do relatório"
+          hint="Volume consolidado do relatorio"
         />
         <AdminMetricCard
           value={resumo.abertas}
@@ -168,7 +181,7 @@ export default function RelatoriosPage() {
         />
         <AdminMetricCard
           value={resumo.emExecucao}
-          label="Em execução"
+          label="Em execucao"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
@@ -182,7 +195,7 @@ export default function RelatoriosPage() {
           titleText={titleText}
           mutedText={mutedText}
           accentClass="text-emerald-500"
-          hint="Ordens concluídas"
+          hint="Ordens concluidas"
         />
       </section>
 
@@ -192,16 +205,16 @@ export default function RelatoriosPage() {
             <FileText className="h-5 w-5" />
           </div>
           <div>
-            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerar Relatório</h2>
+            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerar Relatorio</h2>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Relatório geral, por status, produtividade, tipo de serviço e período.
+              Relatorio geral, por status, produtividade, tipo de servico e periodo.
             </p>
           </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="block">
-            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tipo de Relatório</span>
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tipo de Relatorio</span>
             <select
               value={filtros.tipoRelatorio}
               onChange={(event) =>
@@ -212,11 +225,11 @@ export default function RelatoriosPage() {
               }
               className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
             >
-              <option value="geral">Relatório geral de OS</option>
+              <option value="geral">Relatorio geral de OS</option>
               <option value="status">Relatorio por status</option>
-              <option value="produtividade">Produtividade dos técnicos</option>
-              <option value="tipo">Relatório por tipo de serviço</option>
-              <option value="periodo">Relatório por período</option>
+              <option value="produtividade">Produtividade dos tecnicos</option>
+              <option value="tipo">Relatorio por tipo de servico</option>
+              <option value="periodo">Relatorio por periodo</option>
             </select>
           </label>
 
@@ -234,9 +247,9 @@ export default function RelatoriosPage() {
             >
               <option value="todos">Todos os status</option>
               <option value="aberta">Aberta</option>
-              <option value="em_execucao">Em execução</option>
+              <option value="em_execucao">Em execucao</option>
               <option value="finalizada">Finalizada</option>
-              <option value="nao_executada">Não executada</option>
+              <option value="nao_executada">Nao executada</option>
               <option value="cancelada">Cancelada</option>
             </select>
           </label>
@@ -274,7 +287,7 @@ export default function RelatoriosPage() {
           </label>
 
           <label className="block">
-            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Técnico responsável</span>
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tecnico responsavel</span>
             <select
               value={filtros.tecnicoId}
               onChange={(event) =>
@@ -282,7 +295,7 @@ export default function RelatoriosPage() {
               }
               className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
             >
-              <option value="todos">Todos os técnicos</option>
+              <option value="todos">Todos os tecnicos</option>
               {(dadosRelatorio?.tecnicos ?? []).map((tecnico) => (
                 <option key={tecnico.id} value={tecnico.id}>
                   {tecnico.name}
@@ -292,7 +305,7 @@ export default function RelatoriosPage() {
           </label>
 
           <div>
-            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Período</span>
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Periodo</span>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="relative block">
                 <CalendarRange
@@ -332,7 +345,7 @@ export default function RelatoriosPage() {
             className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium transition ${primaryButton}`}
           >
             <Filter className="h-4 w-4" />
-            Gerar Relatório
+            Gerar Relatorio
           </button>
 
           <button
@@ -383,7 +396,7 @@ export default function RelatoriosPage() {
         <div className="mb-5">
           <h3 className={`text-2xl font-semibold ${titleText}`}>{reportDefinition.title}</h3>
           <p className={`mt-1 text-sm ${mutedText}`}>
-            Data de emissão: {dadosRelatorio?.dataEmissao ?? "-"} | Período:{" "}
+            Data de emissao: {dadosRelatorio?.dataEmissao ?? "-"} | Periodo:{" "}
             {dadosRelatorio?.periodoDescricao ?? "-"}
           </p>
           <p className={`mt-1 text-sm ${mutedText}`}>
@@ -394,9 +407,9 @@ export default function RelatoriosPage() {
         <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <ResumoCard label="Total de OS" value={resumo.total} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
           <ResumoCard label="Abertas" value={resumo.abertas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
-          <ResumoCard label="Em execução" value={resumo.emExecucao} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <ResumoCard label="Em execucao" value={resumo.emExecucao} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
           <ResumoCard label="Finalizadas" value={resumo.finalizadas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
-          <ResumoCard label="Não executadas" value={resumo.naoExecutadas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <ResumoCard label="Nao executadas" value={resumo.naoExecutadas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
           <ResumoCard label="Canceladas" value={resumo.canceladas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
         </div>
 
@@ -447,9 +460,37 @@ export default function RelatoriosPage() {
         </div>
 
         <div className={`mt-4 text-sm ${mutedText}`}>
-          Total de registros: {reportDefinition.rows.length} | Responsavel pela emissao:{" "}
+          Total de registros: {reportPagination.total} | Responsavel pela emissao:{" "}
           {currentUser.name}
         </div>
+
+        {reportPagination.lastPage > 1 && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 text-sm dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">
+            <p className={mutedText}>
+              Pagina {reportPagination.page} de {reportPagination.lastPage}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={loading || reportPagination.page <= 1}
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                className={`rounded-2xl border px-4 py-2 font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${secondaryButton}`}
+              >
+                Pagina anterior
+              </button>
+              <button
+                type="button"
+                disabled={loading || reportPagination.page >= reportPagination.lastPage}
+                onClick={() =>
+                  setPaginaAtual((prev) => Math.min(prev + 1, reportPagination.lastPage))
+                }
+                className={`rounded-2xl border px-4 py-2 font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${secondaryButton}`}
+              >
+                Proxima pagina
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>

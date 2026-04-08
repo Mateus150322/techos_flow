@@ -21,7 +21,7 @@ class RelatoriosAdminTest extends TestCase
 
         $this->criarOs($tecnico->id, [
             'numero' => '2026-000111',
-            'tipo' => 'Manutenção ETA/ETE',
+            'tipo' => 'Manutencao ETA/ETE',
             'status' => 'finalizada',
         ]);
 
@@ -32,7 +32,37 @@ class RelatoriosAdminTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('resumo.total', 1)
-            ->assertJsonPath('reportDefinition.title', 'Relatório por Status');
+            ->assertJsonPath('reportDefinition.title', 'Relatorio por Status');
+    }
+
+    public function test_visualizacao_do_relatorio_geral_e_paginada(): void
+    {
+        $admin = $this->criarUsuario('administrador');
+        $tecnico = $this->criarUsuario('tecnico', 'Tecnico Campo');
+
+        $this->criarOs($tecnico->id, [
+            'numero' => '2026-000301',
+            'tipo' => 'Manutencao ETA/ETE',
+            'status' => 'aberta',
+        ]);
+
+        $this->criarOs($tecnico->id, [
+            'numero' => '2026-000302',
+            'tipo' => 'Manutencao ETA/ETE',
+            'status' => 'finalizada',
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/v1/relatorios/ordens-servico?tipo_relatorio=geral&per_page=1&page=1');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('reportPagination.total', 2)
+            ->assertJsonPath('reportPagination.perPage', 1)
+            ->assertJsonPath('reportPagination.lastPage', 2);
+
+        $this->assertCount(1, $response->json('reportDefinition.rows'));
     }
 
     public function test_nao_admin_nao_pode_consultar_relatorio_de_ordens(): void
@@ -53,7 +83,7 @@ class RelatoriosAdminTest extends TestCase
 
         $this->criarOs($tecnico->id, [
             'numero' => '2026-000222',
-            'tipo' => 'Manutenção ETA/ETE',
+            'tipo' => 'Manutencao ETA/ETE',
             'status' => 'finalizada',
             'descricao' => 'Troca de bomba principal',
         ]);
@@ -73,7 +103,7 @@ class RelatoriosAdminTest extends TestCase
             'attachment;',
             (string) $csvResponse->headers->get('content-disposition')
         );
-        $this->assertStringContainsString('Número da OS', $csvResponse->getContent());
+        $this->assertStringContainsString('Numero da OS', $csvResponse->streamedContent());
 
         $xlsxResponse->assertOk();
         $this->assertStringContainsString(
@@ -91,6 +121,43 @@ class RelatoriosAdminTest extends TestCase
         $this->assertStringStartsWith('%PDF-', $pdfContent);
         $this->assertStringContainsString('Assinatura/', $pdfContent);
         $this->assertStringContainsString('Documento administrativo interno', $pdfContent);
+    }
+
+    public function test_exportacao_pdf_bloqueia_volume_muito_grande(): void
+    {
+        $admin = $this->criarUsuario('administrador');
+        $tecnico = $this->criarUsuario('tecnico', 'Tecnico Campo');
+        $criador = $this->criarUsuario('atendente', 'Atendente Base');
+        $endereco = Endereco::query()->create([
+            'rua' => 'Rua Teste',
+            'numero' => '100',
+            'bairro' => 'Centro',
+            'cidade' => 'Rio Branco',
+            'estado' => 'AC',
+            'cep' => '69900000',
+        ]);
+
+        foreach (range(1, 1001) as $index) {
+            OrdemServico::query()->create([
+                'numero' => sprintf('2026-%06d', $index),
+                'tipo' => 'Manutencao ETA/ETE',
+                'nome_cliente' => 'Cliente ' . $index,
+                'status' => 'finalizada',
+                'prioridade' => 2,
+                'descricao' => 'Descricao ' . $index,
+                'endereco_id' => $endereco->id,
+                'criada_por_id' => $criador->id,
+                'tecnico_responsavel_id' => $tecnico->id,
+            ]);
+        }
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->get('/api/v1/relatorios/ordens-servico/exportar/pdf');
+
+        $response
+            ->assertStatus(422)
+            ->assertSeeText('Exportacao PDF limitada');
     }
 
     private function criarUsuario(string $role, ?string $name = null): User
@@ -117,11 +184,11 @@ class RelatoriosAdminTest extends TestCase
 
         return OrdemServico::query()->create(array_merge([
             'numero' => '2026-000001',
-            'tipo' => 'Manutenção',
+            'tipo' => 'Manutencao',
             'nome_cliente' => 'Cliente Teste',
             'status' => 'aberta',
             'prioridade' => 2,
-            'descricao' => 'Descrição de teste',
+            'descricao' => 'Descricao de teste',
             'endereco_id' => $endereco->id,
             'criada_por_id' => $criador->id,
             'tecnico_responsavel_id' => $tecnicoResponsavelId,

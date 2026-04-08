@@ -4,11 +4,12 @@ namespace App\Services\Relatorios;
 
 use App\Models\OrdemServico;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class OrdemServicoRelatorioService
 {
-    public function buildPayload(array $filters): array
+    public function buildPayload(array $filters, bool $forExport = false): array
     {
         $tipoRelatorio = $filters['tipo_relatorio'] ?? 'geral';
         $status = $filters['status'] ?? 'todos';
@@ -18,16 +19,7 @@ class OrdemServicoRelatorioService
         $dataInicio = $filters['data_inicio'] ?? '';
         $dataFim = $filters['data_fim'] ?? '';
 
-        $ordensFiltradas = OrdemServico::query()
-            ->with(['tecnicoResponsavel:id,name'])
-            ->when($status !== 'todos', fn ($query) => $query->where('status', $status))
-            ->when($tipo !== 'todos', fn ($query) => $query->where('tipo', $tipo))
-            ->when($prioridade !== 'todas', fn ($query) => $query->where('prioridade', (int) $prioridade))
-            ->when($tecnicoId !== 'todos', fn ($query) => $query->where('tecnico_responsavel_id', $tecnicoId))
-            ->when($dataInicio !== '', fn ($query) => $query->whereDate('data_abertura', '>=', $dataInicio))
-            ->when($dataFim !== '', fn ($query) => $query->whereDate('data_abertura', '<=', $dataFim))
-            ->orderByDesc('data_abertura')
-            ->get();
+        $baseQuery = $this->buildBaseQuery($filters);
 
         $tipos = OrdemServico::query()
             ->whereNotNull('tipo')
@@ -47,10 +39,20 @@ class OrdemServicoRelatorioService
             ])
             ->values();
 
-        $resumo = $this->buildResumo($ordensFiltradas);
+        $statusCountMap = $this->buildStatusCountMap($baseQuery);
+        $resumo = $this->buildResumo($statusCountMap);
         $statusResumo = $this->buildStatusResumo($resumo);
-        $produtividadeTecnicos = $this->buildProdutividadeTecnicos($ordensFiltradas);
-        $tiposMaisFrequentes = $this->buildTiposMaisFrequentes($ordensFiltradas, $resumo['total']);
+        $produtividadeTecnicos = $this->buildProdutividadeTecnicos($baseQuery);
+        $tiposMaisFrequentes = $this->buildTiposMaisFrequentes($baseQuery, $resumo['total']);
+        [$reportDefinition, $reportPagination] = $this->buildReportDefinition(
+            $tipoRelatorio,
+            $baseQuery,
+            $filters,
+            $statusResumo,
+            $produtividadeTecnicos,
+            $tiposMaisFrequentes,
+            $forExport
+        );
 
         return [
             'tipos' => $tipos,
@@ -59,15 +61,13 @@ class OrdemServicoRelatorioService
             'statusResumo' => $statusResumo,
             'produtividadeTecnicos' => $produtividadeTecnicos,
             'tiposMaisFrequentes' => $tiposMaisFrequentes,
-            'reportDefinition' => $this->buildReportDefinition(
-                $tipoRelatorio,
-                $ordensFiltradas,
-                $statusResumo,
-                $produtividadeTecnicos,
-                $tiposMaisFrequentes
-            ),
-            'atividadeRecente' => $ordensFiltradas
-                ->take(5)
+            'reportDefinition' => $reportDefinition,
+            'reportPagination' => $reportPagination,
+            'atividadeRecente' => (clone $baseQuery)
+                ->select(['id', 'numero', 'nome_cliente', 'tipo', 'status', 'data_abertura'])
+                ->orderByDesc('data_abertura')
+                ->limit(5)
+                ->get()
                 ->map(fn (OrdemServico $ordem) => [
                     'id' => $ordem->id,
                     'numero' => $ordem->numero,
@@ -89,15 +89,43 @@ class OrdemServicoRelatorioService
         ];
     }
 
-    private function buildResumo(Collection $ordens): array
+    private function buildBaseQuery(array $filters): Builder
+    {
+        $status = $filters['status'] ?? 'todos';
+        $tipo = $filters['tipo'] ?? 'todos';
+        $prioridade = $filters['prioridade'] ?? 'todas';
+        $tecnicoId = $filters['tecnico_id'] ?? 'todos';
+        $dataInicio = $filters['data_inicio'] ?? '';
+        $dataFim = $filters['data_fim'] ?? '';
+
+        return OrdemServico::query()
+            ->when($status !== 'todos', fn (Builder $query) => $query->where('status', $status))
+            ->when($tipo !== 'todos', fn (Builder $query) => $query->where('tipo', $tipo))
+            ->when($prioridade !== 'todas', fn (Builder $query) => $query->where('prioridade', (int) $prioridade))
+            ->when($tecnicoId !== 'todos', fn (Builder $query) => $query->where('tecnico_responsavel_id', $tecnicoId))
+            ->when($dataInicio !== '', fn (Builder $query) => $query->whereDate('data_abertura', '>=', $dataInicio))
+            ->when($dataFim !== '', fn (Builder $query) => $query->whereDate('data_abertura', '<=', $dataFim));
+    }
+
+    private function buildStatusCountMap(Builder $baseQuery): array
+    {
+        return (clone $baseQuery)
+            ->selectRaw('status, COUNT(*) as quantidade')
+            ->groupBy('status')
+            ->pluck('quantidade', 'status')
+            ->map(fn (mixed $quantidade) => (int) $quantidade)
+            ->all();
+    }
+
+    private function buildResumo(array $statusCountMap): array
     {
         return [
-            'total' => $ordens->count(),
-            'abertas' => $ordens->where('status', 'aberta')->count(),
-            'emExecucao' => $ordens->where('status', 'em_execucao')->count(),
-            'finalizadas' => $ordens->where('status', 'finalizada')->count(),
-            'naoExecutadas' => $ordens->where('status', 'nao_executada')->count(),
-            'canceladas' => $ordens->where('status', 'cancelada')->count(),
+            'total' => array_sum($statusCountMap),
+            'abertas' => $statusCountMap['aberta'] ?? 0,
+            'emExecucao' => $statusCountMap['em_execucao'] ?? 0,
+            'finalizadas' => $statusCountMap['finalizada'] ?? 0,
+            'naoExecutadas' => $statusCountMap['nao_executada'] ?? 0,
+            'canceladas' => $statusCountMap['cancelada'] ?? 0,
         ];
     }
 
@@ -105,9 +133,9 @@ class OrdemServicoRelatorioService
     {
         return collect([
             ['status' => 'Abertas', 'quantidade' => $resumo['abertas']],
-            ['status' => 'Em execução', 'quantidade' => $resumo['emExecucao']],
+            ['status' => 'Em execucao', 'quantidade' => $resumo['emExecucao']],
             ['status' => 'Finalizadas', 'quantidade' => $resumo['finalizadas']],
-            ['status' => 'Não executadas', 'quantidade' => $resumo['naoExecutadas']],
+            ['status' => 'Nao executadas', 'quantidade' => $resumo['naoExecutadas']],
             ['status' => 'Canceladas', 'quantidade' => $resumo['canceladas']],
         ])->map(fn (array $item) => [
             ...$item,
@@ -117,136 +145,314 @@ class OrdemServicoRelatorioService
         ])->values()->all();
     }
 
-    private function buildProdutividadeTecnicos(Collection $ordens): array
+    private function buildProdutividadeTecnicos(Builder $baseQuery): array
     {
-        return $ordens
-            ->filter(fn (OrdemServico $ordem) => filled($ordem->tecnico_responsavel_id))
-            ->groupBy('tecnico_responsavel_id')
-            ->map(function (Collection $items) {
-                /** @var OrdemServico $primeira */
-                $primeira = $items->first();
-
-                return [
-                    'tecnico' => $primeira->tecnicoResponsavel?->name ?? 'Sem responsável',
-                    'aceitas' => $items->count(),
-                    'iniciadas' => $items->where('status', 'em_execucao')->count(),
-                    'finalizadas' => $items->where('status', 'finalizada')->count(),
-                    'naoExecutadas' => $items->where('status', 'nao_executada')->count(),
-                ];
-            })
-            ->sortByDesc('finalizadas')
+        return (clone $baseQuery)
+            ->whereNotNull('ordem_servicos.tecnico_responsavel_id')
+            ->leftJoin('users as tecnicos', 'tecnicos.id', '=', 'ordem_servicos.tecnico_responsavel_id')
+            ->selectRaw("
+                COALESCE(tecnicos.name, 'Sem responsavel') as tecnico,
+                COUNT(*) as aceitas,
+                SUM(CASE WHEN ordem_servicos.status = 'em_execucao' THEN 1 ELSE 0 END) as iniciadas,
+                SUM(CASE WHEN ordem_servicos.status = 'finalizada' THEN 1 ELSE 0 END) as finalizadas,
+                SUM(CASE WHEN ordem_servicos.status = 'nao_executada' THEN 1 ELSE 0 END) as naoExecutadas
+            ")
+            ->groupBy('ordem_servicos.tecnico_responsavel_id', 'tecnicos.name')
+            ->orderByDesc('finalizadas')
+            ->get()
+            ->map(fn (object $row) => [
+                'tecnico' => (string) $row->tecnico,
+                'aceitas' => (int) $row->aceitas,
+                'iniciadas' => (int) $row->iniciadas,
+                'finalizadas' => (int) $row->finalizadas,
+                'naoExecutadas' => (int) $row->naoExecutadas,
+            ])
             ->values()
             ->all();
     }
 
-    private function buildTiposMaisFrequentes(Collection $ordens, int $totalOrdens): array
+    private function buildTiposMaisFrequentes(Builder $baseQuery, int $totalOrdens): array
     {
-        return $ordens
+        return (clone $baseQuery)
+            ->selectRaw('tipo, COUNT(*) as quantidade')
             ->groupBy('tipo')
-            ->map(fn (Collection $items, string $tipo) => [
-                'tipo' => $tipo,
-                'quantidade' => $items->count(),
+            ->orderByDesc('quantidade')
+            ->get()
+            ->map(fn (object $row) => [
+                'tipo' => (string) $row->tipo,
+                'quantidade' => (int) $row->quantidade,
                 'percentual' => $totalOrdens > 0
-                    ? (int) round(($items->count() / $totalOrdens) * 100)
+                    ? (int) round(((int) $row->quantidade / $totalOrdens) * 100)
                     : 0,
             ])
-            ->sortByDesc('quantidade')
             ->values()
             ->all();
     }
 
     private function buildReportDefinition(
         string $tipoRelatorio,
-        Collection $ordens,
+        Builder $baseQuery,
+        array $filters,
         array $statusResumo,
         array $produtividadeTecnicos,
-        array $tiposMaisFrequentes
+        array $tiposMaisFrequentes,
+        bool $forExport
     ): array {
         if ($tipoRelatorio === 'status') {
-            return [
-                'title' => 'Relatório por Status',
+            $rows = collect($statusResumo)->map(fn (array $item) => [
+                'status' => $item['status'],
+                'quantidade' => (string) $item['quantidade'],
+                'percentual' => "{$item['percentual']}%",
+            ])->values()->all();
+
+            return [[
+                'title' => 'Relatorio por Status',
                 'columns' => [
                     ['key' => 'status', 'label' => 'Status'],
                     ['key' => 'quantidade', 'label' => 'Quantidade'],
                     ['key' => 'percentual', 'label' => 'Percentual'],
                 ],
-                'rows' => collect($statusResumo)->map(fn (array $item) => [
-                    'status' => $item['status'],
-                    'quantidade' => (string) $item['quantidade'],
-                    'percentual' => "{$item['percentual']}%",
-                ])->values()->all(),
-            ];
+                'rows' => $rows,
+            ], $this->singlePagePagination(count($rows))];
         }
 
         if ($tipoRelatorio === 'produtividade') {
-            return [
-                'title' => 'Relatório de Produtividade dos Técnicos',
+            $rows = collect($produtividadeTecnicos)->map(fn (array $item) => [
+                'tecnico' => $item['tecnico'],
+                'aceitas' => (string) $item['aceitas'],
+                'iniciadas' => (string) $item['iniciadas'],
+                'finalizadas' => (string) $item['finalizadas'],
+                'naoExecutadas' => (string) $item['naoExecutadas'],
+            ])->values()->all();
+
+            return [[
+                'title' => 'Relatorio de Produtividade dos Tecnicos',
                 'columns' => [
-                    ['key' => 'tecnico', 'label' => 'Técnico'],
+                    ['key' => 'tecnico', 'label' => 'Tecnico'],
                     ['key' => 'aceitas', 'label' => 'OS aceitas'],
-                    ['key' => 'iniciadas', 'label' => 'OS em execução'],
+                    ['key' => 'iniciadas', 'label' => 'OS em execucao'],
                     ['key' => 'finalizadas', 'label' => 'OS finalizadas'],
-                    ['key' => 'naoExecutadas', 'label' => 'OS não executadas'],
+                    ['key' => 'naoExecutadas', 'label' => 'OS nao executadas'],
                 ],
-                'rows' => collect($produtividadeTecnicos)->map(fn (array $item) => [
+                'rows' => $rows,
+            ], $this->singlePagePagination(count($rows))];
+        }
+
+        if ($tipoRelatorio === 'tipo') {
+            $rows = collect($tiposMaisFrequentes)->map(fn (array $item) => [
+                'tipo' => $item['tipo'],
+                'quantidade' => (string) $item['quantidade'],
+                'percentual' => "{$item['percentual']}%",
+            ])->values()->all();
+
+            return [[
+                'title' => 'Relatorio por Tipo de Servico',
+                'columns' => [
+                    ['key' => 'tipo', 'label' => 'Tipo de servico'],
+                    ['key' => 'quantidade', 'label' => 'Quantidade'],
+                    ['key' => 'percentual', 'label' => 'Percentual'],
+                ],
+                'rows' => $rows,
+            ], $this->singlePagePagination(count($rows))];
+        }
+
+        $query = (clone $baseQuery)
+            ->with(['tecnicoResponsavel:id,name'])
+            ->orderByDesc('data_abertura');
+
+        $title = $tipoRelatorio === 'periodo'
+            ? 'Relatorio por Periodo'
+            : 'Relatorio Geral de Ordens de Servico';
+
+        $columns = [
+            ['key' => 'numero', 'label' => 'Numero da OS'],
+            ['key' => 'tipo', 'label' => 'Tipo de servico'],
+            ['key' => 'clienteLocal', 'label' => 'Cliente/Local'],
+            ['key' => 'status', 'label' => 'Status'],
+            ['key' => 'prioridade', 'label' => 'Prioridade'],
+            ['key' => 'abertura', 'label' => 'Data de abertura'],
+            ['key' => 'encerramento', 'label' => 'Data de encerramento'],
+            ['key' => 'responsavel', 'label' => 'Responsavel tecnico'],
+            ['key' => 'observacoes', 'label' => 'Observacoes'],
+        ];
+
+        if ($forExport) {
+            $ordens = $query->get();
+            $rows = $this->mapOrdensToRows($ordens);
+
+            return [[
+                'title' => $title,
+                'columns' => $columns,
+                'rows' => $rows,
+            ], $this->singlePagePagination(count($rows))];
+        }
+
+        $perPage = (int) ($filters['per_page'] ?? 20);
+        $page = (int) ($filters['page'] ?? 1);
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        $rows = $this->mapOrdensToRows(collect($paginator->items()));
+
+        return [[
+            'title' => $title,
+            'columns' => $columns,
+            'rows' => $rows,
+        ], [
+            'page' => $paginator->currentPage(),
+            'perPage' => $paginator->perPage(),
+            'lastPage' => $paginator->lastPage(),
+            'total' => $paginator->total(),
+        ]];
+    }
+
+    public function describeReport(array $filters): array
+    {
+        $tipoRelatorio = $filters['tipo_relatorio'] ?? 'geral';
+
+        return match ($tipoRelatorio) {
+            'status' => [
+                'title' => 'Relatorio por Status',
+                'columns' => [
+                    ['key' => 'status', 'label' => 'Status'],
+                    ['key' => 'quantidade', 'label' => 'Quantidade'],
+                    ['key' => 'percentual', 'label' => 'Percentual'],
+                ],
+            ],
+            'produtividade' => [
+                'title' => 'Relatorio de Produtividade dos Tecnicos',
+                'columns' => [
+                    ['key' => 'tecnico', 'label' => 'Tecnico'],
+                    ['key' => 'aceitas', 'label' => 'OS aceitas'],
+                    ['key' => 'iniciadas', 'label' => 'OS em execucao'],
+                    ['key' => 'finalizadas', 'label' => 'OS finalizadas'],
+                    ['key' => 'naoExecutadas', 'label' => 'OS nao executadas'],
+                ],
+            ],
+            'tipo' => [
+                'title' => 'Relatorio por Tipo de Servico',
+                'columns' => [
+                    ['key' => 'tipo', 'label' => 'Tipo de servico'],
+                    ['key' => 'quantidade', 'label' => 'Quantidade'],
+                    ['key' => 'percentual', 'label' => 'Percentual'],
+                ],
+            ],
+            'periodo' => [
+                'title' => 'Relatorio por Periodo',
+                'columns' => $this->detailedReportColumns(),
+            ],
+            default => [
+                'title' => 'Relatorio Geral de Ordens de Servico',
+                'columns' => $this->detailedReportColumns(),
+            ],
+        };
+    }
+
+    public function streamCsvRows(array $filters, callable $emitRow): void
+    {
+        $tipoRelatorio = $filters['tipo_relatorio'] ?? 'geral';
+        $baseQuery = $this->buildBaseQuery($filters);
+
+        if ($tipoRelatorio === 'status') {
+            $resumo = $this->buildResumo($this->buildStatusCountMap($baseQuery));
+
+            foreach ($this->buildStatusResumo($resumo) as $item) {
+                $emitRow([
+                    'status' => $item['status'],
+                    'quantidade' => (string) $item['quantidade'],
+                    'percentual' => "{$item['percentual']}%",
+                ]);
+            }
+
+            return;
+        }
+
+        if ($tipoRelatorio === 'produtividade') {
+            foreach ($this->buildProdutividadeTecnicos($baseQuery) as $item) {
+                $emitRow([
                     'tecnico' => $item['tecnico'],
                     'aceitas' => (string) $item['aceitas'],
                     'iniciadas' => (string) $item['iniciadas'],
                     'finalizadas' => (string) $item['finalizadas'],
                     'naoExecutadas' => (string) $item['naoExecutadas'],
-                ])->values()->all(),
-            ];
+                ]);
+            }
+
+            return;
         }
 
         if ($tipoRelatorio === 'tipo') {
-            return [
-                'title' => 'Relatório por Tipo de Serviço',
-                'columns' => [
-                    ['key' => 'tipo', 'label' => 'Tipo de serviço'],
-                    ['key' => 'quantidade', 'label' => 'Quantidade'],
-                    ['key' => 'percentual', 'label' => 'Percentual'],
-                ],
-                'rows' => collect($tiposMaisFrequentes)->map(fn (array $item) => [
+            $resumo = $this->buildResumo($this->buildStatusCountMap($baseQuery));
+
+            foreach ($this->buildTiposMaisFrequentes($baseQuery, $resumo['total']) as $item) {
+                $emitRow([
                     'tipo' => $item['tipo'],
                     'quantidade' => (string) $item['quantidade'],
                     'percentual' => "{$item['percentual']}%",
-                ])->values()->all(),
-            ];
+                ]);
+            }
+
+            return;
         }
 
+        $query = (clone $baseQuery)
+            ->leftJoin('users as tecnicos', 'tecnicos.id', '=', 'ordem_servicos.tecnico_responsavel_id')
+            ->select([
+                'ordem_servicos.numero',
+                'ordem_servicos.tipo',
+                'ordem_servicos.nome_cliente',
+                'ordem_servicos.status',
+                'ordem_servicos.prioridade',
+                'ordem_servicos.data_abertura',
+                'ordem_servicos.data_encerramento',
+                'ordem_servicos.motivo_nao_execucao',
+                'ordem_servicos.descricao',
+                'tecnicos.name as tecnico_nome',
+            ])
+            ->orderByDesc('ordem_servicos.data_abertura');
+
+        foreach ($query->cursor() as $row) {
+            $emitRow([
+                'numero' => (string) $row->numero,
+                'tipo' => (string) $row->tipo,
+                'clienteLocal' => $row->nome_cliente ?: '-',
+                'status' => $this->formatStatus((string) $row->status),
+                'prioridade' => $this->formatPrioridade((int) $row->prioridade),
+                'abertura' => $this->formatDate($row->data_abertura),
+                'encerramento' => $this->formatDate($row->data_encerramento),
+                'responsavel' => $row->tecnico_nome ?: 'Sem responsavel',
+                'observacoes' => $row->motivo_nao_execucao ?: ($row->descricao ?: '-'),
+            ]);
+        }
+    }
+
+    private function mapOrdensToRows(Collection $ordens): array
+    {
+        return $ordens->map(fn (OrdemServico $ordem) => [
+            'numero' => $ordem->numero,
+            'tipo' => $ordem->tipo,
+            'clienteLocal' => $ordem->nome_cliente ?? '-',
+            'status' => $this->formatStatus($ordem->status),
+            'prioridade' => $this->formatPrioridade((int) $ordem->prioridade),
+            'abertura' => $this->formatDate($ordem->data_abertura),
+            'encerramento' => $this->formatDate($ordem->data_encerramento),
+            'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsavel',
+            'observacoes' => $ordem->motivo_nao_execucao ?: ($ordem->descricao ?: '-'),
+        ])->values()->all();
+    }
+
+    private function singlePagePagination(int $total): array
+    {
         return [
-            'title' => $tipoRelatorio === 'periodo'
-                ? 'Relatório por Período'
-                : 'Relatório Geral de Ordens de Serviço',
-            'columns' => [
-                ['key' => 'numero', 'label' => 'Número da OS'],
-                ['key' => 'tipo', 'label' => 'Tipo de serviço'],
-                ['key' => 'clienteLocal', 'label' => 'Cliente/Local'],
-                ['key' => 'status', 'label' => 'Status'],
-                ['key' => 'prioridade', 'label' => 'Prioridade'],
-                ['key' => 'abertura', 'label' => 'Data de abertura'],
-                ['key' => 'encerramento', 'label' => 'Data de encerramento'],
-                ['key' => 'responsavel', 'label' => 'Responsável técnico'],
-                ['key' => 'observacoes', 'label' => 'Observações'],
-            ],
-            'rows' => $ordens->map(fn (OrdemServico $ordem) => [
-                'numero' => $ordem->numero,
-                'tipo' => $ordem->tipo,
-                'clienteLocal' => $ordem->nome_cliente ?? '-',
-                'status' => $this->formatStatus($ordem->status),
-                'prioridade' => $this->formatPrioridade((int) $ordem->prioridade),
-                'abertura' => $this->formatDate($ordem->data_abertura),
-                'encerramento' => $this->formatDate($ordem->data_encerramento),
-                'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsável',
-                'observacoes' => $ordem->motivo_nao_execucao ?: ($ordem->descricao ?: '-'),
-            ])->values()->all(),
+            'page' => 1,
+            'perPage' => $total === 0 ? 1 : $total,
+            'lastPage' => 1,
+            'total' => $total,
         ];
     }
 
     private function buildPeriodoDescricao(string $dataInicio, string $dataFim): string
     {
         if ($dataInicio === '' && $dataFim === '') {
-            return 'Todos os períodos';
+            return 'Todos os periodos';
         }
 
         if ($dataInicio !== '' && $dataFim !== '') {
@@ -257,7 +463,7 @@ class OrdemServicoRelatorioService
             return "A partir de {$this->formatDate($dataInicio)}";
         }
 
-        return "Até {$this->formatDate($dataFim)}";
+        return "Ate {$this->formatDate($dataFim)}";
     }
 
     private function buildFiltrosDescricao(
@@ -274,28 +480,24 @@ class OrdemServicoRelatorioService
             'Status = ' . ($status === 'todos' ? 'Todos' : $this->formatStatus($status)),
             'Tipo = ' . ($tipo === 'todos' ? 'Todos' : $tipo),
             'Prioridade = ' . ($prioridade === 'todas' ? 'Todas' : $this->formatPrioridade((int) $prioridade)),
-            "Técnico = {$tecnico}",
+            "Tecnico = {$tecnico}",
         ])->join(' | ');
     }
 
     private function formatStatus(string $status): string
     {
-        if ($status === 'em_execucao') {
-            return 'Em execução';
-        }
-
-        if ($status === 'nao_executada') {
-            return 'Não executada';
-        }
-
-        return ucfirst($status);
+        return match ($status) {
+            'em_execucao' => 'Em execucao',
+            'nao_executada' => 'Nao executada',
+            default => ucfirst($status),
+        };
     }
 
     private function formatPrioridade(int $prioridade): string
     {
         return match ($prioridade) {
             1 => 'Alta',
-            2 => 'Média',
+            2 => 'Media',
             3 => 'Baixa',
             default => (string) $prioridade,
         };
@@ -308,5 +510,20 @@ class OrdemServicoRelatorioService
         }
 
         return date('d/m/Y', strtotime((string) $value));
+    }
+
+    private function detailedReportColumns(): array
+    {
+        return [
+            ['key' => 'numero', 'label' => 'Numero da OS'],
+            ['key' => 'tipo', 'label' => 'Tipo de servico'],
+            ['key' => 'clienteLocal', 'label' => 'Cliente/Local'],
+            ['key' => 'status', 'label' => 'Status'],
+            ['key' => 'prioridade', 'label' => 'Prioridade'],
+            ['key' => 'abertura', 'label' => 'Data de abertura'],
+            ['key' => 'encerramento', 'label' => 'Data de encerramento'],
+            ['key' => 'responsavel', 'label' => 'Responsavel tecnico'],
+            ['key' => 'observacoes', 'label' => 'Observacoes'],
+        ];
     }
 }

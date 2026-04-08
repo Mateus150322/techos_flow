@@ -1,8 +1,10 @@
-import { MapPin } from "lucide-react";
+import { useState } from "react";
+import { Loader2, MapPin } from "lucide-react";
 
-import type { Anexo } from "../ordensServico.service";
+import { obterArquivoAnexo, type Anexo } from "../ordensServico.service";
 import { formatarCoordenada, formatarDataHora } from "../ordemServicoDetalhe.utils";
 import { getGoogleMapsUrl } from "@/shared/utils/geolocalizacao";
+import { getApiErrorMessage } from "@/shared/utils/apiError";
 
 type Props = {
   anexo: Anexo;
@@ -47,25 +49,78 @@ export function AnexoItemCard({
   isDark = false,
   wrapper = "div",
 }: Props) {
+  const [baixandoArquivo, setBaixandoArquivo] = useState(false);
+  const [erroArquivo, setErroArquivo] = useState("");
   const classes = getClasses(variant, isDark);
   const Wrapper = wrapper;
+  const fileLabel = anexo.caminho ? anexo.caminho.split("/").pop() : anexo.id;
+
+  async function handleAbrirArquivo() {
+    const ehVisualizavel = anexo.tipo === "foto" || anexo.tipo === "pdf";
+    const previewWindow = ehVisualizavel ? window.open("", "_blank", "noopener,noreferrer") : null;
+
+    try {
+      setBaixandoArquivo(true);
+      setErroArquivo("");
+
+      const { blob, fileName } = await obterArquivoAnexo(anexo.id);
+      const objectUrl = URL.createObjectURL(blob);
+
+      if (ehVisualizavel && previewWindow) {
+        previewWindow.location.href = objectUrl;
+      } else {
+        if (previewWindow) {
+          previewWindow.close();
+        }
+
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = fileName || fileLabel || `anexo-${anexo.id}`;
+        anchor.rel = "noreferrer";
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+
+      window.setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+      }, 60_000);
+    } catch (error) {
+      if (previewWindow) {
+        previewWindow.close();
+      }
+
+      setErroArquivo(getApiErrorMessage(error, "Nao foi possivel abrir o anexo."));
+    } finally {
+      setBaixandoArquivo(false);
+    }
+  }
 
   return (
     <Wrapper className={classes.outer}>
       <p className="font-medium">{anexo.tipo || "Arquivo"}</p>
 
-      {anexo.url ? (
-        <a
-          href={anexo.url}
-          target="_blank"
-          rel="noreferrer"
+      {anexo.id ? (
+        <button
+          type="button"
+          onClick={() => void handleAbrirArquivo()}
+          disabled={baixandoArquivo}
           className={classes.link}
         >
-          {anexo.caminho ? anexo.caminho.split("/").pop() : anexo.id}
-        </a>
+          {baixandoArquivo ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Abrindo anexo...
+            </span>
+          ) : (
+            fileLabel
+          )}
+        </button>
       ) : (
         <p className={classes.fallback}>{anexo.caminho || "-"}</p>
       )}
+
+      {erroArquivo ? <p className="mt-2 text-xs text-red-600">{erroArquivo}</p> : null}
 
       {typeof anexo.latitude === "number" && typeof anexo.longitude === "number" && (
         <div className={classes.geoCard}>

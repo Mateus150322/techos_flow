@@ -95,6 +95,16 @@ export type Paginated<T> = {
   last_page: number;
 };
 
+export type ResumoOrdens = {
+  total: number;
+  abertas: number;
+  em_execucao: number;
+  finalizadas: number;
+  nao_executadas: number;
+  canceladas: number;
+  encerradas: number;
+};
+
 export type CriarOrdemAtendentePayload = {
   tipo_servico: string;
   nome_cliente: string;
@@ -120,34 +130,19 @@ export async function listarOrdens(
   return data;
 }
 
-export async function listarTodasOrdens(
+export async function buscarResumoOrdens(
   params?: Record<string, string | number | undefined>
 ) {
-  const acumuladas: OrdemServico[] = [];
-  let paginaAtual = 1;
-  let ultimaPagina = 1;
-  let total = 0;
+  const { data } = await api.get<ResumoOrdens>("/ordens-servico/resumo", {
+    params,
+  });
 
-  do {
-    const resposta = await listarOrdens({
-      ...params,
-      page: paginaAtual,
-      per_page: 100,
-    });
+  return data;
+}
 
-    acumuladas.push(...resposta.data);
-    ultimaPagina = resposta.last_page || 1;
-    total = resposta.total;
-    paginaAtual += 1;
-  } while (paginaAtual <= ultimaPagina);
-
-  return {
-    current_page: ultimaPagina,
-    data: acumuladas,
-    per_page: 100,
-    total,
-    last_page: ultimaPagina,
-  } satisfies Paginated<OrdemServico>;
+export async function listarOpcoesFiltroOrdens() {
+  const { data } = await api.get<{ tipos: string[] }>("/ordens-servico/opcoes-filtro");
+  return data;
 }
 
 export async function buscarOrdem(id: string, include?: string[]) {
@@ -264,6 +259,25 @@ export async function enviarAnexo(
   });
 
   return data;
+}
+
+export async function obterArquivoAnexo(anexoId: string) {
+  const response = await api.get<Blob>(`/anexos/${anexoId}/arquivo`, {
+    responseType: "blob",
+  });
+
+  const disposition = String(response.headers["content-disposition"] ?? "");
+  const fileNameMatch =
+    disposition.match(/filename\*=UTF-8''([^;]+)/i) ?? disposition.match(/filename="?([^"]+)"?/i);
+  const fileName = fileNameMatch?.[1]
+    ? decodeURIComponent(fileNameMatch[1])
+    : `anexo-${anexoId}`;
+
+  return {
+    blob: response.data,
+    fileName,
+    mimeType: String(response.headers["content-type"] ?? "application/octet-stream"),
+  };
 }
 
 export async function aceitarOrdem(osId: string) {

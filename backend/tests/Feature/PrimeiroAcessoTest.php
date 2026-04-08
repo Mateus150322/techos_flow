@@ -37,7 +37,7 @@ class PrimeiroAcessoTest extends TestCase
         $response
             ->assertStatus(403)
             ->assertJson([
-                'message' => 'É necessário alterar a senha antes de continuar.',
+                'message' => 'E necessario alterar a senha antes de continuar.',
             ]);
     }
 
@@ -87,7 +87,7 @@ class PrimeiroAcessoTest extends TestCase
     private function criarUsuarioPrimeiroAcesso(): User
     {
         return User::query()->create([
-            'name' => 'Usuário Primeiro Acesso',
+            'name' => 'Usuario Primeiro Acesso',
             'email' => fake()->unique()->safeEmail(),
             'password' => Hash::make('Temp123!'),
             'role' => 'atendente',

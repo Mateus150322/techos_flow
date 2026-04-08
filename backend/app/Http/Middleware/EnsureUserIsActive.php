@@ -12,14 +12,14 @@ class EnsureUserIsActive
         $user = $request->user();
 
         if (! $user) {
-            return response()->json(['message' => 'Não autenticado.'], 401);
+            return response()->json(['message' => 'Nao autenticado.'], 401);
         }
 
         if (! $user->is_active) {
             $user->currentAccessToken()?->delete();
 
             return response()->json([
-                'message' => 'Usuário inativo.',
+                'message' => 'Usuario inativo.',
             ], 403);
         }
 

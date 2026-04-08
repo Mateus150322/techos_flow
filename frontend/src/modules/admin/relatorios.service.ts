@@ -15,6 +15,15 @@ export type BuscarRelatoriosParams = {
   tecnicoId: string;
   dataInicio: string;
   dataFim: string;
+  page?: number;
+  perPage?: number;
+};
+
+export type ReportPagination = {
+  page: number;
+  perPage: number;
+  lastPage: number;
+  total: number;
 };
 
 export type RelatoriosResponse = {
@@ -22,6 +31,7 @@ export type RelatoriosResponse = {
   tecnicos: TecnicoFiltro[];
   resumo: ResumoRelatorios;
   reportDefinition: ReportDefinition;
+  reportPagination: ReportPagination;
   atividadeRecente: Pick<
     OrdemServico,
     "id" | "numero" | "nome_cliente" | "tipo" | "status" | "data_abertura"
@@ -42,6 +52,8 @@ function buildRelatorioParams(params: BuscarRelatoriosParams) {
     tecnico_id: params.tecnicoId === "todos" ? undefined : params.tecnicoId,
     data_inicio: params.dataInicio || undefined,
     data_fim: params.dataFim || undefined,
+    page: params.page,
+    per_page: params.perPage,
   };
 }
 

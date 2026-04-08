@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Concerns\UsesCaseInsensitiveLike;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class UsuarioController extends Controller
 {
+    use UsesCaseInsensitiveLike;
+
     public function index(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -36,13 +39,15 @@ class UsuarioController extends Controller
         }
 
         if (! empty($data['q'])) {
-            $search = mb_strtolower(trim($data['q']));
+            $search = trim($data['q']);
+            $likeOperator = $this->caseInsensitiveLikeOperator($query);
+            $pattern = $this->containsPattern($search);
 
-            $query->where(function ($builder) use ($search) {
+            $query->where(function ($builder) use ($likeOperator, $pattern) {
                 $builder
-                    ->whereRaw('LOWER(name) like ?', ["%{$search}%"])
-                    ->orWhereRaw('LOWER(email) like ?', ["%{$search}%"])
-                    ->orWhereRaw('LOWER(role) like ?', ["%{$search}%"]);
+                    ->where('name', $likeOperator, $pattern)
+                    ->orWhere('email', $likeOperator, $pattern)
+                    ->orWhere('role', $likeOperator, $pattern);
             });
         }
 
@@ -125,7 +130,7 @@ class UsuarioController extends Controller
 
         if (($data['is_active'] ?? null) === false && $request->user()?->is($user)) {
             return response()->json([
-                'message' => 'Você não pode inativar seu próprio usuário.',
+                'message' => 'Voce nao pode inativar seu proprio usuario.',
             ], 422);
         }
 
@@ -144,7 +149,7 @@ class UsuarioController extends Controller
 
             if ($adminsAtivos <= 1) {
                 return response()->json([
-                    'message' => 'Não é possível remover o último administrador ativo.',
+                    'message' => 'Nao e possivel remover o ultimo administrador ativo.',
                 ], 422);
             }
         }
@@ -178,8 +183,8 @@ class UsuarioController extends Controller
         return [
             'password.required' => 'Informe a senha.',
             'password.min' => 'A senha deve ter pelo menos 8 caracteres.',
-            'password.max' => 'A senha deve ter no máximo 255 caracteres.',
-            'password.regex' => 'A senha deve conter letra maiúscula, letra minúscula, número e caractere especial.',
+            'password.max' => 'A senha deve ter no maximo 255 caracteres.',
+            'password.regex' => 'A senha deve conter letra maiuscula, letra minuscula, numero e caractere especial.',
         ];
     }
 }

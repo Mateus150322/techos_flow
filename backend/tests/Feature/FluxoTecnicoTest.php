@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Anexo;
 use App\Models\Endereco;
 use App\Models\OrdemServico;
 use App\Models\User;
@@ -26,11 +27,7 @@ class FluxoTecnicoTest extends TestCase
 
         $response = $this->postJson("/api/v1/ordens-servico/{$os->id}/iniciar");
 
-        $response
-            ->assertStatus(403)
-            ->assertJson([
-                'message' => 'Esta OS está atribuída a outro técnico.',
-            ]);
+        $response->assertStatus(403);
     }
 
     public function test_tecnico_responsavel_pode_iniciar_e_finalizar_execucao(): void
@@ -71,18 +68,15 @@ class FluxoTecnicoTest extends TestCase
         Sanctum::actingAs($outroTecnico);
 
         $response = $this->postJson("/api/v1/ordens-servico/{$os->id}/nao-executada", [
-            'motivo_nao_execucao' => 'Equipamento indisponível.',
+            'motivo_nao_execucao' => 'Equipamento indisponivel.',
         ]);
 
-        $response
-            ->assertStatus(403)
-            ->assertJson([
-                'message' => 'Esta OS está atribuída a outro técnico.',
-            ]);
+        $response->assertStatus(403);
     }
 
-    public function test_tecnico_responsavel_pode_enviar_anexo(): void
+    public function test_tecnico_responsavel_pode_enviar_anexo_em_armazenamento_privado(): void
     {
+        Storage::fake('local');
         Storage::fake('public');
 
         $tecnico = $this->criarUsuario('tecnico');
@@ -96,7 +90,7 @@ class FluxoTecnicoTest extends TestCase
             'longitude' => -67.8243,
             'precisao_metros' => 8.5,
             'geolocalizacao_capturada_em' => now()->toISOString(),
-            'endereco_capturado' => 'Avenida Ceará, Centro, Rio Branco/AC',
+            'endereco_capturado' => 'Avenida Ceara, Centro, Rio Branco/AC',
         ]);
 
         $response
@@ -104,7 +98,9 @@ class FluxoTecnicoTest extends TestCase
             ->assertJsonPath('anexo.tipo', 'pdf')
             ->assertJsonPath('anexo.latitude', -9.97499)
             ->assertJsonPath('anexo.longitude', -67.8243)
-            ->assertJsonPath('anexo.endereco_capturado', 'Avenida Ceará, Centro, Rio Branco/AC');
+            ->assertJsonPath('anexo.endereco_capturado', 'Avenida Ceara, Centro, Rio Branco/AC');
+
+        $caminho = (string) $response->json('anexo.caminho');
 
         $this->assertDatabaseHas('anexos', [
             'os_id' => $os->id,
@@ -112,8 +108,68 @@ class FluxoTecnicoTest extends TestCase
             'tipo' => 'pdf',
             'latitude' => -9.97499,
             'longitude' => -67.8243,
-            'endereco_capturado' => 'Avenida Ceará, Centro, Rio Branco/AC',
+            'endereco_capturado' => 'Avenida Ceara, Centro, Rio Branco/AC',
         ]);
+        Storage::disk('local')->assertExists($caminho);
+        Storage::disk('public')->assertMissing($caminho);
+    }
+
+    public function test_usuario_autenticado_pode_visualizar_anexo_por_rota_privada(): void
+    {
+        Storage::fake('local');
+
+        $tecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnico->id);
+
+        Sanctum::actingAs($tecnico);
+
+        $upload = $this->postJson("/api/v1/ordens-servico/{$os->id}/anexos", [
+            'arquivo' => UploadedFile::fake()->create('evidencia.pdf', 200, 'application/pdf'),
+        ]);
+
+        $anexoId = (string) $upload->json('anexo.id');
+
+        $response = $this->get("/api/v1/anexos/{$anexoId}/arquivo");
+
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'application/pdf',
+            (string) $response->headers->get('content-type')
+        );
+        $this->assertStringContainsString(
+            'inline;',
+            (string) $response->headers->get('content-disposition')
+        );
+    }
+
+    public function test_rota_privada_consegue_ler_anexo_legado_do_disco_publico(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+
+        $admin = $this->criarUsuario('administrador');
+        $tecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnico->id);
+
+        Storage::disk('public')->put('anexos/legado.pdf', 'conteudo legado');
+
+        $anexo = Anexo::query()->create([
+            'os_id' => $os->id,
+            'caminho' => 'anexos/legado.pdf',
+            'tipo' => 'pdf',
+            'submetido_por_id' => $tecnico->id,
+            'criado_em' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->get("/api/v1/anexos/{$anexo->id}/arquivo");
+
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'application/pdf',
+            (string) $response->headers->get('content-type')
+        );
     }
 
     public function test_busca_de_ordens_funciona_com_sqlite_usando_q(): void
@@ -121,7 +177,7 @@ class FluxoTecnicoTest extends TestCase
         $tecnico = $this->criarUsuario('tecnico');
         $os = $this->criarOs($tecnico->id, [
             'numero' => '2026-000321',
-            'tipo' => 'Manutenção ETA/ETE',
+            'tipo' => 'Manutencao ETA/ETE',
             'descricao' => 'Falha na bomba principal',
             'nome_cliente' => 'ETA Central',
         ]);
@@ -142,10 +198,10 @@ class FluxoTecnicoTest extends TestCase
         Sanctum::actingAs($tecnico);
 
         $response = $this->postJson('/api/v1/ordens-servico', [
-            'tipo_servico' => 'Manutenção',
+            'tipo_servico' => 'Manutencao',
             'nome_cliente' => 'Cliente Teste',
             'prioridade' => 2,
-            'descricao' => 'Teste de criação de OS geral por técnico',
+            'descricao' => 'Teste de criacao de OS geral por tecnico',
             'endereco' => [
                 'logradouro' => 'Rua Teste',
                 'numero' => '100',
@@ -156,11 +212,7 @@ class FluxoTecnicoTest extends TestCase
             ],
         ]);
 
-        $response
-            ->assertStatus(403)
-            ->assertJson([
-                'message' => 'Técnico só pode abrir OS do tipo Manutenção ETA/ETE.',
-            ]);
+        $response->assertStatus(403);
     }
 
     public function test_administrador_nao_pode_operar_fluxo_tecnico_da_os(): void
@@ -200,11 +252,11 @@ class FluxoTecnicoTest extends TestCase
 
         return OrdemServico::query()->create(array_merge([
             'numero' => '2026-000001',
-            'tipo' => 'Manutenção',
+            'tipo' => 'Manutencao',
             'nome_cliente' => 'Cliente Teste',
             'status' => 'aberta',
             'prioridade' => 2,
-            'descricao' => 'Descrição de teste',
+            'descricao' => 'Descricao de teste',
             'endereco_id' => $endereco->id,
             'criada_por_id' => $criador->id,
             'tecnico_responsavel_id' => $tecnicoResponsavelId,

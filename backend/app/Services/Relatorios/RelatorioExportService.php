@@ -3,9 +3,13 @@
 namespace App\Services\Relatorios;
 
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RelatorioExportService
 {
+    private const MAX_XLSX_ROWS = 5000;
+    private const MAX_PDF_ROWS = 1000;
+
     public function export(string $format, array $payload, string $responsavelEmissao): array
     {
         return match ($format) {
@@ -26,6 +30,47 @@ class RelatorioExportService
             ],
             default => abort(404),
         };
+    }
+
+    public function ensureExportWithinLimits(string $format, int $rowCount): void
+    {
+        if ($format === 'xlsx' && $rowCount > self::MAX_XLSX_ROWS) {
+            abort(422, 'Exportacao XLSX limitada a 5000 registros. Use CSV para volumes maiores.');
+        }
+
+        if ($format === 'pdf' && $rowCount > self::MAX_PDF_ROWS) {
+            abort(422, 'Exportacao PDF limitada a 1000 registros. Use CSV ou XLSX para volumes maiores.');
+        }
+    }
+
+    public function streamCsv(string $reportTitle, array $columns, callable $emitRows): StreamedResponse
+    {
+        return response()->streamDownload(
+            function () use ($columns, $emitRows) {
+                $handle = fopen('php://output', 'w');
+
+                if ($handle === false) {
+                    abort(500, 'Nao foi possivel preparar o arquivo CSV.');
+                }
+
+                fwrite($handle, chr(239) . chr(187) . chr(191));
+                fputcsv($handle, array_map(fn (array $column) => $column['label'], $columns));
+
+                $emitRows(function (array $row) use ($handle, $columns) {
+                    fputcsv(
+                        $handle,
+                        array_map(
+                            fn (array $column) => $this->sanitizeTextValue($row[$column['key']] ?? ''),
+                            $columns
+                        )
+                    );
+                });
+
+                fclose($handle);
+            },
+            $this->buildExportFileName($reportTitle, 'csv'),
+            ['Content-Type' => 'text/csv; charset=UTF-8']
+        );
     }
 
     private function buildExportFileName(string $reportTitle, string $format): string

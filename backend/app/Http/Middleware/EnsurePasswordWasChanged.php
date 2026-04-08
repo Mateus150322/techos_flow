@@ -12,12 +12,12 @@ class EnsurePasswordWasChanged
         $user = $request->user();
 
         if (! $user) {
-            return response()->json(['message' => 'Não autenticado.'], 401);
+            return response()->json(['message' => 'Nao autenticado.'], 401);
         }
 
         if ($user->must_change_password) {
             return response()->json([
-                'message' => 'É necessário alterar a senha antes de continuar.',
+                'message' => 'E necessario alterar a senha antes de continuar.',
             ], 403);
         }
 

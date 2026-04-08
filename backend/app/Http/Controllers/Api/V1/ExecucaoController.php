@@ -12,9 +12,6 @@ class ExecucaoController extends Controller
 {
     use EnsuresTecnicoResponsavel;
 
-    /**
-     * Iniciar execução (cria uma execução e muda OS para em_execucao se estiver aberta)
-     */
     public function store(Request $request, string $id)
     {
         $data = $request->validate([
@@ -31,7 +28,7 @@ class ExecucaoController extends Controller
 
         if (in_array($os->status, ['finalizada', 'cancelada', 'nao_executada'], true)) {
             return response()->json([
-                'message' => 'Não é possível iniciar execução para OS já encerrada.',
+                'message' => 'Nao e possivel iniciar execucao para OS ja encerrada.',
             ], 422);
         }
 
@@ -42,7 +39,7 @@ class ExecucaoController extends Controller
 
         if ($execucaoAberta) {
             return response()->json([
-                'message' => 'Já existe uma execução em andamento para esta OS.',
+                'message' => 'Ja existe uma execucao em andamento para esta OS.',
                 'execucao' => $execucaoAberta,
             ], 422);
         }
@@ -65,9 +62,6 @@ class ExecucaoController extends Controller
         ], 201);
     }
 
-    /**
-     * Finalizar execução (marca data_fim e finaliza OS)
-     */
     public function finalizar(Request $request, string $id)
     {
         $data = $request->validate([
@@ -85,7 +79,7 @@ class ExecucaoController extends Controller
 
         if ($os->status !== 'em_execucao') {
             return response()->json([
-                'message' => 'A OS precisa estar em execução para ser finalizada.',
+                'message' => 'A OS precisa estar em execucao para ser finalizada.',
             ], 422);
         }
 
@@ -97,13 +91,13 @@ class ExecucaoController extends Controller
 
         if ($execucao->data_fim) {
             return response()->json([
-                'message' => 'Esta execução já foi finalizada.',
+                'message' => 'Esta execucao ja foi finalizada.',
             ], 422);
         }
 
         $execucao->data_fim = $data['data_fim'] ?? now();
 
-        if (!empty($data['observacao'])) {
+        if (! empty($data['observacao'])) {
             $execucao->observacao = $data['observacao'];
         }
 
@@ -114,7 +108,7 @@ class ExecucaoController extends Controller
         $os->save();
 
         return response()->json([
-            'message' => 'Execução finalizada e OS encerrada.',
+            'message' => 'Execucao finalizada e OS encerrada.',
             'execucao' => $execucao,
             'os' => $os,
         ]);

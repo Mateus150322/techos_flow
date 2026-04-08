@@ -110,7 +110,7 @@ class UsuariosAdminTest extends TestCase
         $response
             ->assertStatus(422)
             ->assertJson([
-                'message' => 'Você não pode inativar seu próprio usuário.',
+                'message' => 'Voce nao pode inativar seu proprio usuario.',
             ]);
     }
 
@@ -127,7 +127,7 @@ class UsuariosAdminTest extends TestCase
         $response
             ->assertStatus(422)
             ->assertJson([
-                'message' => 'Não é possível remover o último administrador ativo.',
+                'message' => 'Nao e possivel remover o ultimo administrador ativo.',
             ]);
     }
 
@@ -143,7 +143,7 @@ class UsuariosAdminTest extends TestCase
         $response
             ->assertStatus(403)
             ->assertJson([
-                'message' => 'Usuário inativo.',
+                'message' => 'Usuario inativo.',
             ]);
     }
 
@@ -158,7 +158,7 @@ class UsuariosAdminTest extends TestCase
         $response
             ->assertStatus(403)
             ->assertJson([
-                'message' => 'Usuário inativo.',
+                'message' => 'Usuario inativo.',
             ]);
     }
 

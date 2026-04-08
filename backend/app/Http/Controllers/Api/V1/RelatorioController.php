@@ -8,6 +8,7 @@ use App\Services\Relatorios\RelatorioExportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RelatorioController extends Controller
 {
@@ -22,6 +23,7 @@ class RelatorioController extends Controller
             'tecnicos' => $payload['tecnicos'],
             'resumo' => $payload['resumo'],
             'reportDefinition' => $payload['reportDefinition'],
+            'reportPagination' => $payload['reportPagination'],
             'atividadeRecente' => $payload['atividadeRecente'],
             'periodoDescricao' => $payload['periodoDescricao'],
             'filtrosDescricao' => $payload['filtrosDescricao'],
@@ -34,8 +36,23 @@ class RelatorioController extends Controller
         string $format,
         OrdemServicoRelatorioService $relatorioService,
         RelatorioExportService $exportService
-    ): Response {
-        $payload = $relatorioService->buildPayload($this->validatedFilters($request));
+    ): Response|StreamedResponse {
+        $filters = $this->validatedFilters($request);
+
+        if ($format === 'csv') {
+            $definition = $relatorioService->describeReport($filters);
+
+            return $exportService->streamCsv(
+                $definition['title'],
+                $definition['columns'],
+                fn (callable $writeRow) => $relatorioService->streamCsvRows($filters, $writeRow)
+            );
+        }
+
+        $previewPayload = $relatorioService->buildPayload($filters);
+        $exportService->ensureExportWithinLimits($format, $previewPayload['reportPagination']['total']);
+
+        $payload = $relatorioService->buildPayload($filters, true);
         $exported = $exportService->export($format, $payload, $request->user()?->name ?? 'Sistema');
 
         return response($exported['content'], 200, [
@@ -58,6 +75,8 @@ class RelatorioController extends Controller
             'tecnico_id' => 'nullable|uuid',
             'data_inicio' => 'nullable|date',
             'data_fim' => 'nullable|date|after_or_equal:data_inicio',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
         ]);
     }
 }

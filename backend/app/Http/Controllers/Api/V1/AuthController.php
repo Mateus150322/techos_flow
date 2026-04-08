@@ -21,13 +21,13 @@ class AuthController extends Controller
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             return response()->json([
-                'message' => 'Credenciais inválidas.',
+                'message' => 'Credenciais invalidas.',
             ], 401);
         }
 
         if (! $user->is_active) {
             return response()->json([
-                'message' => 'Usuário inativo.',
+                'message' => 'Usuario inativo.',
             ], 403);
         }
 
@@ -67,9 +67,9 @@ class AuthController extends Controller
 
         if (! Hash::check($data['current_password'], $user->password)) {
             return response()->json([
-                'message' => 'A senha atual informada está incorreta.',
+                'message' => 'A senha atual informada esta incorreta.',
                 'errors' => [
-                    'current_password' => ['A senha atual informada está incorreta.'],
+                    'current_password' => ['A senha atual informada esta incorreta.'],
                 ],
             ], 422);
         }
@@ -105,11 +105,11 @@ class AuthController extends Controller
     {
         return [
             'password.required' => 'Informe a nova senha.',
-            'password.confirmed' => 'A confirmação da nova senha não confere.',
+            'password.confirmed' => 'A confirmacao da nova senha nao confere.',
             'password.min' => 'A nova senha deve ter pelo menos 8 caracteres.',
-            'password.max' => 'A nova senha deve ter no máximo 255 caracteres.',
+            'password.max' => 'A nova senha deve ter no maximo 255 caracteres.',
             'password.different' => 'A nova senha deve ser diferente da senha atual.',
-            'password.regex' => 'A nova senha deve conter letra maiúscula, letra minúscula, número e caractere especial.',
+            'password.regex' => 'A nova senha deve conter letra maiuscula, letra minuscula, numero e caractere especial.',
             'current_password.required' => 'Informe a senha atual.',
         ];
     }

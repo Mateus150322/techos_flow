@@ -1,131 +1,60 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, BarChart3, CheckCircle2, Clock3 } from "lucide-react";
 
 import { AdminShell } from "@/modules/admin/AdminShell";
 import { AdminMetricCard } from "@/modules/admin/components/AdminMetricCard";
-import {
-  getTecnicoResponsavel,
-  type OrdemServico,
-} from "@/modules/ordensServico/ordensServico.service";
 import { StatusBadge } from "@/modules/ordensServico/components/StatusBadge";
 import { type CurrentUser } from "@/shared/auth/session";
 import { useTheme } from "@/shared/hooks/useTheme";
+import { getApiErrorMessage } from "@/shared/utils/apiError";
+import { buscarDashboardAdmin, type AdminDashboardResponse } from "./dashboard.service";
 
 type AdminDashboardContentProps = {
   currentUser: CurrentUser;
-  orders: OrdemServico[];
-  loading: boolean;
 };
 
-export function AdminDashboardContent({
-  currentUser,
-  orders,
-  loading,
-}: AdminDashboardContentProps) {
+export function AdminDashboardContent({ currentUser }: AdminDashboardContentProps) {
   const { isDark } = useTheme();
+  const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
 
-  const abertas = orders.filter((os) => os.status === "aberta").length;
-  const emExecucao = orders.filter((os) => os.status === "em_execucao").length;
-  const finalizadas = orders.filter((os) => os.status === "finalizada").length;
-  const naoExecutadas = orders.filter((os) => os.status === "nao_executada").length;
-  const canceladas = orders.filter((os) => os.status === "cancelada").length;
-  const pendentes = abertas + emExecucao;
+  useEffect(() => {
+    async function carregarDashboard() {
+      try {
+        setLoading(true);
+        setErro("");
+        const data = await buscarDashboardAdmin();
+        setDashboard(data);
+      } catch (error) {
+        setDashboard(null);
+        setErro(getApiErrorMessage(error, "Nao foi possivel carregar os indicadores."));
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  const ordensDoMesAtual = useMemo(() => {
-    const agora = new Date();
-    const mes = agora.getMonth();
-    const ano = agora.getFullYear();
+    void carregarDashboard();
+  }, []);
 
-    return orders.filter((order) => {
-      const dataAbertura = new Date(order.data_abertura ?? "");
-
-      return (
-        Number.isFinite(dataAbertura.getTime()) &&
-        dataAbertura.getMonth() === mes &&
-        dataAbertura.getFullYear() === ano
-      );
-    });
-  }, [orders]);
+  const resumo = dashboard?.resumo;
+  const distribuicaoStatus = dashboard?.distribuicao_status ?? [];
+  const tiposBreakdown = dashboard?.tipos_breakdown ?? [];
+  const produtividadeTecnicos = dashboard?.produtividade_tecnicos ?? [];
+  const resumoMesAtual = dashboard?.resumo_mes_atual;
+  const recentOrders = dashboard?.atividade_recente ?? [];
 
   const tempoMedioHoras = useMemo(() => {
-    const duracoes = orders
-      .filter((order) => order.status === "finalizada" && order.data_abertura && order.data_encerramento)
-      .map((order) => {
-        const inicio = new Date(order.data_abertura).getTime();
-        const fim = new Date(order.data_encerramento ?? "").getTime();
-
-        if (!Number.isFinite(inicio) || !Number.isFinite(fim) || fim < inicio) {
-          return null;
-        }
-
-        return (fim - inicio) / (1000 * 60 * 60);
-      })
-      .filter((value): value is number => typeof value === "number");
-
-    if (!duracoes.length) {
+    if (typeof resumo?.tempo_medio_horas !== "number") {
       return "-";
     }
 
-    const media = duracoes.reduce((total, value) => total + value, 0) / duracoes.length;
-    return `${media.toFixed(1)}h`;
-  }, [orders]);
+    return `${resumo.tempo_medio_horas.toFixed(1)}h`;
+  }, [resumo?.tempo_medio_horas]);
 
-  const tiposBreakdown = useMemo(() => {
-    const grouped = new Map<string, number>();
-
-    for (const order of orders) {
-      const tipo = order.tipo?.trim() || "Sem tipo";
-      grouped.set(tipo, (grouped.get(tipo) ?? 0) + 1);
-    }
-
-    return Array.from(grouped.entries())
-      .map(([tipo, total]) => ({ tipo, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
-  }, [orders]);
-
-  const statusPercentages = useMemo(() => {
-    const total = orders.length || 1;
-
-    return {
-      abertas: Math.round((abertas / total) * 100),
-      emExecucao: Math.round((emExecucao / total) * 100),
-      finalizadas: Math.round((finalizadas / total) * 100),
-      naoExecutadas: Math.round((naoExecutadas / total) * 100),
-      canceladas: Math.round((canceladas / total) * 100),
-    };
-  }, [abertas, canceladas, emExecucao, finalizadas, naoExecutadas, orders.length]);
-
-  const produtividadeTecnicos = useMemo(() => {
-    const grouped = new Map<string, { nome: string; atribuidas: number; finalizadas: number }>();
-
-    for (const order of orders) {
-      const tecnico = getTecnicoResponsavel(order);
-      const key = tecnico?.id ?? "nao_atribuida";
-      const nome = tecnico?.name ?? "Sem responsavel";
-      const atual = grouped.get(key) ?? { nome, atribuidas: 0, finalizadas: 0 };
-
-      atual.atribuidas += tecnico ? 1 : 0;
-      atual.finalizadas += tecnico && order.status === "finalizada" ? 1 : 0;
-
-      grouped.set(key, atual);
-    }
-
-    return Array.from(grouped.values())
-      .filter((item) => item.nome !== "Sem responsavel")
-      .sort((a, b) => b.atribuidas - a.atribuidas)
-      .slice(0, 4);
-  }, [orders]);
-
-  const recentOrders = useMemo(() => {
-    return [...orders]
-      .sort(
-        (a, b) =>
-          new Date(b.data_abertura ?? "").getTime() -
-          new Date(a.data_abertura ?? "").getTime()
-      )
-      .slice(0, 5);
-  }, [orders]);
+  const abertas = resumo?.abertas ?? 0;
+  const finalizadas = resumo?.finalizadas ?? 0;
+  const total = resumo?.total ?? 0;
 
   const cardBg = isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-slate-200";
   const softBg = isDark ? "bg-zinc-950/80 border-zinc-800" : "bg-slate-50 border-slate-200";
@@ -136,19 +65,31 @@ export function AdminDashboardContent({
 
   return (
     <AdminShell currentUser={currentUser} activeTab="indicadores">
+      {erro ? (
+        <div
+          className={`mb-6 rounded-3xl border px-5 py-4 text-sm ${
+            isDark
+              ? "border-red-900 bg-red-950 text-red-300"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {erro}
+        </div>
+      ) : null}
+
       <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AdminMetricCard
           label="Total de OS"
-          value={orders.length}
+          value={total}
           icon={<BarChart3 className="h-6 w-6 text-blue-500" />}
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          hint="Panorama geral da operação"
+          hint="Panorama geral da operacao"
         />
         <AdminMetricCard
-          label="Taxa de conclusão"
-          value={`${orders.length ? Math.round((finalizadas / orders.length) * 100) : 0}%`}
+          label="Taxa de conclusao"
+          value={`${total ? Math.round((finalizadas / total) * 100) : 0}%`}
           icon={<CheckCircle2 className="h-6 w-6 text-emerald-500" />}
           cardBg={cardBg}
           titleText={titleText}
@@ -156,7 +97,7 @@ export function AdminDashboardContent({
           hint="Percentual concluido no conjunto atual"
         />
         <AdminMetricCard
-          label="Tempo médio"
+          label="Tempo medio"
           value={tempoMedioHoras}
           icon={<Clock3 className="h-6 w-6 text-amber-500" />}
           cardBg={cardBg}
@@ -166,18 +107,18 @@ export function AdminDashboardContent({
         />
         <AdminMetricCard
           label="Pendentes"
-          value={pendentes}
+          value={resumo?.pendentes ?? 0}
           icon={<AlertTriangle className="h-6 w-6 text-red-500" />}
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          hint="Ordens abertas ou em execução"
+          hint="Ordens abertas ou em execucao"
         />
       </section>
 
       <section className="mb-6 grid gap-6 xl:grid-cols-2">
         <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-          <h2 className={`text-2xl font-semibold ${titleText}`}>Distribuição por status</h2>
+          <h2 className={`text-2xl font-semibold ${titleText}`}>Distribuicao por status</h2>
           <p className={`mt-1 text-sm ${mutedText}`}>
             Visao geral do status das ordens de servico.
           </p>
@@ -187,24 +128,34 @@ export function AdminDashboardContent({
               className="relative h-56 w-56 rounded-full p-8"
               style={{
                 background: `conic-gradient(
-                  #3b82f6 0 ${statusPercentages.abertas}%,
-                  #f4b400 ${statusPercentages.abertas}% ${statusPercentages.abertas + statusPercentages.emExecucao}%,
-                  #22c55e ${statusPercentages.abertas + statusPercentages.emExecucao}% ${
-                    statusPercentages.abertas + statusPercentages.emExecucao + statusPercentages.finalizadas
+                  #3b82f6 0 ${getPercentual(distribuicaoStatus, "aberta")}%, 
+                  #f4b400 ${getPercentual(distribuicaoStatus, "aberta")}% ${
+                    getPercentual(distribuicaoStatus, "aberta") +
+                    getPercentual(distribuicaoStatus, "em_execucao")
+                  }%,
+                  #22c55e ${
+                    getPercentual(distribuicaoStatus, "aberta") +
+                    getPercentual(distribuicaoStatus, "em_execucao")
+                  }% ${
+                    getPercentual(distribuicaoStatus, "aberta") +
+                    getPercentual(distribuicaoStatus, "em_execucao") +
+                    getPercentual(distribuicaoStatus, "finalizada")
                   }%,
                   #ef4444 ${
-                    statusPercentages.abertas + statusPercentages.emExecucao + statusPercentages.finalizadas
+                    getPercentual(distribuicaoStatus, "aberta") +
+                    getPercentual(distribuicaoStatus, "em_execucao") +
+                    getPercentual(distribuicaoStatus, "finalizada")
                   }% ${
-                    statusPercentages.abertas +
-                    statusPercentages.emExecucao +
-                    statusPercentages.finalizadas +
-                    statusPercentages.naoExecutadas
+                    getPercentual(distribuicaoStatus, "aberta") +
+                    getPercentual(distribuicaoStatus, "em_execucao") +
+                    getPercentual(distribuicaoStatus, "finalizada") +
+                    getPercentual(distribuicaoStatus, "nao_executada")
                   }%,
                   #6b7280 ${
-                    statusPercentages.abertas +
-                    statusPercentages.emExecucao +
-                    statusPercentages.finalizadas +
-                    statusPercentages.naoExecutadas
+                    getPercentual(distribuicaoStatus, "aberta") +
+                    getPercentual(distribuicaoStatus, "em_execucao") +
+                    getPercentual(distribuicaoStatus, "finalizada") +
+                    getPercentual(distribuicaoStatus, "nao_executada")
                   } 100%
                 )`,
               }}
@@ -218,37 +169,20 @@ export function AdminDashboardContent({
             </div>
 
             <div className="space-y-4">
-              <LegendItem
-                label={`Abertas: ${statusPercentages.abertas}%`}
-                color="bg-blue-500"
-                mutedText={mutedText}
-              />
-              <LegendItem
-                label={`Em execução: ${statusPercentages.emExecucao}%`}
-                color="bg-amber-400"
-                mutedText={mutedText}
-              />
-              <LegendItem
-                label={`Finalizadas: ${statusPercentages.finalizadas}%`}
-                color="bg-emerald-500"
-                mutedText={mutedText}
-              />
-              <LegendItem
-                label={`Não executadas: ${statusPercentages.naoExecutadas}%`}
-                color="bg-red-500"
-                mutedText={mutedText}
-              />
-              <LegendItem
-                label={`Canceladas: ${statusPercentages.canceladas}%`}
-                color="bg-slate-500"
-                mutedText={mutedText}
-              />
+              {distribuicaoStatus.map((item) => (
+                <LegendItem
+                  key={item.status}
+                  label={`${item.label}: ${item.percentual}%`}
+                  color={statusColor(item.status)}
+                  mutedText={mutedText}
+                />
+              ))}
             </div>
           </div>
         </div>
 
         <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-          <h2 className={`text-2xl font-semibold ${titleText}`}>OS por tipo de serviço</h2>
+          <h2 className={`text-2xl font-semibold ${titleText}`}>OS por tipo de servico</h2>
           <p className={`mt-1 text-sm ${mutedText}`}>Quantidade de ordens por categoria.</p>
 
           <div className="mt-8 overflow-x-auto pb-2">
@@ -260,8 +194,7 @@ export function AdminDashboardContent({
                       className="w-full rounded-2xl bg-blue-500"
                       style={{
                         height: `${Math.max(
-                          (item.total /
-                            Math.max(...tiposBreakdown.map((tipo) => tipo.total), 1)) *
+                          (item.total / Math.max(...tiposBreakdown.map((tipo) => tipo.total), 1)) *
                             100,
                           item.total ? 16 : 0
                         )}%`,
@@ -280,19 +213,23 @@ export function AdminDashboardContent({
       </section>
 
       <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-        <h2 className={`text-2xl font-semibold ${titleText}`}>Produtividade dos técnicos</h2>
+        <h2 className={`text-2xl font-semibold ${titleText}`}>Produtividade dos tecnicos</h2>
         <p className={`mt-1 text-sm ${mutedText}`}>
           Comparacao entre OS atribuidas e finalizadas por tecnico.
         </p>
 
         <div className="mt-8 space-y-6">
-          {produtividadeTecnicos.length === 0 ? (
+          {loading ? (
+            <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
+              Carregando produtividade...
+            </div>
+          ) : produtividadeTecnicos.length === 0 ? (
             <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
               Nenhum tecnico com ordens atribuidas no momento.
             </div>
           ) : (
             produtividadeTecnicos.map((item) => (
-              <div key={item.nome}>
+              <div key={item.id}>
                 <div className="mb-2 flex items-center justify-between">
                   <span className={`font-medium ${titleText}`}>{item.nome}</span>
                   <span className={`text-sm ${mutedText}`}>
@@ -319,10 +256,7 @@ export function AdminDashboardContent({
                       style={{
                         width: `${
                           item.atribuidas
-                            ? Math.max(
-                                (item.finalizadas / item.atribuidas) * 100,
-                                item.finalizadas ? 8 : 0
-                              )
+                            ? Math.max((item.finalizadas / item.atribuidas) * 100, item.finalizadas ? 8 : 0)
                             : 0
                         }%`,
                       }}
@@ -337,40 +271,34 @@ export function AdminDashboardContent({
       </section>
 
       <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-        <h2 className={`text-2xl font-semibold ${titleText}`}>Resumo do mês atual</h2>
+        <h2 className={`text-2xl font-semibold ${titleText}`}>Resumo do mes atual</h2>
         <p className={`mt-1 text-sm ${mutedText}`}>Indicadores com base nas OS abertas neste mes.</p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <SoftMetric
             label="Abertas"
-            value={ordensDoMesAtual.filter((os) => os.status === "aberta").length}
+            value={resumoMesAtual?.abertas ?? 0}
             softBg={softBg}
             titleText={titleText}
             mutedText={mutedText}
           />
           <SoftMetric
-            label="Em execução"
-            value={ordensDoMesAtual.filter((os) => os.status === "em_execucao").length}
+            label="Em execucao"
+            value={resumoMesAtual?.em_execucao ?? 0}
             softBg={softBg}
             titleText={titleText}
             mutedText={mutedText}
           />
           <SoftMetric
             label="Finalizadas"
-            value={ordensDoMesAtual.filter((os) => os.status === "finalizada").length}
+            value={resumoMesAtual?.finalizadas ?? 0}
             softBg={softBg}
             titleText={titleText}
             mutedText={mutedText}
           />
           <SoftMetric
-            label="Técnicos ativos"
-            value={
-              new Set(
-                ordensDoMesAtual
-                  .map((order) => getTecnicoResponsavel(order)?.id)
-                  .filter((id): id is string => Boolean(id))
-              ).size
-            }
+            label="Tecnicos ativos"
+            value={resumoMesAtual?.tecnicos_ativos ?? 0}
             softBg={softBg}
             titleText={titleText}
             mutedText={mutedText}
@@ -414,6 +342,28 @@ export function AdminDashboardContent({
       </section>
     </AdminShell>
   );
+}
+
+function statusColor(status: string) {
+  switch (status) {
+    case "aberta":
+      return "bg-blue-500";
+    case "em_execucao":
+      return "bg-amber-400";
+    case "finalizada":
+      return "bg-emerald-500";
+    case "nao_executada":
+      return "bg-red-500";
+    default:
+      return "bg-slate-500";
+  }
+}
+
+function getPercentual(
+  distribuicaoStatus: AdminDashboardResponse["distribuicao_status"],
+  status: string
+) {
+  return distribuicaoStatus.find((item) => item.status === status)?.percentual ?? 0;
 }
 
 function LegendItem({

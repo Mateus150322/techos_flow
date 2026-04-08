@@ -12,7 +12,9 @@ export type CurrentUser = {
 
 const TOKEN_STORAGE_KEY = "token";
 const USER_STORAGE_KEY = "user";
+const SESSION_VALIDATED_AT_STORAGE_KEY = "session_validated_at";
 const SESSION_EVENT_NAME = "techosflow:session-changed";
+const SESSION_VALIDATION_TTL_MS = 60_000;
 
 function isUserRole(value: unknown): value is UserRole {
   return value === "administrador" || value === "tecnico" || value === "atendente";
@@ -62,6 +64,14 @@ function getStoredUserRaw() {
   return localStorage.getItem(USER_STORAGE_KEY);
 }
 
+function setSessionValidatedAt(value: number) {
+  localStorage.setItem(SESSION_VALIDATED_AT_STORAGE_KEY, String(value));
+}
+
+function clearSessionValidatedAt() {
+  localStorage.removeItem(SESSION_VALIDATED_AT_STORAGE_KEY);
+}
+
 function emitSessionChange() {
   window.dispatchEvent(new Event(SESSION_EVENT_NAME));
 }
@@ -82,19 +92,38 @@ export function useCurrentUser(fallbackRole: UserRole = "atendente") {
   return useMemo(() => parseStoredUser(rawUser, fallbackRole), [fallbackRole, rawUser]);
 }
 
+export function hasFreshSessionValidation(ttlMs = SESSION_VALIDATION_TTL_MS) {
+  const rawValue = localStorage.getItem(SESSION_VALIDATED_AT_STORAGE_KEY);
+
+  if (!rawValue) {
+    return false;
+  }
+
+  const validatedAt = Number(rawValue);
+
+  if (!Number.isFinite(validatedAt)) {
+    return false;
+  }
+
+  return Date.now() - validatedAt < ttlMs;
+}
+
 export function saveSession(token: string, user: CurrentUser) {
   localStorage.setItem(TOKEN_STORAGE_KEY, token);
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  setSessionValidatedAt(Date.now());
   emitSessionChange();
 }
 
 export function updateStoredUser(user: CurrentUser) {
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  setSessionValidatedAt(Date.now());
   emitSessionChange();
 }
 
 export function clearSession() {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
   localStorage.removeItem(USER_STORAGE_KEY);
+  clearSessionValidatedAt();
   emitSessionChange();
 }

@@ -6,15 +6,17 @@ use App\Http\Controllers\Api\V1\Concerns\EnsuresTecnicoResponsavel;
 use App\Http\Controllers\Controller;
 use App\Models\Endereco;
 use App\Models\OrdemServico;
+use App\Support\Concerns\UsesCaseInsensitiveLike;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\DB as QueryBuilder;
 use Illuminate\Support\Str;
 
 class OrdemServicoController extends Controller
 {
     use EnsuresTecnicoResponsavel;
+    use UsesCaseInsensitiveLike;
 
     public function store(Request $request)
     {
@@ -40,7 +42,7 @@ class OrdemServicoController extends Controller
             $this->normalizeTipoServico($data['tipo_servico']) !== 'manutencao eta/ete'
         ) {
             return response()->json([
-                'message' => 'Técnico só pode abrir OS do tipo Manutenção ETA/ETE.',
+                'message' => 'Tecnico so pode abrir OS do tipo Manutencao ETA/ETE.',
             ], 403);
         }
 
@@ -90,16 +92,7 @@ class OrdemServicoController extends Controller
 
     public function index(Request $request)
     {
-        $data = $request->validate([
-            'status' => 'nullable|in:aberta,em_execucao,finalizada,nao_executada,cancelada',
-            'prioridade' => 'nullable|integer|in:1,2,3',
-            'tipo' => 'nullable|string|max:255',
-            'q' => 'nullable|string|max:255',
-            'sort' => 'nullable|in:data_abertura,prioridade,status,numero,tipo,nome_cliente',
-            'dir' => 'nullable|in:asc,desc',
-            'per_page' => 'nullable|integer|min:1|max:100',
-            'include' => 'nullable|string',
-        ]);
+        $data = $this->validateListFilters($request);
 
         $perPage = $data['per_page'] ?? 15;
         $sort = $data['sort'] ?? 'data_abertura';
@@ -116,38 +109,48 @@ class OrdemServicoController extends Controller
 
         $query = OrdemServico::query();
 
-        if (!empty($include)) {
+        if (! empty($include)) {
             $query->with($include);
         }
 
-        if (!empty($data['status'])) {
-            $query->where('status', $data['status']);
-        }
-
-        if (!empty($data['prioridade'])) {
-            $query->where('prioridade', (int) $data['prioridade']);
-        }
-
-        if (!empty($data['tipo'])) {
-            $tipo = mb_strtolower($data['tipo']);
-            $query->where(QueryBuilder::raw('LOWER(tipo)'), 'like', '%' . $tipo . '%');
-        }
-
-        if (!empty($data['q'])) {
-            $q = mb_strtolower($data['q']);
-
-            $query->where(function ($where) use ($q) {
-                $where->where(QueryBuilder::raw('LOWER(numero)'), 'like', "%{$q}%")
-                    ->orWhere(QueryBuilder::raw('LOWER(descricao)'), 'like', "%{$q}%")
-                    ->orWhere(QueryBuilder::raw('LOWER(nome_cliente)'), 'like', "%{$q}%");
-            });
-        }
+        $this->applyListFilters($query, $data);
 
         $query->orderBy($sort, $dir);
 
         return response()->json(
             $query->paginate($perPage)->appends($request->query())
         );
+    }
+
+    public function summary(Request $request)
+    {
+        $data = $this->validateListFilters($request);
+        $query = OrdemServico::query();
+
+        $this->applyListFilters($query, $data);
+
+        return response()->json([
+            'total' => (clone $query)->count(),
+            'abertas' => (clone $query)->where('status', 'aberta')->count(),
+            'em_execucao' => (clone $query)->where('status', 'em_execucao')->count(),
+            'finalizadas' => (clone $query)->where('status', 'finalizada')->count(),
+            'nao_executadas' => (clone $query)->where('status', 'nao_executada')->count(),
+            'canceladas' => (clone $query)->where('status', 'cancelada')->count(),
+            'encerradas' => (clone $query)->whereIn('status', ['finalizada', 'nao_executada', 'cancelada'])->count(),
+        ]);
+    }
+
+    public function filterOptions()
+    {
+        return response()->json([
+            'tipos' => OrdemServico::query()
+                ->whereNotNull('tipo')
+                ->orderBy('tipo')
+                ->pluck('tipo')
+                ->filter()
+                ->unique()
+                ->values(),
+        ]);
     }
 
     public function show(Request $request, string $id)
@@ -174,7 +177,7 @@ class OrdemServicoController extends Controller
 
         $query = OrdemServico::query();
 
-        if (!empty($include)) {
+        if (! empty($include)) {
             $query->with($include);
         }
 
@@ -198,7 +201,7 @@ class OrdemServicoController extends Controller
 
         if (in_array($os->status, ['finalizada', 'cancelada', 'nao_executada'], true)) {
             return response()->json([
-                'message' => 'Não é possível marcar como não executada uma OS já encerrada.',
+                'message' => 'Nao e possivel marcar como nao executada uma OS ja encerrada.',
             ], 422);
         }
 
@@ -208,7 +211,7 @@ class OrdemServicoController extends Controller
         $os->save();
 
         return response()->json([
-            'message' => 'OS marcada como não executada com sucesso.',
+            'message' => 'OS marcada como nao executada com sucesso.',
             'os' => $os,
         ]);
     }
@@ -218,7 +221,7 @@ class OrdemServicoController extends Controller
         $user = $request->user();
 
         if ($user->role !== 'tecnico') {
-            return response()->json(['message' => 'Apenas técnicos podem aceitar OS.'], 403);
+            return response()->json(['message' => 'Apenas tecnicos podem aceitar OS.'], 403);
         }
 
         $os = OrdemServico::query()->findOrFail($id);
@@ -232,13 +235,13 @@ class OrdemServicoController extends Controller
         if ($os->tecnico_responsavel_id) {
             if ($os->tecnico_responsavel_id === $user->id) {
                 return response()->json([
-                    'message' => 'Essa OS já está atribuída a você.',
+                    'message' => 'Essa OS ja esta atribuida a voce.',
                     'data' => $os,
                 ]);
             }
 
             return response()->json([
-                'message' => 'Essa OS já foi aceita por outro técnico.',
+                'message' => 'Essa OS ja foi aceita por outro tecnico.',
             ], 409);
         }
 
@@ -278,5 +281,63 @@ class OrdemServicoController extends Controller
             ->ascii()
             ->lower()
             ->squish();
+    }
+
+    private function validateListFilters(Request $request): array
+    {
+        return $request->validate([
+            'status' => 'nullable|in:aberta,em_execucao,finalizada,nao_executada,cancelada',
+            'prioridade' => 'nullable|integer|in:1,2,3',
+            'tipo' => 'nullable|string|max:255',
+            'q' => 'nullable|string|max:255',
+            'sort' => 'nullable|in:data_abertura,prioridade,status,numero,tipo,nome_cliente',
+            'dir' => 'nullable|in:asc,desc',
+            'per_page' => 'nullable|integer|min:1|max:100',
+            'include' => 'nullable|string',
+            'tecnico_id' => 'nullable|uuid',
+            'sem_responsavel' => 'nullable|boolean',
+        ]);
+    }
+
+    private function applyListFilters(Builder $query, array $data): void
+    {
+        $likeOperator = $this->caseInsensitiveLikeOperator($query);
+
+        if (! empty($data['status'])) {
+            $query->where('status', $data['status']);
+        }
+
+        if (! empty($data['prioridade'])) {
+            $query->where('prioridade', (int) $data['prioridade']);
+        }
+
+        if (! empty($data['tecnico_id'])) {
+            $query->where('tecnico_responsavel_id', $data['tecnico_id']);
+        }
+
+        if (array_key_exists('sem_responsavel', $data) && filter_var($data['sem_responsavel'], FILTER_VALIDATE_BOOL)) {
+            $query->whereNull('tecnico_responsavel_id');
+        }
+
+        if (! empty($data['tipo'])) {
+            $query->where('tipo', $data['tipo']);
+        }
+
+        if (! empty($data['q'])) {
+            $q = trim($data['q']);
+            $pattern = $this->containsPattern($q);
+
+            $query->where(function (Builder $where) use ($likeOperator, $pattern) {
+                $where->where('numero', $likeOperator, $pattern)
+                    ->orWhere('tipo', $likeOperator, $pattern)
+                    ->orWhere('descricao', $likeOperator, $pattern)
+                    ->orWhere('nome_cliente', $likeOperator, $pattern)
+                    ->orWhereHas('tecnicoResponsavel', function (Builder $tecnicoQuery) use ($pattern) {
+                        $tecnicoLikeOperator = $this->caseInsensitiveLikeOperator($tecnicoQuery);
+
+                        $tecnicoQuery->where('name', $tecnicoLikeOperator, $pattern);
+                    });
+            });
+        }
     }
 }

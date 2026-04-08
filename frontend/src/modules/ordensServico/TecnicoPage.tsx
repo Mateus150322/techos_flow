@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -10,13 +10,11 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { logout as logoutSession } from "@/modules/auth/auth.service";
+import { buscarDashboardTecnico, type TecnicoDashboardResponse } from "@/modules/dashboard/dashboard.service";
 import { useCurrentUser } from "@/shared/auth/session";
 import { useTheme } from "@/shared/hooks/useTheme";
-import {
-  getTecnicoResponsavel,
-  listarTodasOrdens,
-  type OrdemServico,
-} from "./ordensServico.service";
+import { getApiErrorMessage } from "@/shared/utils/apiError";
+import { getTecnicoResponsavel, type OrdemServico } from "./ordensServico.service";
 import FormularioETAETETecnico from "./components/FormularioETAETETecnico";
 import { PainelOperacionalHeader } from "./components/PainelOperacionalHeader";
 import { ResumoMetricaCard } from "./components/ResumoMetricaCard";
@@ -30,87 +28,41 @@ export default function TecnicoPage() {
   const { isDark, toggleTheme } = useTheme();
 
   const [abaPrincipal, setAbaPrincipal] = useState<AbaPrincipal>("consultar");
-  const [ordens, setOrdens] = useState<OrdemServico[]>([]);
+  const [dashboard, setDashboard] = useState<TecnicoDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
+  const buscaAplicada = useDeferredValue(busca);
   const [ordemSelecionadaId, setOrdemSelecionadaId] = useState<string | null>(null);
 
   const currentUser = useCurrentUser("tecnico");
 
-  async function carregarOrdens() {
+  const carregarOrdens = useCallback(async (search = buscaAplicada) => {
     try {
       setLoading(true);
       setErro("");
-
-      const response = await listarTodasOrdens({
-        include: "tecnicoResponsavel",
-      });
-
-      setOrdens(response.data ?? []);
-    } catch {
-      setErro("Não foi possível carregar as ordens de serviço.");
+      const response = await buscarDashboardTecnico(search);
+      setDashboard(response);
+    } catch (error) {
+      setDashboard(null);
+      setErro(getApiErrorMessage(error, "Nao foi possivel carregar as ordens de servico."));
     } finally {
       setLoading(false);
     }
-  }
+  }, [buscaAplicada]);
 
   useEffect(() => {
+    if (abaPrincipal !== "consultar") {
+      return;
+    }
+
     void carregarOrdens();
-  }, []);
+  }, [abaPrincipal, buscaAplicada, carregarOrdens]);
 
   async function handleLogout() {
     await logoutSession();
     navigate("/login");
   }
-
-  function getResponsavelId(os: OrdemServico) {
-    return os.tecnico_responsavel_id ?? getTecnicoResponsavel(os)?.id ?? null;
-  }
-
-  const ordensFiltradas = useMemo(() => {
-    const termo = busca.toLowerCase().trim();
-
-    return ordens.filter((os) => {
-      if (!termo) return true;
-
-      const responsavel = getTecnicoResponsavel(os)?.name?.toLowerCase() ?? "";
-      const status = os.status.replaceAll("_", " ").toLowerCase();
-
-      return [
-        os.numero,
-        os.tipo,
-        os.nome_cliente,
-        os.descricao,
-        responsavel,
-        status,
-      ]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(termo));
-    });
-  }, [busca, ordens]);
-
-  const osDisponiveis = useMemo(() => {
-    return ordensFiltradas.filter(
-      (os) => os.status === "aberta" && !getResponsavelId(os)
-    );
-  }, [ordensFiltradas]);
-
-  const minhasOS = useMemo(() => {
-    return ordensFiltradas.filter(
-      (os) => !!currentUser.id && getResponsavelId(os) === currentUser.id
-    );
-  }, [currentUser.id, ordensFiltradas]);
-
-  const osEmExecucao = useMemo(() => {
-    return minhasOS.filter((os) => os.status === "em_execucao");
-  }, [minhasOS]);
-
-  const osFinalizadas = useMemo(() => {
-    return minhasOS.filter(
-      (os) => os.status === "finalizada" || os.status === "nao_executada"
-    );
-  }, [minhasOS]);
 
   function formatarData(data?: string | null) {
     if (!data) return "-";
@@ -118,8 +70,13 @@ export default function TecnicoPage() {
   }
 
   function nomeResponsavel(os: OrdemServico) {
-    return getTecnicoResponsavel(os)?.name || "Sem responsável";
+    return getTecnicoResponsavel(os)?.name || "Sem responsavel";
   }
+
+  const osDisponiveis = dashboard?.secoes.disponiveis ?? [];
+  const minhasOS = dashboard?.secoes.minhas ?? [];
+  const osEmExecucao = dashboard?.secoes.em_execucao ?? [];
+  const osFinalizadas = dashboard?.secoes.finalizadas ?? [];
 
   const pageBg = isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900";
   const headerBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
@@ -154,8 +111,8 @@ export default function TecnicoPage() {
         onToggleTheme={toggleTheme}
         onLogout={handleLogout}
         userName={currentUser.name}
-        roleLabel="Técnico"
-        subtitle="Painel operacional do técnico"
+        roleLabel="Tecnico"
+        subtitle="Painel operacional do tecnico"
         icon={<ClipboardList className="h-6 w-6" />}
       />
 
@@ -188,7 +145,7 @@ export default function TecnicoPage() {
           <FormularioETAETETecnico
             onCriada={() => {
               setAbaPrincipal("consultar");
-              void carregarOrdens();
+              void carregarOrdens("");
             }}
           />
         )}
@@ -197,8 +154,8 @@ export default function TecnicoPage() {
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <ResumoMetricaCard
-                titulo="OS Disponíveis"
-                valor={osDisponiveis.length}
+                titulo="OS Disponiveis"
+                valor={dashboard?.resumo.disponiveis ?? 0}
                 icone={<PackageOpen className="h-5 w-5 text-blue-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
@@ -208,7 +165,7 @@ export default function TecnicoPage() {
 
               <ResumoMetricaCard
                 titulo="Minhas OS"
-                valor={minhasOS.length}
+                valor={dashboard?.resumo.minhas ?? 0}
                 icone={<ClipboardList className="h-5 w-5 text-indigo-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
@@ -217,8 +174,8 @@ export default function TecnicoPage() {
               />
 
               <ResumoMetricaCard
-                titulo="Em Execução"
-                valor={osEmExecucao.length}
+                titulo="Em execucao"
+                valor={dashboard?.resumo.em_execucao ?? 0}
                 icone={<Wrench className="h-5 w-5 text-amber-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
@@ -227,8 +184,8 @@ export default function TecnicoPage() {
               />
 
               <ResumoMetricaCard
-                titulo="Concluídas"
-                valor={osFinalizadas.length}
+                titulo="Concluidas"
+                valor={dashboard?.resumo.concluidas ?? 0}
                 icone={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}
                 cardBg={cardBg}
                 cardAccent={cardAccent}
@@ -240,9 +197,9 @@ export default function TecnicoPage() {
             <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
               <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <h2 className={`text-2xl font-semibold ${titleText}`}>Ordens de Serviço</h2>
+                  <h2 className={`text-2xl font-semibold ${titleText}`}>Ordens de Servico</h2>
                   <p className={`mt-2 text-sm ${mutedText}`}>
-                    Consulte, aceite e acompanhe as ordens disponíveis e atribuídas a você.
+                    Consulte, aceite e acompanhe as ordens disponiveis e atribuidas a voce.
                   </p>
                 </div>
 
@@ -253,14 +210,14 @@ export default function TecnicoPage() {
                       type="text"
                       value={busca}
                       onChange={(event) => setBusca(event.target.value)}
-                      placeholder="Buscar por número, cliente, tipo, status ou responsável..."
+                      placeholder="Buscar por numero, cliente, tipo, status ou responsavel..."
                       className={inputClass}
                     />
                   </div>
                 </div>
               </div>
 
-              {erro && (
+              {erro ? (
                 <div
                   className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
                     isDark
@@ -270,11 +227,11 @@ export default function TecnicoPage() {
                 >
                   {erro}
                 </div>
-              )}
+              ) : null}
 
               <TabelaOrdensSection
-                titulo="OS Disponíveis"
-                descricao="Ordens abertas e ainda sem responsável técnico."
+                titulo="OS Disponiveis"
+                descricao="Ordens abertas e ainda sem responsavel tecnico."
                 ordens={osDisponiveis}
                 loading={loading}
                 isDark={isDark}
@@ -290,7 +247,7 @@ export default function TecnicoPage() {
 
               <TabelaOrdensSection
                 titulo="Minhas OS"
-                descricao="Ordens já atribuídas a você, independentemente do status."
+                descricao="Ordens ja atribuidas a voce, independentemente do status."
                 ordens={minhasOS}
                 loading={loading}
                 isDark={isDark}
@@ -305,7 +262,7 @@ export default function TecnicoPage() {
               />
 
               <TabelaOrdensSection
-                titulo="Em Execução"
+                titulo="Em execucao"
                 descricao="Ordens em andamento sob sua responsabilidade."
                 ordens={osEmExecucao}
                 loading={loading}
@@ -322,7 +279,7 @@ export default function TecnicoPage() {
 
               <TabelaOrdensSection
                 titulo="Finalizadas"
-                descricao="Ordens encerradas como finalizadas ou não executadas."
+                descricao="Ordens encerradas como finalizadas ou nao executadas."
                 ordens={osFinalizadas}
                 loading={loading}
                 isDark={isDark}
@@ -338,7 +295,7 @@ export default function TecnicoPage() {
 
               {!loading && (
                 <div className={`mt-4 text-sm ${mutedText}`}>
-                  Exibindo {ordensFiltradas.length} de {ordens.length} ordens de serviço.
+                  Exibindo ate {osDisponiveis.length + minhasOS.length + osEmExecucao.length + osFinalizadas.length} ordens no painel filtrado.
                 </div>
               )}
             </div>
@@ -350,7 +307,7 @@ export default function TecnicoPage() {
         ordemId={ordemSelecionadaId}
         open={!!ordemSelecionadaId}
         onClose={() => setOrdemSelecionadaId(null)}
-        onAtualizou={carregarOrdens}
+        onAtualizou={() => void carregarOrdens()}
       />
     </div>
   );
