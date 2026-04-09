@@ -8,7 +8,7 @@ export type GeolocalizacaoCapturada = {
 
 async function obterPosicaoAtual(): Promise<GeolocationPosition> {
   if (!("geolocation" in navigator)) {
-    throw new Error("Este dispositivo nao oferece suporte a geolocalizacao.");
+    throw new Error("Este dispositivo não oferece suporte a geolocalização.");
   }
 
   return new Promise((resolve, reject) => {
@@ -21,15 +21,15 @@ async function obterPosicaoAtual(): Promise<GeolocationPosition> {
           case error.PERMISSION_DENIED:
             reject(
               new Error(
-                "Permita o acesso a localizacao no navegador para enviar a foto com geolocalizacao."
+                "Permita o acesso à localização no navegador para enviar a foto com geolocalização."
               )
             );
             return;
           case error.TIMEOUT:
-            reject(new Error("A captura da localizacao expirou. Tente novamente."));
+            reject(new Error("A captura da localização expirou. Tente novamente."));
             return;
           default:
-            reject(new Error("Nao foi possivel obter a localizacao atual."));
+            reject(new Error("Não foi possível obter a localização atual."));
         }
       },
       {

@@ -51,7 +51,7 @@ export function AtendenteDashboardContent({
         setDashboard(data);
       } catch (error) {
         setDashboard(null);
-        setErro(getApiErrorMessage(error, "Nao foi possivel carregar as ordens de servico."));
+        setErro(getApiErrorMessage(error, "Não foi possível carregar as ordens de serviço."));
       } finally {
         setLoading(false);
       }
@@ -71,7 +71,7 @@ export function AtendenteDashboardContent({
   }
 
   function nomeResponsavel(os: OrdemServico) {
-    return getTecnicoResponsavel(os)?.name || "Sem responsavel";
+    return getTecnicoResponsavel(os)?.name || "Sem responsável";
   }
 
   const resumo = dashboard?.resumo;
@@ -145,7 +145,7 @@ export function AtendenteDashboardContent({
         {abaPrincipal === "criar" && (
           <FormularioOSGeral
             titulo="Nova OS geral"
-            descricao="Abra uma nova ordem de servico com cliente, prioridade, descricao e endereco."
+            descricao="Abra uma nova ordem de serviço com cliente, prioridade, descrição e endereço."
             onCriada={(ordemCriada) => navigate(`/ordens-servico/${ordemCriada.id}`)}
           />
         )}
@@ -174,7 +174,7 @@ export function AtendenteDashboardContent({
               />
 
               <ResumoMetricaCard
-                titulo="Em execucao"
+                titulo="Em execução"
                 valor={resumo?.em_execucao ?? 0}
                 icone={<PlayCircle className="h-5 w-5 text-amber-600" />}
                 cardBg={cardBg}
@@ -197,9 +197,9 @@ export function AtendenteDashboardContent({
             <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
               <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <h2 className={`text-2xl font-semibold ${titleText}`}>Ordens de Servico</h2>
+                  <h2 className={`text-2xl font-semibold ${titleText}`}>Ordens de Serviço</h2>
                   <p className={`mt-2 text-sm ${mutedText}`}>
-                    Consulte o andamento das ordens abertas pelo atendimento e pela operacao.
+                    Consulte o andamento das ordens abertas pelo atendimento e pela operação.
                   </p>
                 </div>
 
@@ -210,7 +210,7 @@ export function AtendenteDashboardContent({
                       type="text"
                       value={busca}
                       onChange={(event) => setBusca(event.target.value)}
-                      placeholder="Buscar por numero, cliente, tipo, status ou responsavel..."
+                      placeholder="Buscar por número, cliente, tipo, status ou responsável..."
                       className={inputClass}
                     />
                   </div>
@@ -231,7 +231,7 @@ export function AtendenteDashboardContent({
 
               <TabelaOrdensSection
                 titulo="Abertas"
-                descricao="Ordens aguardando aceite ou inicio da execucao."
+                descricao="Ordens aguardando aceite ou início da execução."
                 ordens={ordensAbertas}
                 loading={loading}
                 isDark={isDark}
@@ -246,8 +246,8 @@ export function AtendenteDashboardContent({
               />
 
               <TabelaOrdensSection
-                titulo="Em execucao"
-                descricao="Ordens atualmente em andamento com a equipe tecnica."
+                titulo="Em execução"
+                descricao="Ordens atualmente em andamento com a equipe técnica."
                 ordens={ordensEmExecucao}
                 loading={loading}
                 isDark={isDark}
@@ -263,7 +263,7 @@ export function AtendenteDashboardContent({
 
               <TabelaOrdensSection
                 titulo="Encerradas"
-                descricao="Ordens concluidas, nao executadas ou canceladas."
+                descricao="Ordens concluídas, não executadas ou canceladas."
                 ordens={ordensEncerradas}
                 loading={loading}
                 isDark={isDark}
@@ -279,7 +279,7 @@ export function AtendenteDashboardContent({
 
               {!loading && (
                 <div className={`mt-4 text-sm ${mutedText}`}>
-                  Exibindo ate {ordensAbertas.length + ordensEmExecucao.length + ordensEncerradas.length} ordens no painel consultado.
+                  Exibindo até {ordensAbertas.length + ordensEmExecucao.length + ordensEncerradas.length} ordens no painel consultado.
                 </div>
               )}
             </div>

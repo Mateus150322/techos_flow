@@ -28,7 +28,7 @@ class ExecucaoController extends Controller
 
         if (in_array($os->status, ['finalizada', 'cancelada', 'nao_executada'], true)) {
             return response()->json([
-                'message' => 'Nao e possivel iniciar execucao para OS ja encerrada.',
+                'message' => 'Não é possível iniciar execução para OS já encerrada.',
             ], 422);
         }
 
@@ -39,7 +39,7 @@ class ExecucaoController extends Controller
 
         if ($execucaoAberta) {
             return response()->json([
-                'message' => 'Ja existe uma execucao em andamento para esta OS.',
+                'message' => 'Já existe uma execução em andamento para esta OS.',
                 'execucao' => $execucaoAberta,
             ], 422);
         }
@@ -79,7 +79,7 @@ class ExecucaoController extends Controller
 
         if ($os->status !== 'em_execucao') {
             return response()->json([
-                'message' => 'A OS precisa estar em execucao para ser finalizada.',
+                'message' => 'A OS precisa estar em execução para ser finalizada.',
             ], 422);
         }
 
@@ -91,7 +91,7 @@ class ExecucaoController extends Controller
 
         if ($execucao->data_fim) {
             return response()->json([
-                'message' => 'Esta execucao ja foi finalizada.',
+                'message' => 'Esta execução já foi finalizada.',
             ], 422);
         }
 
@@ -108,7 +108,7 @@ class ExecucaoController extends Controller
         $os->save();
 
         return response()->json([
-            'message' => 'Execucao finalizada e OS encerrada.',
+            'message' => 'Execução finalizada e OS encerrada.',
             'execucao' => $execucao,
             'os' => $os,
         ]);

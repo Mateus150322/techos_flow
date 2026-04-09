@@ -51,8 +51,8 @@ export default function FormularioETAETETecnico({ onCriada }: Props) {
     if (!formData.setorRequisitante.trim()) return "Informe o setor requisitante.";
     if (!formData.encarregado.trim()) return "Informe o encarregado.";
     if (!formData.equipe.trim()) return "Informe a equipe.";
-    if (!formData.tipoManutencao) return "Selecione o tipo de manutencao.";
-    if (!formData.servico.trim()) return "Descreva o servico.";
+    if (!formData.tipoManutencao) return "Selecione o tipo de manutenção.";
+    if (!formData.servico.trim()) return "Descreva o serviço.";
     if (!formData.equipamento.trim()) return "Informe o equipamento.";
 
     return "";
@@ -78,7 +78,7 @@ export default function FormularioETAETETecnico({ onCriada }: Props) {
         prioridade: 2,
         descricao: `
 Data Chamada: ${formData.dataChamada}
-Hora Inicio: ${formData.horaInicio || "-"}
+Hora Início: ${formData.horaInicio || "-"}
 Hora Fim: ${formData.horaFim || "-"}
 Data Final: ${formData.dataFinal || "-"}
 Unidade: ${formData.unidade}
@@ -87,11 +87,11 @@ Setor: ${formData.setorRequisitante}
 Encarregado: ${formData.encarregado}
 Equipe: ${formData.equipe}
 
-Tipo Manutencao: ${formData.tipoManutencao}
-Servico: ${formData.servico}
+Tipo Manutenção: ${formData.tipoManutencao}
+Serviço: ${formData.servico}
 Equipamento: ${formData.equipamento}
 
-Diagnostico: ${formData.diagnostico}
+Diagnóstico: ${formData.diagnostico}
 Procedimento: ${formData.procedimento}
 Material: ${formData.materialUtilizado}
         `.trim(),
@@ -108,7 +108,7 @@ Material: ${formData.materialUtilizado}
       setFormData(initialForm);
       onCriada?.();
     } catch (error) {
-      setErro(getApiErrorMessage(error, "Nao foi possivel criar a OS."));
+      setErro(getApiErrorMessage(error, "Não foi possível criar a OS."));
     } finally {
       setEnviando(false);
     }
@@ -128,13 +128,13 @@ Material: ${formData.materialUtilizado}
     <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
       <div className="mb-6">
         <h2 className={`text-2xl font-semibold ${titleText}`}>
-          Ordem de Servico - Manutencao ETA/ETE
+          Ordem de Serviço - Manutenção ETA/ETE
         </h2>
         <p className={`mt-2 text-sm ${mutedText}`}>
-          Formulario especifico para manutencao em unidades operacionais.
+          Formulário específico para manutenção em unidades operacionais.
         </p>
         <p className={`mt-3 text-xs uppercase tracking-[0.16em] ${mutedText}`}>
-          Campos principais da abertura tecnica
+          Campos principais da abertura técnica
         </p>
       </div>
 
@@ -153,9 +153,9 @@ Material: ${formData.materialUtilizado}
 
         <section className={sectionCard}>
           <div className="mb-5">
-            <h3 className={`text-xl font-semibold ${titleText}`}>Solicitacao</h3>
+            <h3 className={`text-xl font-semibold ${titleText}`}>Solicitação</h3>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Registre o horario e a referencia inicial do atendimento.
+              Registre o horário e a referência inicial do atendimento.
             </p>
           </div>
 
@@ -174,7 +174,7 @@ Material: ${formData.materialUtilizado}
             />
 
             <Campo
-              label="Hora Inicio"
+              label="Hora Início"
               titleText={titleText}
               input={
                 <input
@@ -218,7 +218,7 @@ Material: ${formData.materialUtilizado}
           <div className="mb-5">
             <h3 className={`text-xl font-semibold ${titleText}`}>Unidade e Local</h3>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Identifique a unidade operacional e o ponto exato do servico.
+              Identifique a unidade operacional e o ponto exato do serviço.
             </p>
           </div>
 
@@ -231,7 +231,7 @@ Material: ${formData.materialUtilizado}
                   { value: "ETA", label: "ETA" },
                   { value: "EEE", label: "E.E.E" },
                   { value: "ETE", label: "ETE" },
-                  { value: "CAPITACAO", label: "Captacao" },
+                  { value: "CAPITACAO", label: "Captação" },
                 ].map((item) => (
                   <label key={item.value} className="inline-flex items-center gap-2">
                     <input
@@ -264,9 +264,9 @@ Material: ${formData.materialUtilizado}
 
         <section className={sectionCard}>
           <div className="mb-5">
-            <h3 className={`text-xl font-semibold ${titleText}`}>Responsaveis</h3>
+            <h3 className={`text-xl font-semibold ${titleText}`}>Responsáveis</h3>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Informe quem solicitou e quem esta envolvido na equipe.
+              Informe quem solicitou e quem está envolvido na equipe.
             </p>
           </div>
 
@@ -317,15 +317,15 @@ Material: ${formData.materialUtilizado}
 
         <section className={sectionCard}>
           <div className="mb-5">
-            <h3 className={`text-xl font-semibold ${titleText}`}>Manutencao</h3>
+            <h3 className={`text-xl font-semibold ${titleText}`}>Manutenção</h3>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Descreva a natureza do servico e o equipamento envolvido.
+              Descreva a natureza do serviço e o equipamento envolvido.
             </p>
           </div>
 
           <div>
             <label className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Tipo de Manutencao *
+              Tipo de Manutenção *
             </label>
             <div className="flex gap-8 pt-2">
               <label className="inline-flex items-center gap-2">
@@ -351,14 +351,14 @@ Material: ${formData.materialUtilizado}
           </div>
 
           <Campo
-            label="Servico *"
+            label="Serviço *"
             titleText={titleText}
             input={
               <textarea
                 rows={3}
                 value={formData.servico}
                 onChange={(e) => updateField("servico", e.target.value)}
-                placeholder="Descreva o servico a ser realizado"
+                placeholder="Descreva o serviço a ser realizado"
                 className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
               />
             }
@@ -372,7 +372,7 @@ Material: ${formData.materialUtilizado}
                 type="text"
                 value={formData.equipamento}
                 onChange={(e) => updateField("equipamento", e.target.value)}
-                placeholder="Equipamento relacionado ao servico"
+                placeholder="Equipamento relacionado ao serviço"
                 className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
               />
             }
@@ -381,21 +381,21 @@ Material: ${formData.materialUtilizado}
 
         <section className={sectionCard}>
           <div className="mb-5">
-            <h3 className={`text-xl font-semibold ${titleText}`}>Execucao</h3>
+            <h3 className={`text-xl font-semibold ${titleText}`}>Execução</h3>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Adicione o contexto tecnico inicial para facilitar a continuidade da OS.
+              Adicione o contexto técnico inicial para facilitar a continuidade da OS.
             </p>
           </div>
 
           <Campo
-            label="Diagnostico"
+            label="Diagnóstico"
             titleText={titleText}
             input={
               <textarea
                 rows={3}
                 value={formData.diagnostico}
                 onChange={(e) => updateField("diagnostico", e.target.value)}
-                placeholder="Diagnostico do problema"
+                placeholder="Diagnóstico do problema"
                 className={`w-full rounded-xl border px-4 py-3 ${inputBg}`}
               />
             }
@@ -443,7 +443,7 @@ Material: ${formData.materialUtilizado}
           ) : (
             <>
               <PlusCircle className="h-4 w-4" />
-              Criar Ordem de Servico ETA/ETE
+              Criar Ordem de Serviço ETA/ETE
             </>
           )}
         </button>

@@ -1,3 +1,5 @@
+import type { Endereco } from "./ordensServico.service";
+
 export const ORDEM_SERVICO_DETALHE_INCLUDES = [
   "endereco",
   "criadaPor",
@@ -41,6 +43,20 @@ export function formatarCoordenada(valor?: number | null) {
   }
 
   return valor.toFixed(6);
+}
+
+export function listarLinhasEnderecoOperacional(endereco?: Endereco | null) {
+  if (!endereco) {
+    return [];
+  }
+
+  const cidadeEstado = [endereco.cidade, endereco.estado]
+    .filter((value): value is string => Boolean(value))
+    .join(" - ");
+
+  return [endereco.rua, endereco.bairro, cidadeEstado].filter(
+    (value): value is string => Boolean(value)
+  );
 }
 
 export function getTiposAceitosAnexo(tipoAnexo: string) {

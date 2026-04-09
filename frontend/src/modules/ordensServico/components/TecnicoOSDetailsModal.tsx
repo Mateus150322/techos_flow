@@ -11,6 +11,7 @@ import {
 
 import {
   formatarDataHora,
+  listarLinhasEnderecoOperacional,
   formatarStatus,
 } from "../ordemServicoDetalhe.utils";
 import { AnexoItemCard } from "./AnexoItemCard";
@@ -102,6 +103,11 @@ export default function TecnicoOSDetailsModal({
     }),
     [os?.descricao]
   );
+  const linhasEndereco = useMemo(
+    () => listarLinhasEnderecoOperacional(os?.endereco),
+    [os?.endereco]
+  );
+  const enderecoReferencia = useMemo(() => linhasEndereco.join("\n"), [linhasEndereco]);
 
   async function executarAcao(fn: () => Promise<boolean>) {
     const ok = await fn();
@@ -205,30 +211,50 @@ export default function TecnicoOSDetailsModal({
 
               <section className="space-y-6">
                 <CardSection titulo="Endereço e evidências" icone={<MapPin className="h-5 w-5" />}>
-                  <Info label="Endereço" value={os.endereco ? `${os.endereco.rua}, ${os.endereco.numero} - ${os.endereco.bairro}, ${os.endereco.cidade}/${os.endereco.estado}` : "-"} full />
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                      Endereço da OS
+                    </p>
+                    <p className="mt-3 whitespace-pre-wrap text-sm text-slate-900">
+                      {linhasEndereco.join("\n") || "-"}
+                    </p>
+                  </div>
 
                   {podeEnviarAnexo && (
-                    <EvidenciaUploadPanel
-                      variant="modal"
-                      processandoAcao={processandoAcao}
-                      arquivoSelecionado={arquivoSelecionado}
-                      setArquivoSelecionado={setArquivoSelecionado}
-                      tipoAnexo={tipoAnexo}
-                      selecionarTipoAnexo={selecionarTipoAnexo}
-                      incluirGeolocalizacao={incluirGeolocalizacao}
-                      alternarIncluirGeolocalizacao={alternarIncluirGeolocalizacao}
-                      processandoGeolocalizacao={processandoGeolocalizacao}
-                      geolocalizacaoCapturada={geolocalizacaoCapturada}
-                      atualizarEnderecoCapturado={atualizarEnderecoCapturado}
-                      onCapturarGeolocalizacao={handleCapturarGeolocalizacao}
-                      onEnviar={handleEnviarAnexo}
-                    />
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                      <p className="mb-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                        Nova evidência
+                      </p>
+                      <EvidenciaUploadPanel
+                        variant="modal"
+                        processandoAcao={processandoAcao}
+                        arquivoSelecionado={arquivoSelecionado}
+                        setArquivoSelecionado={setArquivoSelecionado}
+                        tipoAnexo={tipoAnexo}
+                        selecionarTipoAnexo={selecionarTipoAnexo}
+                        incluirGeolocalizacao={incluirGeolocalizacao}
+                        alternarIncluirGeolocalizacao={alternarIncluirGeolocalizacao}
+                        processandoGeolocalizacao={processandoGeolocalizacao}
+                        geolocalizacaoCapturada={geolocalizacaoCapturada}
+                        atualizarEnderecoCapturado={atualizarEnderecoCapturado}
+                        onCapturarGeolocalizacao={handleCapturarGeolocalizacao}
+                        onEnviar={handleEnviarAnexo}
+                      />
+                    </div>
                   )}
 
                   {os.anexos?.length ? (
                     <div className="space-y-3">
+                      <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                        Evidências enviadas
+                      </p>
                       {os.anexos.map((anexo) => (
-                        <AnexoItemCard key={anexo.id} anexo={anexo} variant="modal" />
+                        <AnexoItemCard
+                          key={anexo.id}
+                          anexo={anexo}
+                          variant="modal"
+                          enderecoReferencia={enderecoReferencia}
+                        />
                       ))}
                     </div>
                   ) : (

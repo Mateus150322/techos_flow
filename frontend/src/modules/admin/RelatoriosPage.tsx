@@ -64,7 +64,7 @@ export default function RelatoriosPage() {
 
         setDadosRelatorio(response);
       } catch (error) {
-        setErro(getApiErrorMessage(error, "Nao foi possivel carregar os relatorios."));
+        setErro(getApiErrorMessage(error, "Não foi possível carregar os relatórios."));
       } finally {
         setLoading(false);
       }
@@ -122,7 +122,7 @@ export default function RelatoriosPage() {
 
       URL.revokeObjectURL(url);
     } catch (error) {
-      setErro(getApiErrorMessage(error, "Nao foi possivel exportar o relatorio."));
+      setErro(getApiErrorMessage(error, "Não foi possível exportar o relatório."));
     } finally {
       setExportandoFormato(null);
     }
@@ -146,7 +146,7 @@ export default function RelatoriosPage() {
   };
 
   const reportDefinition = dadosRelatorio?.reportDefinition ?? {
-    title: "Relatorio",
+    title: "Relatório",
     columns: [],
     rows: [],
   };
@@ -168,7 +168,7 @@ export default function RelatoriosPage() {
           titleText={titleText}
           mutedText={mutedText}
           accentClass="text-blue-500"
-          hint="Volume consolidado do relatorio"
+          hint="Volume consolidado do relatório"
         />
         <AdminMetricCard
           value={resumo.abertas}
@@ -181,7 +181,7 @@ export default function RelatoriosPage() {
         />
         <AdminMetricCard
           value={resumo.emExecucao}
-          label="Em execucao"
+          label="Em execução"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
@@ -195,7 +195,7 @@ export default function RelatoriosPage() {
           titleText={titleText}
           mutedText={mutedText}
           accentClass="text-emerald-500"
-          hint="Ordens concluidas"
+          hint="Ordens concluídas"
         />
       </section>
 
@@ -205,16 +205,16 @@ export default function RelatoriosPage() {
             <FileText className="h-5 w-5" />
           </div>
           <div>
-            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerar Relatorio</h2>
+            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerar Relatório</h2>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Relatorio geral, por status, produtividade, tipo de servico e periodo.
+              Relatório geral, por status, produtividade, tipo de serviço e período.
             </p>
           </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="block">
-            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tipo de Relatorio</span>
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tipo de Relatório</span>
             <select
               value={filtros.tipoRelatorio}
               onChange={(event) =>
@@ -225,11 +225,11 @@ export default function RelatoriosPage() {
               }
               className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
             >
-              <option value="geral">Relatorio geral de OS</option>
-              <option value="status">Relatorio por status</option>
-              <option value="produtividade">Produtividade dos tecnicos</option>
-              <option value="tipo">Relatorio por tipo de servico</option>
-              <option value="periodo">Relatorio por periodo</option>
+              <option value="geral">Relatório geral de OS</option>
+              <option value="status">Relatório por status</option>
+              <option value="produtividade">Produtividade dos técnicos</option>
+              <option value="tipo">Relatório por tipo de serviço</option>
+              <option value="periodo">Relatório por período</option>
             </select>
           </label>
 
@@ -247,9 +247,9 @@ export default function RelatoriosPage() {
             >
               <option value="todos">Todos os status</option>
               <option value="aberta">Aberta</option>
-              <option value="em_execucao">Em execucao</option>
+              <option value="em_execucao">Em execução</option>
               <option value="finalizada">Finalizada</option>
-              <option value="nao_executada">Nao executada</option>
+              <option value="nao_executada">Não executada</option>
               <option value="cancelada">Cancelada</option>
             </select>
           </label>
@@ -281,13 +281,13 @@ export default function RelatoriosPage() {
             >
               <option value="todas">Todas as prioridades</option>
               <option value="1">Alta</option>
-              <option value="2">Media</option>
+              <option value="2">Média</option>
               <option value="3">Baixa</option>
             </select>
           </label>
 
           <label className="block">
-            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tecnico responsavel</span>
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Técnico responsável</span>
             <select
               value={filtros.tecnicoId}
               onChange={(event) =>
@@ -295,7 +295,7 @@ export default function RelatoriosPage() {
               }
               className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
             >
-              <option value="todos">Todos os tecnicos</option>
+              <option value="todos">Todos os técnicos</option>
               {(dadosRelatorio?.tecnicos ?? []).map((tecnico) => (
                 <option key={tecnico.id} value={tecnico.id}>
                   {tecnico.name}
@@ -305,7 +305,7 @@ export default function RelatoriosPage() {
           </label>
 
           <div>
-            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Periodo</span>
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Período</span>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="relative block">
                 <CalendarRange
@@ -345,7 +345,7 @@ export default function RelatoriosPage() {
             className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium transition ${primaryButton}`}
           >
             <Filter className="h-4 w-4" />
-            Gerar Relatorio
+            Gerar Relatório
           </button>
 
           <button
@@ -396,7 +396,7 @@ export default function RelatoriosPage() {
         <div className="mb-5">
           <h3 className={`text-2xl font-semibold ${titleText}`}>{reportDefinition.title}</h3>
           <p className={`mt-1 text-sm ${mutedText}`}>
-            Data de emissao: {dadosRelatorio?.dataEmissao ?? "-"} | Periodo:{" "}
+            Data de emissão: {dadosRelatorio?.dataEmissao ?? "-"} | Período:{" "}
             {dadosRelatorio?.periodoDescricao ?? "-"}
           </p>
           <p className={`mt-1 text-sm ${mutedText}`}>
@@ -407,9 +407,9 @@ export default function RelatoriosPage() {
         <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <ResumoCard label="Total de OS" value={resumo.total} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
           <ResumoCard label="Abertas" value={resumo.abertas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
-          <ResumoCard label="Em execucao" value={resumo.emExecucao} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <ResumoCard label="Em execução" value={resumo.emExecucao} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
           <ResumoCard label="Finalizadas" value={resumo.finalizadas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
-          <ResumoCard label="Nao executadas" value={resumo.naoExecutadas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <ResumoCard label="Não executadas" value={resumo.naoExecutadas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
           <ResumoCard label="Canceladas" value={resumo.canceladas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
         </div>
 
@@ -429,7 +429,7 @@ export default function RelatoriosPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={Math.max(reportDefinition.columns.length, 1)} className="p-6 text-center">
-                      <span className={mutedText}>Carregando dados do relatorio...</span>
+                      <span className={mutedText}>Carregando dados do relatório...</span>
                     </td>
                   </tr>
                 ) : reportDefinition.rows.length === 0 ? (
@@ -460,14 +460,14 @@ export default function RelatoriosPage() {
         </div>
 
         <div className={`mt-4 text-sm ${mutedText}`}>
-          Total de registros: {reportPagination.total} | Responsavel pela emissao:{" "}
+          Total de registros: {reportPagination.total} | Responsável pela emissão:{" "}
           {currentUser.name}
         </div>
 
         {reportPagination.lastPage > 1 && (
           <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 text-sm dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">
             <p className={mutedText}>
-              Pagina {reportPagination.page} de {reportPagination.lastPage}
+              Página {reportPagination.page} de {reportPagination.lastPage}
             </p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -476,7 +476,7 @@ export default function RelatoriosPage() {
                 onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
                 className={`rounded-2xl border px-4 py-2 font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${secondaryButton}`}
               >
-                Pagina anterior
+                Página anterior
               </button>
               <button
                 type="button"
@@ -486,7 +486,7 @@ export default function RelatoriosPage() {
                 }
                 className={`rounded-2xl border px-4 py-2 font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${secondaryButton}`}
               >
-                Proxima pagina
+                Próxima página
               </button>
             </div>
           </div>
@@ -497,7 +497,7 @@ export default function RelatoriosPage() {
         <div className="mb-5">
           <h3 className={`text-2xl font-semibold ${titleText}`}>Atividade recente</h3>
           <p className={`mt-1 text-sm ${mutedText}`}>
-            Ultimas ordens de servico atualizadas conforme os filtros aplicados.
+            Últimas ordens de serviço atualizadas conforme os filtros aplicados.
           </p>
         </div>
 

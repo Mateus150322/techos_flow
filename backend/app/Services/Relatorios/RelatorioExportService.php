@@ -35,11 +35,11 @@ class RelatorioExportService
     public function ensureExportWithinLimits(string $format, int $rowCount): void
     {
         if ($format === 'xlsx' && $rowCount > self::MAX_XLSX_ROWS) {
-            abort(422, 'Exportacao XLSX limitada a 5000 registros. Use CSV para volumes maiores.');
+            abort(422, 'Exportação XLSX limitada a 5000 registros. Use CSV para volumes maiores.');
         }
 
         if ($format === 'pdf' && $rowCount > self::MAX_PDF_ROWS) {
-            abort(422, 'Exportacao PDF limitada a 1000 registros. Use CSV ou XLSX para volumes maiores.');
+            abort(422, 'Exportação PDF limitada a 1000 registros. Use CSV ou XLSX para volumes maiores.');
         }
     }
 
@@ -50,7 +50,7 @@ class RelatorioExportService
                 $handle = fopen('php://output', 'w');
 
                 if ($handle === false) {
-                    abort(500, 'Nao foi possivel preparar o arquivo CSV.');
+                    abort(500, 'Não foi possível preparar o arquivo CSV.');
                 }
 
                 fwrite($handle, chr(239) . chr(187) . chr(191));
@@ -915,3 +915,4 @@ XML;
         return preg_replace('/[^\P{C}\t\n\r]/u', '', $text) ?? $text;
     }
 }
+

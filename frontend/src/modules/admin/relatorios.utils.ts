@@ -207,7 +207,7 @@ export function calcularStatusResumo(resumo: ResumoRelatorios): StatusResumoItem
       percentual: resumo.total ? Math.round((resumo.abertas / resumo.total) * 100) : 0,
     },
     {
-      status: "Em execucao",
+      status: "Em execução",
       quantidade: resumo.emExecucao,
       percentual: resumo.total ? Math.round((resumo.emExecucao / resumo.total) * 100) : 0,
     },
@@ -217,7 +217,7 @@ export function calcularStatusResumo(resumo: ResumoRelatorios): StatusResumoItem
       percentual: resumo.total ? Math.round((resumo.finalizadas / resumo.total) * 100) : 0,
     },
     {
-      status: "Nao executadas",
+      status: "Não executadas",
       quantidade: resumo.naoExecutadas,
       percentual: resumo.total ? Math.round((resumo.naoExecutadas / resumo.total) * 100) : 0,
     },
@@ -269,13 +269,13 @@ export function buildReportDefinition({
 
   if (filtrosAplicados.tipoRelatorio === "produtividade") {
     return {
-      title: "Relatorio de Produtividade dos Tecnicos",
+      title: "Relatório de Produtividade dos Técnicos",
       columns: [
-        { key: "tecnico", label: "Tecnico" },
+        { key: "tecnico", label: "Técnico" },
         { key: "aceitas", label: "OS aceitas" },
-        { key: "iniciadas", label: "OS em execucao" },
+        { key: "iniciadas", label: "OS em execução" },
         { key: "finalizadas", label: "OS finalizadas" },
-        { key: "naoExecutadas", label: "OS nao executadas" },
+        { key: "naoExecutadas", label: "OS não executadas" },
       ],
       rows: produtividadeTecnicos.map((item) => ({
         tecnico: item.tecnico,
@@ -289,9 +289,9 @@ export function buildReportDefinition({
 
   if (filtrosAplicados.tipoRelatorio === "tipo") {
     return {
-      title: "Relatorio por Tipo de Servico",
+      title: "Relatório por Tipo de Serviço",
       columns: [
-        { key: "tipo", label: "Tipo de servico" },
+        { key: "tipo", label: "Tipo de serviço" },
         { key: "quantidade", label: "Quantidade" },
         { key: "percentual", label: "Percentual" },
       ],
@@ -306,18 +306,18 @@ export function buildReportDefinition({
   return {
     title:
       filtrosAplicados.tipoRelatorio === "periodo"
-        ? "Relatorio por Periodo"
-        : "Relatorio Geral de Ordens de Servico",
+        ? "Relatório por Período"
+        : "Relatório Geral de Ordens de Serviço",
     columns: [
       { key: "numero", label: "Numero da OS" },
-      { key: "tipo", label: "Tipo de servico" },
+      { key: "tipo", label: "Tipo de serviço" },
       { key: "clienteLocal", label: "Cliente/Local" },
       { key: "status", label: "Status" },
       { key: "prioridade", label: "Prioridade" },
       { key: "abertura", label: "Data de abertura" },
       { key: "encerramento", label: "Data de encerramento" },
-      { key: "responsavel", label: "Responsavel tecnico" },
-      { key: "observacoes", label: "Observacoes" },
+      { key: "responsavel", label: "Responsável técnico" },
+      { key: "observacoes", label: "Observações" },
     ],
     rows: ordensFiltradas.map((ordem) => ({
       numero: ordem.numero,
@@ -327,7 +327,7 @@ export function buildReportDefinition({
       prioridade: formatPrioridade(ordem.prioridade),
       abertura: formatDate(ordem.data_abertura),
       encerramento: formatDate(ordem.data_encerramento),
-      responsavel: getTecnicoResponsavel(ordem)?.name ?? "Sem responsavel",
+      responsavel: getTecnicoResponsavel(ordem)?.name ?? "Sem responsável",
       observacoes: ordem.motivo_nao_execucao || ordem.descricao || "-",
     })),
   };
@@ -335,7 +335,7 @@ export function buildReportDefinition({
 
 export function buildPeriodoDescricao(dataInicio: string, dataFim: string) {
   if (!dataInicio && !dataFim) {
-    return "Todos os periodos";
+    return "Todos os períodos";
   }
 
   if (dataInicio && dataFim) {
@@ -346,7 +346,7 @@ export function buildPeriodoDescricao(dataInicio: string, dataFim: string) {
     return `A partir de ${formatDate(dataInicio)}`;
   }
 
-  return `Ate ${formatDate(dataFim)}`;
+  return `Até ${formatDate(dataFim)}`;
 }
 
 export function buildFiltrosDescricao(
@@ -361,7 +361,7 @@ export function buildFiltrosDescricao(
     `Prioridade = ${
       filtros.prioridade === "todas" ? "Todas" : formatPrioridade(Number(filtros.prioridade))
     }`,
-    `Tecnico = ${tecnico}`,
+    `Técnico = ${tecnico}`,
   ].join(" | ");
 }
 
@@ -375,11 +375,11 @@ export function formatDate(value?: string | null) {
 
 export function formatStatus(status: OrdemStatus) {
   if (status === "em_execucao") {
-    return "Em execucao";
+    return "Em execução";
   }
 
   if (status === "nao_executada") {
-    return "Nao executada";
+    return "Não executada";
   }
 
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -391,7 +391,7 @@ export function formatPrioridade(prioridade: number) {
   }
 
   if (prioridade === 2) {
-    return "Media";
+    return "Média";
   }
 
   if (prioridade === 3) {

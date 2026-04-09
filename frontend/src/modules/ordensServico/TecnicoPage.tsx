@@ -45,7 +45,7 @@ export default function TecnicoPage() {
       setDashboard(response);
     } catch (error) {
       setDashboard(null);
-      setErro(getApiErrorMessage(error, "Nao foi possivel carregar as ordens de servico."));
+      setErro(getApiErrorMessage(error, "Não foi possível carregar as ordens de serviço."));
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export default function TecnicoPage() {
   }
 
   function nomeResponsavel(os: OrdemServico) {
-    return getTecnicoResponsavel(os)?.name || "Sem responsavel";
+    return getTecnicoResponsavel(os)?.name || "Sem responsável";
   }
 
   const osDisponiveis = dashboard?.secoes.disponiveis ?? [];
@@ -111,8 +111,8 @@ export default function TecnicoPage() {
         onToggleTheme={toggleTheme}
         onLogout={handleLogout}
         userName={currentUser.name}
-        roleLabel="Tecnico"
-        subtitle="Painel operacional do tecnico"
+        roleLabel="Técnico"
+        subtitle="Painel operacional do técnico"
         icon={<ClipboardList className="h-6 w-6" />}
       />
 
@@ -174,7 +174,7 @@ export default function TecnicoPage() {
               />
 
               <ResumoMetricaCard
-                titulo="Em execucao"
+                titulo="Em execução"
                 valor={dashboard?.resumo.em_execucao ?? 0}
                 icone={<Wrench className="h-5 w-5 text-amber-600" />}
                 cardBg={cardBg}
@@ -210,7 +210,7 @@ export default function TecnicoPage() {
                       type="text"
                       value={busca}
                       onChange={(event) => setBusca(event.target.value)}
-                      placeholder="Buscar por numero, cliente, tipo, status ou responsavel..."
+                      placeholder="Buscar por número, cliente, tipo, status ou responsável..."
                       className={inputClass}
                     />
                   </div>
@@ -231,7 +231,7 @@ export default function TecnicoPage() {
 
               <TabelaOrdensSection
                 titulo="OS Disponiveis"
-                descricao="Ordens abertas e ainda sem responsavel tecnico."
+                descricao="Ordens abertas e ainda sem responsável técnico."
                 ordens={osDisponiveis}
                 loading={loading}
                 isDark={isDark}
@@ -262,7 +262,7 @@ export default function TecnicoPage() {
               />
 
               <TabelaOrdensSection
-                titulo="Em execucao"
+                titulo="Em execução"
                 descricao="Ordens em andamento sob sua responsabilidade."
                 ordens={osEmExecucao}
                 loading={loading}
@@ -279,7 +279,7 @@ export default function TecnicoPage() {
 
               <TabelaOrdensSection
                 titulo="Finalizadas"
-                descricao="Ordens encerradas como finalizadas ou nao executadas."
+                descricao="Ordens encerradas como finalizadas ou não executadas."
                 ordens={osFinalizadas}
                 loading={loading}
                 isDark={isDark}
@@ -295,7 +295,7 @@ export default function TecnicoPage() {
 
               {!loading && (
                 <div className={`mt-4 text-sm ${mutedText}`}>
-                  Exibindo ate {osDisponiveis.length + minhasOS.length + osEmExecucao.length + osFinalizadas.length} ordens no painel filtrado.
+                  Exibindo até {osDisponiveis.length + minhasOS.length + osEmExecucao.length + osFinalizadas.length} ordens no painel filtrado.
                 </div>
               )}
             </div>

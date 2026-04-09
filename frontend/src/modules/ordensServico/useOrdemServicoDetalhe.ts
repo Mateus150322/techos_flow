@@ -51,7 +51,7 @@ export function useOrdemServicoDetalhe({
     if (!ordemId) {
       setOs(null);
       setLoading(false);
-      setError("ID nao informado.");
+      setError("ID não informado.");
       return;
     }
 
@@ -129,7 +129,7 @@ export function useOrdemServicoDetalhe({
       return false;
     }
 
-    return executarAcao(() => aceitarOrdem(os.id), "Nao foi possivel aceitar a OS.");
+    return executarAcao(() => aceitarOrdem(os.id), "Não foi possível aceitar a OS.");
   }
 
   async function iniciar(payload?: IniciarExecucaoPayload) {
@@ -139,7 +139,7 @@ export function useOrdemServicoDetalhe({
 
     return executarAcao(
       () => iniciarExecucao(os.id, payload ?? {}),
-      "Nao foi possivel iniciar a execucao."
+      "Não foi possível iniciar a execução."
     );
   }
 
@@ -150,7 +150,7 @@ export function useOrdemServicoDetalhe({
 
     return executarAcao(
       () => finalizarExecucao(os.id, payload),
-      "Nao foi possivel finalizar a execucao."
+      "Não foi possível finalizar a execução."
     );
   }
 
@@ -161,7 +161,7 @@ export function useOrdemServicoDetalhe({
 
     return executarAcao(
       () => marcarNaoExecutada(os.id, payload),
-      "Nao foi possivel marcar a OS como nao executada."
+      "Não foi possível marcar a OS como não executada."
     );
   }
 
@@ -177,7 +177,7 @@ export function useOrdemServicoDetalhe({
       setError(
         getApiErrorMessage(
           captureError,
-          "Nao foi possivel capturar a geolocalizacao para esta evidencia."
+          "Não foi possível capturar a geolocalização para esta evidência."
         )
       );
       return null;
@@ -223,7 +223,7 @@ export function useOrdemServicoDetalhe({
 
       return true;
     } catch (uploadError) {
-      setError(getApiErrorMessage(uploadError, "Nao foi possivel enviar o anexo."));
+      setError(getApiErrorMessage(uploadError, "Não foi possível enviar o anexo."));
       return false;
     } finally {
       setProcessandoAcao(false);

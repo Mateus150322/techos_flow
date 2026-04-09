@@ -42,7 +42,7 @@ class OrdemServicoController extends Controller
             $this->normalizeTipoServico($data['tipo_servico']) !== 'manutencao eta/ete'
         ) {
             return response()->json([
-                'message' => 'Tecnico so pode abrir OS do tipo Manutencao ETA/ETE.',
+                'message' => 'Técnico só pode abrir OS do tipo Manutenção ETA/ETE.',
             ], 403);
         }
 
@@ -201,7 +201,7 @@ class OrdemServicoController extends Controller
 
         if (in_array($os->status, ['finalizada', 'cancelada', 'nao_executada'], true)) {
             return response()->json([
-                'message' => 'Nao e possivel marcar como nao executada uma OS ja encerrada.',
+                'message' => 'Não é possível marcar como não executada uma OS já encerrada.',
             ], 422);
         }
 
@@ -211,7 +211,7 @@ class OrdemServicoController extends Controller
         $os->save();
 
         return response()->json([
-            'message' => 'OS marcada como nao executada com sucesso.',
+            'message' => 'OS marcada como não executada com sucesso.',
             'os' => $os,
         ]);
     }
@@ -221,7 +221,7 @@ class OrdemServicoController extends Controller
         $user = $request->user();
 
         if ($user->role !== 'tecnico') {
-            return response()->json(['message' => 'Apenas tecnicos podem aceitar OS.'], 403);
+            return response()->json(['message' => 'Apenas técnicos podem aceitar OS.'], 403);
         }
 
         $os = OrdemServico::query()->findOrFail($id);
@@ -235,13 +235,13 @@ class OrdemServicoController extends Controller
         if ($os->tecnico_responsavel_id) {
             if ($os->tecnico_responsavel_id === $user->id) {
                 return response()->json([
-                    'message' => 'Essa OS ja esta atribuida a voce.',
+                    'message' => 'Essa OS já está atribuída a você.',
                     'data' => $os,
                 ]);
             }
 
             return response()->json([
-                'message' => 'Essa OS ja foi aceita por outro tecnico.',
+                'message' => 'Essa OS já foi aceita por outro técnico.',
             ], 409);
         }
 

@@ -168,7 +168,7 @@ export default function FormularioOSGeral({
         <h2 className={`text-2xl font-semibold ${titleText}`}>{titulo}</h2>
         <p className={`mt-2 text-sm ${mutedText}`}>{descricao}</p>
         <p className={`mt-3 text-xs uppercase tracking-[0.16em] ${mutedText}`}>
-          Campos marcados com * sao obrigatorios
+          Campos marcados com * são obrigatórios
         </p>
       </div>
 
@@ -189,7 +189,7 @@ export default function FormularioOSGeral({
           <div className="mb-5">
             <h3 className={`text-xl font-semibold ${titleText}`}>Dados da OS</h3>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Identifique o tipo da solicitacao e o cliente atendido.
+              Identifique o tipo da solicitação e o cliente atendido.
             </p>
           </div>
 
@@ -264,9 +264,9 @@ export default function FormularioOSGeral({
 
         <section className={sectionCard}>
           <div className="mb-5">
-            <h3 className={`text-xl font-semibold ${titleText}`}>Endereco do cliente</h3>
+            <h3 className={`text-xl font-semibold ${titleText}`}>Endereço do cliente</h3>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Informe o local que sera usado como referencia para atendimento.
+              Informe o local que será usado como referência para atendimento.
             </p>
           </div>
 

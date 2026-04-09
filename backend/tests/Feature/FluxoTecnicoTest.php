@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -98,9 +99,8 @@ class FluxoTecnicoTest extends TestCase
             ->assertJsonPath('anexo.tipo', 'pdf')
             ->assertJsonPath('anexo.latitude', -9.97499)
             ->assertJsonPath('anexo.longitude', -67.8243)
+            ->assertJsonMissingPath('anexo.caminho')
             ->assertJsonPath('anexo.endereco_capturado', 'Avenida Ceara, Centro, Rio Branco/AC');
-
-        $caminho = (string) $response->json('anexo.caminho');
 
         $this->assertDatabaseHas('anexos', [
             'os_id' => $os->id,
@@ -110,6 +110,11 @@ class FluxoTecnicoTest extends TestCase
             'longitude' => -67.8243,
             'endereco_capturado' => 'Avenida Ceara, Centro, Rio Branco/AC',
         ]);
+
+        $caminho = (string) Anexo::query()
+            ->where('os_id', $os->id)
+            ->value('caminho');
+
         Storage::disk('local')->assertExists($caminho);
         Storage::disk('public')->assertMissing($caminho);
     }
@@ -117,6 +122,7 @@ class FluxoTecnicoTest extends TestCase
     public function test_usuario_autenticado_pode_visualizar_anexo_por_rota_privada(): void
     {
         Storage::fake('local');
+        Log::spy();
 
         $tecnico = $this->criarUsuario('tecnico');
         $os = $this->criarOs($tecnico->id);
@@ -140,6 +146,51 @@ class FluxoTecnicoTest extends TestCase
             'inline;',
             (string) $response->headers->get('content-disposition')
         );
+
+        Log::shouldHaveReceived('info')
+            ->withArgs(function (string $message, array $context) use ($tecnico, $anexoId, $os) {
+                return $message === 'anexo_access_granted'
+                    && $context['user_id'] === $tecnico->id
+                    && $context['anexo_id'] === $anexoId
+                    && $context['os_id'] === $os->id;
+            })
+            ->once();
+    }
+
+    public function test_tecnico_nao_pode_visualizar_anexo_de_os_de_outro_tecnico(): void
+    {
+        Storage::fake('local');
+        Log::spy();
+
+        $tecnicoResponsavel = $this->criarUsuario('tecnico');
+        $outroTecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnicoResponsavel->id);
+
+        Sanctum::actingAs($tecnicoResponsavel);
+
+        $upload = $this->postJson("/api/v1/ordens-servico/{$os->id}/anexos", [
+            'arquivo' => UploadedFile::fake()->create('evidencia.pdf', 200, 'application/pdf'),
+        ]);
+
+        $anexoId = (string) $upload->json('anexo.id');
+
+        Sanctum::actingAs($outroTecnico);
+
+        $response = $this->get("/api/v1/anexos/{$anexoId}/arquivo");
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Acesso negado ao anexo solicitado.');
+
+        Log::shouldHaveReceived('info')
+            ->withArgs(function (string $message, array $context) use ($outroTecnico, $anexoId, $os) {
+                return $message === 'anexo_access_denied'
+                    && $context['user_id'] === $outroTecnico->id
+                    && $context['anexo_id'] === $anexoId
+                    && $context['os_id'] === $os->id
+                    && $context['motivo'] === 'tecnico_sem_permissao_na_os';
+            })
+            ->once();
     }
 
     public function test_rota_privada_consegue_ler_anexo_legado_do_disco_publico(): void

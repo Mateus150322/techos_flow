@@ -15,6 +15,7 @@ import {
 
 import {
   formatarDataHora,
+  listarLinhasEnderecoOperacional,
   formatarStatus,
 } from "./ordemServicoDetalhe.utils";
 import { AnexoItemCard } from "./components/AnexoItemCard";
@@ -79,6 +80,8 @@ export default function OrdemDetalhePage() {
     : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100";
   const temAcoesOperacionais =
     podeIniciarExecucao || podeFinalizarExecucao || podeMarcarNaoExecutada;
+  const linhasEndereco = listarLinhasEnderecoOperacional(os?.endereco);
+  const enderecoReferencia = linhasEndereco.join("\n");
 
   if (loading) {
     return (
@@ -300,17 +303,16 @@ export default function OrdemDetalhePage() {
 
             <div className="space-y-4">
               <Section title="Endereço" icon={<MapPin className="h-4 w-4" />} cardBg={cardBg}>
-                {os.endereco ? (
-                  <div className={`space-y-1 text-sm ${bodyText}`}>
-                    <p>
-                      {os.endereco.rua}, {os.endereco.numero}
+                {linhasEndereco.length ? (
+                  <div className={`rounded-xl border px-4 py-4 ${innerCardBg}`}>
+                    <p className={`text-xs font-medium uppercase tracking-[0.16em] ${mutedText}`}>
+                      Endereço da OS
                     </p>
-                    {os.endereco.complemento ? <p>{os.endereco.complemento}</p> : null}
-                    <p>{os.endereco.bairro}</p>
-                    <p>
-                      {os.endereco.cidade} - {os.endereco.estado}
-                    </p>
-                    <p>CEP: {os.endereco.cep}</p>
+                    <div className={`mt-3 space-y-1 text-sm ${bodyText}`}>
+                      {linhasEndereco.map((linha) => (
+                        <p key={linha}>{linha}</p>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <p className={`text-sm ${mutedText}`}>Endereço não informado.</p>
@@ -336,6 +338,7 @@ export default function OrdemDetalhePage() {
                         variant="page"
                         isDark={isDark}
                         wrapper="li"
+                        enderecoReferencia={enderecoReferencia}
                       />
                     ))}
                   </ul>

@@ -143,9 +143,9 @@ class OrdemServicoDashboardService
 
         return [
             ['status' => 'aberta', 'label' => 'Abertas', 'quantidade' => (int) ($counts['aberta'] ?? 0)],
-            ['status' => 'em_execucao', 'label' => 'Em execucao', 'quantidade' => (int) ($counts['em_execucao'] ?? 0)],
+            ['status' => 'em_execucao', 'label' => 'Em execução', 'quantidade' => (int) ($counts['em_execucao'] ?? 0)],
             ['status' => 'finalizada', 'label' => 'Finalizadas', 'quantidade' => (int) ($counts['finalizada'] ?? 0)],
-            ['status' => 'nao_executada', 'label' => 'Nao executadas', 'quantidade' => (int) ($counts['nao_executada'] ?? 0)],
+            ['status' => 'nao_executada', 'label' => 'Não executadas', 'quantidade' => (int) ($counts['nao_executada'] ?? 0)],
             ['status' => 'cancelada', 'label' => 'Canceladas', 'quantidade' => (int) ($counts['cancelada'] ?? 0)],
         ];
     }
@@ -155,47 +155,44 @@ class OrdemServicoDashboardService
         $inicio = now()->startOfMonth();
         $fim = now()->endOfMonth();
 
-        $ordensDoMes = OrdemServico::query()
+        $resumo = OrdemServico::query()
             ->whereBetween('data_abertura', [$inicio, $fim])
-            ->get(['status', 'tecnico_responsavel_id']);
+            ->selectRaw("SUM(CASE WHEN status = 'aberta' THEN 1 ELSE 0 END) as abertas")
+            ->selectRaw("SUM(CASE WHEN status = 'em_execucao' THEN 1 ELSE 0 END) as em_execucao")
+            ->selectRaw("SUM(CASE WHEN status = 'finalizada' THEN 1 ELSE 0 END) as finalizadas")
+            ->first();
 
         return [
-            'abertas' => $ordensDoMes->where('status', 'aberta')->count(),
-            'em_execucao' => $ordensDoMes->where('status', 'em_execucao')->count(),
-            'finalizadas' => $ordensDoMes->where('status', 'finalizada')->count(),
-            'tecnicos_ativos' => $ordensDoMes
-                ->pluck('tecnico_responsavel_id')
-                ->filter()
-                ->unique()
-                ->count(),
+            'abertas' => (int) ($resumo->abertas ?? 0),
+            'em_execucao' => (int) ($resumo->em_execucao ?? 0),
+            'finalizadas' => (int) ($resumo->finalizadas ?? 0),
+            'tecnicos_ativos' => (int) OrdemServico::query()
+                ->whereBetween('data_abertura', [$inicio, $fim])
+                ->whereNotNull('tecnico_responsavel_id')
+                ->distinct()
+                ->count('tecnico_responsavel_id'),
         ];
     }
 
     private function calculateTempoMedioHoras(): ?float
     {
-        $duracoes = OrdemServico::query()
+        $query = OrdemServico::query()
             ->where('status', 'finalizada')
             ->whereNotNull('data_abertura')
-            ->whereNotNull('data_encerramento')
-            ->get(['data_abertura', 'data_encerramento'])
-            ->map(function (OrdemServico $ordem) {
-                $inicio = optional($ordem->data_abertura)->getTimestamp();
-                $fim = optional($ordem->data_encerramento)->getTimestamp();
+            ->whereNotNull('data_encerramento');
 
-                if (! $inicio || ! $fim || $fim < $inicio) {
-                    return null;
-                }
+        $driver = $query->getConnection()->getDriverName();
+        $expression = $driver === 'pgsql'
+            ? 'AVG(EXTRACT(EPOCH FROM (data_encerramento - data_abertura)) / 3600.0)'
+            : 'AVG((julianday(data_encerramento) - julianday(data_abertura)) * 24.0)';
 
-                return ($fim - $inicio) / 3600;
-            })
-            ->filter(fn ($value) => is_numeric($value))
-            ->values();
+        $media = $query->selectRaw("{$expression} as media_horas")->value('media_horas');
 
-        if ($duracoes->isEmpty()) {
+        if ($media === null) {
             return null;
         }
 
-        return round((float) $duracoes->avg(), 1);
+        return round((float) $media, 1);
     }
 
     private function baseListQuery(): Builder

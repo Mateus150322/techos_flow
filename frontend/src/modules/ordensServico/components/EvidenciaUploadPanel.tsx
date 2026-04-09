@@ -94,7 +94,7 @@ export function EvidenciaUploadPanel({
 
   return (
     <div className={classes.panel}>
-      <p className="text-sm font-semibold text-slate-900">Enviar evidencia</p>
+      <p className="text-sm font-semibold text-slate-900">Enviar evidência</p>
 
       <div className={variant === "page" ? "grid gap-4 md:grid-cols-2" : "space-y-3"}>
         <select
@@ -128,7 +128,7 @@ export function EvidenciaUploadPanel({
               className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
             />
             <span className={classes.toggleText}>
-              Incluir a geolocalizacao do aparelho junto com a foto. Se quiser,
+              Incluir a geolocalização do aparelho junto com a foto. Se quiser,
               informe um endereco ou ponto de referencia manualmente.
             </span>
           </label>
@@ -143,10 +143,10 @@ export function EvidenciaUploadPanel({
               >
                 <MapPin className="h-4 w-4" />
                 {processandoGeolocalizacao
-                  ? "Capturando localizacao..."
+                  ? "Capturando localização..."
                   : geolocalizacaoCapturada
-                    ? "Atualizar localizacao"
-                    : "Capturar localizacao"}
+                    ? "Atualizar localização"
+                    : "Capturar localização"}
               </button>
 
               {geolocalizacaoCapturada ? (
@@ -176,7 +176,7 @@ export function EvidenciaUploadPanel({
                   <div className={variant === "page" ? "mt-3" : undefined}>
                     {variant === "page" && (
                       <label className="mb-2 block text-sm font-medium text-emerald-800">
-                        Endereco ou referencia da evidencia
+                        Endereço ou referência da evidência
                       </label>
                     )}
                     <textarea
@@ -185,14 +185,14 @@ export function EvidenciaUploadPanel({
                       onChange={(event) =>
                         atualizarEnderecoCapturado(event.target.value)
                       }
-                      placeholder="Endereco ou ponto de referencia da evidencia (opcional)."
+                      placeholder="Endereço ou ponto de referência da evidência (opcional)."
                       className={classes.textarea}
                     />
                   </div>
                 </div>
               ) : (
                 <p className={classes.helperText}>
-                  A localizacao atual sera vinculada a foto. O endereco pode ser
+                  A localização atual será vinculada à foto. O endereço pode ser
                   preenchido manualmente como complemento.
                 </p>
               )}
@@ -214,7 +214,7 @@ export function EvidenciaUploadPanel({
         className={classes.submitButton}
       >
         <Upload className="h-4 w-4" />
-        {processandoAcao ? "Enviando..." : "Enviar evidencia"}
+        {processandoAcao ? "Enviando..." : "Enviar evidência"}
       </button>
     </div>
   );

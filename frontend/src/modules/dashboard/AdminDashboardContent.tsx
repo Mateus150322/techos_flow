@@ -28,7 +28,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
         setDashboard(data);
       } catch (error) {
         setDashboard(null);
-        setErro(getApiErrorMessage(error, "Nao foi possivel carregar os indicadores."));
+        setErro(getApiErrorMessage(error, "Não foi possível carregar os indicadores."));
       } finally {
         setLoading(false);
       }
@@ -85,25 +85,25 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          hint="Panorama geral da operacao"
+          hint="Panorama geral da operação"
         />
         <AdminMetricCard
-          label="Taxa de conclusao"
+          label="Taxa de conclusão"
           value={`${total ? Math.round((finalizadas / total) * 100) : 0}%`}
           icon={<CheckCircle2 className="h-6 w-6 text-emerald-500" />}
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          hint="Percentual concluido no conjunto atual"
+          hint="Percentual concluído no conjunto atual"
         />
         <AdminMetricCard
-          label="Tempo medio"
+          label="Tempo médio"
           value={tempoMedioHoras}
           icon={<Clock3 className="h-6 w-6 text-amber-500" />}
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          hint="Media entre abertura e encerramento"
+          hint="Média entre abertura e encerramento"
         />
         <AdminMetricCard
           label="Pendentes"
@@ -112,15 +112,15 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          hint="Ordens abertas ou em execucao"
+          hint="Ordens abertas ou em execução"
         />
       </section>
 
       <section className="mb-6 grid gap-6 xl:grid-cols-2">
         <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-          <h2 className={`text-2xl font-semibold ${titleText}`}>Distribuicao por status</h2>
+          <h2 className={`text-2xl font-semibold ${titleText}`}>Distribuição por status</h2>
           <p className={`mt-1 text-sm ${mutedText}`}>
-            Visao geral do status das ordens de servico.
+            Visão geral do status das ordens de serviço.
           </p>
 
           <div className="mt-8 flex flex-col items-center gap-8 lg:flex-row lg:items-center lg:justify-between">
@@ -182,7 +182,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
         </div>
 
         <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-          <h2 className={`text-2xl font-semibold ${titleText}`}>OS por tipo de servico</h2>
+          <h2 className={`text-2xl font-semibold ${titleText}`}>OS por tipo de serviço</h2>
           <p className={`mt-1 text-sm ${mutedText}`}>Quantidade de ordens por categoria.</p>
 
           <div className="mt-8 overflow-x-auto pb-2">
@@ -213,9 +213,9 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
       </section>
 
       <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-        <h2 className={`text-2xl font-semibold ${titleText}`}>Produtividade dos tecnicos</h2>
+        <h2 className={`text-2xl font-semibold ${titleText}`}>Produtividade dos técnicos</h2>
         <p className={`mt-1 text-sm ${mutedText}`}>
-          Comparacao entre OS atribuidas e finalizadas por tecnico.
+          Comparação entre OS atribuídas e finalizadas por técnico.
         </p>
 
         <div className="mt-8 space-y-6">
@@ -225,7 +225,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
             </div>
           ) : produtividadeTecnicos.length === 0 ? (
             <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
-              Nenhum tecnico com ordens atribuidas no momento.
+              Nenhum técnico com ordens atribuídas no momento.
             </div>
           ) : (
             produtividadeTecnicos.map((item) => (
@@ -233,7 +233,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
                 <div className="mb-2 flex items-center justify-between">
                   <span className={`font-medium ${titleText}`}>{item.nome}</span>
                   <span className={`text-sm ${mutedText}`}>
-                    {item.finalizadas} finalizadas de {item.atribuidas} atribuidas
+                    {item.finalizadas} finalizadas de {item.atribuidas} atribuídas
                   </span>
                 </div>
                 <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
@@ -262,7 +262,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
                       }}
                     />
                   </div>
-                  <div className={`text-sm ${mutedText}`}>Atribuidas / Finalizadas</div>
+                  <div className={`text-sm ${mutedText}`}>Atribuídas / Finalizadas</div>
                 </div>
               </div>
             ))
@@ -271,8 +271,8 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
       </section>
 
       <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-        <h2 className={`text-2xl font-semibold ${titleText}`}>Resumo do mes atual</h2>
-        <p className={`mt-1 text-sm ${mutedText}`}>Indicadores com base nas OS abertas neste mes.</p>
+        <h2 className={`text-2xl font-semibold ${titleText}`}>Resumo do mês atual</h2>
+        <p className={`mt-1 text-sm ${mutedText}`}>Indicadores com base nas OS abertas neste mês.</p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <SoftMetric
@@ -283,7 +283,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
             mutedText={mutedText}
           />
           <SoftMetric
-            label="Em execucao"
+            label="Em execução"
             value={resumoMesAtual?.em_execucao ?? 0}
             softBg={softBg}
             titleText={titleText}
@@ -297,7 +297,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
             mutedText={mutedText}
           />
           <SoftMetric
-            label="Tecnicos ativos"
+            label="Técnicos ativos"
             value={resumoMesAtual?.tecnicos_ativos ?? 0}
             softBg={softBg}
             titleText={titleText}
@@ -308,7 +308,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
 
       <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
         <h2 className={`text-2xl font-semibold ${titleText}`}>Atividade recente</h2>
-        <p className={`mt-1 text-sm ${mutedText}`}>Ultimas ordens de servico atualizadas.</p>
+        <p className={`mt-1 text-sm ${mutedText}`}>Últimas ordens de serviço atualizadas.</p>
 
         <div className="mt-6 space-y-3">
           {loading ? (

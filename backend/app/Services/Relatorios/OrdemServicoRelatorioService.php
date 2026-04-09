@@ -133,9 +133,9 @@ class OrdemServicoRelatorioService
     {
         return collect([
             ['status' => 'Abertas', 'quantidade' => $resumo['abertas']],
-            ['status' => 'Em execucao', 'quantidade' => $resumo['emExecucao']],
+            ['status' => 'Em execução', 'quantidade' => $resumo['emExecucao']],
             ['status' => 'Finalizadas', 'quantidade' => $resumo['finalizadas']],
-            ['status' => 'Nao executadas', 'quantidade' => $resumo['naoExecutadas']],
+            ['status' => 'Não executadas', 'quantidade' => $resumo['naoExecutadas']],
             ['status' => 'Canceladas', 'quantidade' => $resumo['canceladas']],
         ])->map(fn (array $item) => [
             ...$item,
@@ -151,7 +151,7 @@ class OrdemServicoRelatorioService
             ->whereNotNull('ordem_servicos.tecnico_responsavel_id')
             ->leftJoin('users as tecnicos', 'tecnicos.id', '=', 'ordem_servicos.tecnico_responsavel_id')
             ->selectRaw("
-                COALESCE(tecnicos.name, 'Sem responsavel') as tecnico,
+                COALESCE(tecnicos.name, 'Sem responsável') as tecnico,
                 COUNT(*) as aceitas,
                 SUM(CASE WHEN ordem_servicos.status = 'em_execucao' THEN 1 ELSE 0 END) as iniciadas,
                 SUM(CASE WHEN ordem_servicos.status = 'finalizada' THEN 1 ELSE 0 END) as finalizadas,
@@ -206,7 +206,7 @@ class OrdemServicoRelatorioService
             ])->values()->all();
 
             return [[
-                'title' => 'Relatorio por Status',
+                'title' => 'Relatório por Status',
                 'columns' => [
                     ['key' => 'status', 'label' => 'Status'],
                     ['key' => 'quantidade', 'label' => 'Quantidade'],
@@ -226,13 +226,13 @@ class OrdemServicoRelatorioService
             ])->values()->all();
 
             return [[
-                'title' => 'Relatorio de Produtividade dos Tecnicos',
+                'title' => 'Relatório de Produtividade dos Técnicos',
                 'columns' => [
-                    ['key' => 'tecnico', 'label' => 'Tecnico'],
+                    ['key' => 'tecnico', 'label' => 'Técnico'],
                     ['key' => 'aceitas', 'label' => 'OS aceitas'],
-                    ['key' => 'iniciadas', 'label' => 'OS em execucao'],
+                    ['key' => 'iniciadas', 'label' => 'OS em execução'],
                     ['key' => 'finalizadas', 'label' => 'OS finalizadas'],
-                    ['key' => 'naoExecutadas', 'label' => 'OS nao executadas'],
+                    ['key' => 'naoExecutadas', 'label' => 'OS não executadas'],
                 ],
                 'rows' => $rows,
             ], $this->singlePagePagination(count($rows))];
@@ -246,9 +246,9 @@ class OrdemServicoRelatorioService
             ])->values()->all();
 
             return [[
-                'title' => 'Relatorio por Tipo de Servico',
+                'title' => 'Relatório por Tipo de Serviço',
                 'columns' => [
-                    ['key' => 'tipo', 'label' => 'Tipo de servico'],
+                    ['key' => 'tipo', 'label' => 'Tipo de serviço'],
                     ['key' => 'quantidade', 'label' => 'Quantidade'],
                     ['key' => 'percentual', 'label' => 'Percentual'],
                 ],
@@ -261,19 +261,19 @@ class OrdemServicoRelatorioService
             ->orderByDesc('data_abertura');
 
         $title = $tipoRelatorio === 'periodo'
-            ? 'Relatorio por Periodo'
-            : 'Relatorio Geral de Ordens de Servico';
+            ? 'Relatório por Período'
+            : 'Relatório Geral de Ordens de Serviço';
 
         $columns = [
-            ['key' => 'numero', 'label' => 'Numero da OS'],
-            ['key' => 'tipo', 'label' => 'Tipo de servico'],
+            ['key' => 'numero', 'label' => 'Número da OS'],
+            ['key' => 'tipo', 'label' => 'Tipo de serviço'],
             ['key' => 'clienteLocal', 'label' => 'Cliente/Local'],
             ['key' => 'status', 'label' => 'Status'],
             ['key' => 'prioridade', 'label' => 'Prioridade'],
             ['key' => 'abertura', 'label' => 'Data de abertura'],
             ['key' => 'encerramento', 'label' => 'Data de encerramento'],
-            ['key' => 'responsavel', 'label' => 'Responsavel tecnico'],
-            ['key' => 'observacoes', 'label' => 'Observacoes'],
+            ['key' => 'responsavel', 'label' => 'Responsável técnico'],
+            ['key' => 'observacoes', 'label' => 'Contexto operacional'],
         ];
 
         if ($forExport) {
@@ -310,7 +310,7 @@ class OrdemServicoRelatorioService
 
         return match ($tipoRelatorio) {
             'status' => [
-                'title' => 'Relatorio por Status',
+                'title' => 'Relatório por Status',
                 'columns' => [
                     ['key' => 'status', 'label' => 'Status'],
                     ['key' => 'quantidade', 'label' => 'Quantidade'],
@@ -318,29 +318,29 @@ class OrdemServicoRelatorioService
                 ],
             ],
             'produtividade' => [
-                'title' => 'Relatorio de Produtividade dos Tecnicos',
+                'title' => 'Relatório de Produtividade dos Técnicos',
                 'columns' => [
-                    ['key' => 'tecnico', 'label' => 'Tecnico'],
+                    ['key' => 'tecnico', 'label' => 'Técnico'],
                     ['key' => 'aceitas', 'label' => 'OS aceitas'],
-                    ['key' => 'iniciadas', 'label' => 'OS em execucao'],
+                    ['key' => 'iniciadas', 'label' => 'OS em execução'],
                     ['key' => 'finalizadas', 'label' => 'OS finalizadas'],
-                    ['key' => 'naoExecutadas', 'label' => 'OS nao executadas'],
+                    ['key' => 'naoExecutadas', 'label' => 'OS não executadas'],
                 ],
             ],
             'tipo' => [
-                'title' => 'Relatorio por Tipo de Servico',
+                'title' => 'Relatório por Tipo de Serviço',
                 'columns' => [
-                    ['key' => 'tipo', 'label' => 'Tipo de servico'],
+                    ['key' => 'tipo', 'label' => 'Tipo de serviço'],
                     ['key' => 'quantidade', 'label' => 'Quantidade'],
                     ['key' => 'percentual', 'label' => 'Percentual'],
                 ],
             ],
             'periodo' => [
-                'title' => 'Relatorio por Periodo',
+                'title' => 'Relatório por Período',
                 'columns' => $this->detailedReportColumns(),
             ],
             default => [
-                'title' => 'Relatorio Geral de Ordens de Servico',
+                'title' => 'Relatório Geral de Ordens de Serviço',
                 'columns' => $this->detailedReportColumns(),
             ],
         };
@@ -418,8 +418,11 @@ class OrdemServicoRelatorioService
                 'prioridade' => $this->formatPrioridade((int) $row->prioridade),
                 'abertura' => $this->formatDate($row->data_abertura),
                 'encerramento' => $this->formatDate($row->data_encerramento),
-                'responsavel' => $row->tecnico_nome ?: 'Sem responsavel',
-                'observacoes' => $row->motivo_nao_execucao ?: ($row->descricao ?: '-'),
+                    'responsavel' => $row->tecnico_nome ?: 'Sem responsável',
+                'observacoes' => $this->formatContextoOperacional(
+                    $row->motivo_nao_execucao,
+                    $row->descricao
+                ),
             ]);
         }
     }
@@ -434,8 +437,11 @@ class OrdemServicoRelatorioService
             'prioridade' => $this->formatPrioridade((int) $ordem->prioridade),
             'abertura' => $this->formatDate($ordem->data_abertura),
             'encerramento' => $this->formatDate($ordem->data_encerramento),
-            'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsavel',
-            'observacoes' => $ordem->motivo_nao_execucao ?: ($ordem->descricao ?: '-'),
+            'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsável',
+            'observacoes' => $this->formatContextoOperacional(
+                $ordem->motivo_nao_execucao,
+                $ordem->descricao
+            ),
         ])->values()->all();
     }
 
@@ -452,7 +458,7 @@ class OrdemServicoRelatorioService
     private function buildPeriodoDescricao(string $dataInicio, string $dataFim): string
     {
         if ($dataInicio === '' && $dataFim === '') {
-            return 'Todos os periodos';
+            return 'Todos os períodos';
         }
 
         if ($dataInicio !== '' && $dataFim !== '') {
@@ -463,7 +469,7 @@ class OrdemServicoRelatorioService
             return "A partir de {$this->formatDate($dataInicio)}";
         }
 
-        return "Ate {$this->formatDate($dataFim)}";
+        return "Até {$this->formatDate($dataFim)}";
     }
 
     private function buildFiltrosDescricao(
@@ -480,15 +486,15 @@ class OrdemServicoRelatorioService
             'Status = ' . ($status === 'todos' ? 'Todos' : $this->formatStatus($status)),
             'Tipo = ' . ($tipo === 'todos' ? 'Todos' : $tipo),
             'Prioridade = ' . ($prioridade === 'todas' ? 'Todas' : $this->formatPrioridade((int) $prioridade)),
-            "Tecnico = {$tecnico}",
+            "Técnico = {$tecnico}",
         ])->join(' | ');
     }
 
     private function formatStatus(string $status): string
     {
         return match ($status) {
-            'em_execucao' => 'Em execucao',
-            'nao_executada' => 'Nao executada',
+            'em_execucao' => 'Em execução',
+            'nao_executada' => 'Não executada',
             default => ucfirst($status),
         };
     }
@@ -497,7 +503,7 @@ class OrdemServicoRelatorioService
     {
         return match ($prioridade) {
             1 => 'Alta',
-            2 => 'Media',
+            2 => 'Média',
             3 => 'Baixa',
             default => (string) $prioridade,
         };
@@ -515,15 +521,32 @@ class OrdemServicoRelatorioService
     private function detailedReportColumns(): array
     {
         return [
-            ['key' => 'numero', 'label' => 'Numero da OS'],
-            ['key' => 'tipo', 'label' => 'Tipo de servico'],
+            ['key' => 'numero', 'label' => 'Número da OS'],
+            ['key' => 'tipo', 'label' => 'Tipo de serviço'],
             ['key' => 'clienteLocal', 'label' => 'Cliente/Local'],
             ['key' => 'status', 'label' => 'Status'],
             ['key' => 'prioridade', 'label' => 'Prioridade'],
             ['key' => 'abertura', 'label' => 'Data de abertura'],
             ['key' => 'encerramento', 'label' => 'Data de encerramento'],
-            ['key' => 'responsavel', 'label' => 'Responsavel tecnico'],
-            ['key' => 'observacoes', 'label' => 'Observacoes'],
+            ['key' => 'responsavel', 'label' => 'Responsável técnico'],
+            ['key' => 'observacoes', 'label' => 'Contexto operacional'],
         ];
+    }
+
+    private function formatContextoOperacional(?string $motivoNaoExecucao, ?string $descricao): string
+    {
+        $texto = trim((string) ($motivoNaoExecucao ?: $descricao ?: ''));
+
+        if ($texto === '') {
+            return '-';
+        }
+
+        $texto = preg_replace('/\s+/u', ' ', $texto) ?? $texto;
+
+        if (mb_strlen($texto) <= 120) {
+            return $texto;
+        }
+
+        return rtrim(mb_substr($texto, 0, 117)) . '...';
     }
 }

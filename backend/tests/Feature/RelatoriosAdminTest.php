@@ -32,7 +32,7 @@ class RelatoriosAdminTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('resumo.total', 1)
-            ->assertJsonPath('reportDefinition.title', 'Relatorio por Status');
+            ->assertJsonPath('reportDefinition.title', 'Relatório por Status');
     }
 
     public function test_visualizacao_do_relatorio_geral_e_paginada(): void
@@ -103,7 +103,7 @@ class RelatoriosAdminTest extends TestCase
             'attachment;',
             (string) $csvResponse->headers->get('content-disposition')
         );
-        $this->assertStringContainsString('Numero da OS', $csvResponse->streamedContent());
+        $this->assertStringContainsString('Número da OS', $csvResponse->streamedContent());
 
         $xlsxResponse->assertOk();
         $this->assertStringContainsString(
@@ -157,7 +157,7 @@ class RelatoriosAdminTest extends TestCase
 
         $response
             ->assertStatus(422)
-            ->assertSeeText('Exportacao PDF limitada');
+            ->assertSeeText('Exportação PDF limitada');
     }
 
     private function criarUsuario(string $role, ?string $name = null): User

@@ -51,24 +51,28 @@ class UsuarioController extends Controller
             });
         }
 
-        $statsRows = (clone $query)->get(['role', 'created_at', 'is_active']);
+        $stats = (clone $query)
+            ->reorder()
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END) as ativos')
+            ->selectRaw('SUM(CASE WHEN is_active = false THEN 1 ELSE 0 END) as inativos')
+            ->selectRaw("SUM(CASE WHEN role = 'administrador' THEN 1 ELSE 0 END) as administradores")
+            ->selectRaw("SUM(CASE WHEN role = 'tecnico' THEN 1 ELSE 0 END) as tecnicos")
+            ->selectRaw("SUM(CASE WHEN role = 'atendente' THEN 1 ELSE 0 END) as atendentes")
+            ->selectRaw('SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as ultimos_7_dias', [now()->subDays(7)])
+            ->first();
         $paginator = $query->paginate((int) ($data['per_page'] ?? 15));
 
         return response()->json(
             array_merge($paginator->toArray(), [
                 'stats' => [
-                    'total' => $statsRows->count(),
-                    'ativos' => $statsRows->where('is_active', true)->count(),
-                    'inativos' => $statsRows->where('is_active', false)->count(),
-                    'administradores' => $statsRows->where('role', 'administrador')->count(),
-                    'tecnicos' => $statsRows->where('role', 'tecnico')->count(),
-                    'atendentes' => $statsRows->where('role', 'atendente')->count(),
-                    'ultimos_7_dias' => $statsRows
-                        ->filter(
-                            fn (User $user) => $user->created_at
-                                && $user->created_at->greaterThanOrEqualTo(now()->subDays(7))
-                        )
-                        ->count(),
+                    'total' => (int) ($stats->total ?? 0),
+                    'ativos' => (int) ($stats->ativos ?? 0),
+                    'inativos' => (int) ($stats->inativos ?? 0),
+                    'administradores' => (int) ($stats->administradores ?? 0),
+                    'tecnicos' => (int) ($stats->tecnicos ?? 0),
+                    'atendentes' => (int) ($stats->atendentes ?? 0),
+                    'ultimos_7_dias' => (int) ($stats->ultimos_7_dias ?? 0),
                 ],
             ])
         );
@@ -130,7 +134,7 @@ class UsuarioController extends Controller
 
         if (($data['is_active'] ?? null) === false && $request->user()?->is($user)) {
             return response()->json([
-                'message' => 'Voce nao pode inativar seu proprio usuario.',
+                'message' => 'Você não pode inativar seu próprio usuário.',
             ], 422);
         }
 
@@ -149,7 +153,7 @@ class UsuarioController extends Controller
 
             if ($adminsAtivos <= 1) {
                 return response()->json([
-                    'message' => 'Nao e possivel remover o ultimo administrador ativo.',
+                    'message' => 'Não é possível remover o último administrador ativo.',
                 ], 422);
             }
         }
@@ -183,8 +187,8 @@ class UsuarioController extends Controller
         return [
             'password.required' => 'Informe a senha.',
             'password.min' => 'A senha deve ter pelo menos 8 caracteres.',
-            'password.max' => 'A senha deve ter no maximo 255 caracteres.',
-            'password.regex' => 'A senha deve conter letra maiuscula, letra minuscula, numero e caractere especial.',
+            'password.max' => 'A senha deve ter no máximo 255 caracteres.',
+            'password.regex' => 'A senha deve conter letra maiúscula, letra minúscula, número e caractere especial.',
         ];
     }
 }

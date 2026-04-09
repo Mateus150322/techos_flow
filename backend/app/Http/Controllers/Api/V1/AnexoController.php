@@ -8,6 +8,7 @@ use App\Models\Anexo;
 use App\Models\OrdemServico;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 
@@ -64,6 +65,8 @@ class AnexoController extends Controller
             'criado_em' => now(),
         ]);
 
+        $this->logAnexoAccess('anexo_upload', $user, $anexo, $os);
+
         return response()->json([
             'message' => 'Anexo enviado com sucesso.',
             'anexo' => $this->buildAnexoPayload($anexo),
@@ -81,9 +84,28 @@ class AnexoController extends Controller
         }
 
         if (! in_array($user->role, ['atendente', 'tecnico', 'administrador'], true)) {
+            $this->logAnexoAccess('anexo_access_denied', $user, $anexo, $ordemServico, [
+                'motivo' => 'perfil_nao_autorizado',
+            ]);
+
             return response()->json([
                 'message' => 'Acesso negado ao anexo solicitado.',
             ], 403);
+        }
+
+        if ($user->role === 'tecnico') {
+            $osDisponivel = $ordemServico->status === 'aberta' && ! $ordemServico->tecnico_responsavel_id;
+            $tecnicoResponsavel = $ordemServico->tecnico_responsavel_id === $user->id;
+
+            if (! $osDisponivel && ! $tecnicoResponsavel) {
+                $this->logAnexoAccess('anexo_access_denied', $user, $anexo, $ordemServico, [
+                    'motivo' => 'tecnico_sem_permissao_na_os',
+                ]);
+
+                return response()->json([
+                    'message' => 'Acesso negado ao anexo solicitado.',
+                ], 403);
+            }
         }
 
         $disk = $this->resolveStorageDisk($anexo->caminho);
@@ -91,6 +113,10 @@ class AnexoController extends Controller
         if (! $disk) {
             abort(404);
         }
+
+        $this->logAnexoAccess('anexo_access_granted', $user, $anexo, $ordemServico, [
+            'storage_disk' => $disk,
+        ]);
 
         $fileName = basename((string) $anexo->caminho);
         $mimeType = Storage::disk($disk)->mimeType($anexo->caminho) ?: 'application/octet-stream';
@@ -115,7 +141,7 @@ class AnexoController extends Controller
     {
         return [
             'id' => $anexo->id,
-            'caminho' => $anexo->caminho,
+            'nome_arquivo' => basename((string) $anexo->caminho),
             'tipo' => $anexo->tipo,
             'latitude' => $anexo->latitude,
             'longitude' => $anexo->longitude,
@@ -140,5 +166,22 @@ class AnexoController extends Controller
         }
 
         return null;
+    }
+
+    private function logAnexoAccess(
+        string $event,
+        mixed $user,
+        Anexo $anexo,
+        OrdemServico $ordemServico,
+        array $context = []
+    ): void {
+        Log::info($event, array_merge([
+            'user_id' => $user?->id,
+            'user_role' => $user?->role,
+            'anexo_id' => $anexo->id,
+            'os_id' => $ordemServico->id,
+            'os_status' => $ordemServico->status,
+            'tecnico_responsavel_id' => $ordemServico->tecnico_responsavel_id,
+        ], $context));
     }
 }

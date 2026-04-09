@@ -41,7 +41,7 @@ export type Execucao = {
 
 export type Anexo = {
   id: string;
-  caminho?: string | null;
+  nome_arquivo?: string | null;
   tipo?: string | null;
   url?: string | null;
   latitude?: number | null;

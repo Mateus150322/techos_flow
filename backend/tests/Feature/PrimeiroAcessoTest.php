@@ -37,7 +37,7 @@ class PrimeiroAcessoTest extends TestCase
         $response
             ->assertStatus(403)
             ->assertJson([
-                'message' => 'E necessario alterar a senha antes de continuar.',
+                'message' => 'É necessário alterar a senha antes de continuar.',
             ]);
     }
 
