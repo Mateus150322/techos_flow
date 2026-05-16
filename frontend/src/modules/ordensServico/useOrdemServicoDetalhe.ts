@@ -87,6 +87,23 @@ export function useOrdemServicoDetalhe({
     return os.execucoes.find((execucao) => !execucao.data_fim) ?? null;
   }, [os]);
 
+  const execucaoRecuperavel = useMemo(() => {
+    if (!os?.execucoes?.length || os?.status !== "em_execucao" || ultimaExecucaoAberta) {
+      return null;
+    }
+
+    return [...os.execucoes]
+      .sort((atual, proxima) => {
+        const atualTs = new Date(atual.data_fim ?? atual.data_inicio).getTime();
+        const proximaTs = new Date(proxima.data_fim ?? proxima.data_inicio).getTime();
+
+        return proximaTs - atualTs;
+      })
+      .at(0) ?? null;
+  }, [os, ultimaExecucaoAberta]);
+
+  const execucaoParaFinalizacao = ultimaExecucaoAberta ?? execucaoRecuperavel;
+
   const tecnicoResponsavelId = os?.tecnico_responsavel_id ?? tecnicoResponsavel?.id ?? null;
   const osSemResponsavel = !tecnicoResponsavelId;
   const osEhMinha = !!tecnicoResponsavelId && tecnicoResponsavelId === currentUser.id;
@@ -99,7 +116,7 @@ export function useOrdemServicoDetalhe({
     currentUser.role === "tecnico" &&
     os?.status === "em_execucao" &&
     osEhMinha &&
-    !!ultimaExecucaoAberta;
+    !!execucaoParaFinalizacao;
   const podeMarcarNaoExecutada =
     currentUser.role === "tecnico" &&
     osEhMinha &&
@@ -270,6 +287,7 @@ export function useOrdemServicoDetalhe({
     criadaPor,
     tecnicoResponsavel,
     ultimaExecucaoAberta,
+    execucaoParaFinalizacao,
     osSemResponsavel,
     osEhMinha,
     osEhDeOutroTecnico,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { Pencil, Search, ShieldAlert, UserPlus, X } from "lucide-react";
 
@@ -17,6 +17,10 @@ import {
   getApiErrorMessage,
   getFirstApiValidationMessage,
 } from "@/shared/utils/apiError";
+import {
+  getFirstPasswordPolicyError,
+  getPasswordRequirements,
+} from "@/shared/utils/passwordPolicy";
 
 type FormState = {
   name: string;
@@ -24,6 +28,7 @@ type FormState = {
   role: PerfilUsuario;
   password: string;
   passwordConfirmation: string;
+  valorHora: string;
 };
 
 const INITIAL_FORM: FormState = {
@@ -32,11 +37,22 @@ const INITIAL_FORM: FormState = {
   role: "atendente",
   password: "",
   passwordConfirmation: "",
+  valorHora: "",
 };
 
 export default function UsuariosPage() {
   const { isDark } = useTheme();
   const currentUser = useCurrentUser();
+  const buscaId = useId();
+  const perfilFiltroId = useId();
+  const statusFiltroId = useId();
+  const nomeId = useId();
+  const emailId = useId();
+  const roleId = useId();
+  const senhaId = useId();
+  const confirmarSenhaId = useId();
+  const valorHoraId = useId();
+  const tabelaCaptionId = useId();
 
   const [usuarios, setUsuarios] = useState<UsuarioAdmin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +77,12 @@ export default function UsuariosPage() {
     tecnicos: 0,
     atendentes: 0,
     ultimos_7_dias: 0,
+  });
+
+  const requisitosSenha = getPasswordRequirements(form.password, {
+    name: form.name,
+    email: form.email,
+    confirmation: form.passwordConfirmation,
   });
 
   const carregarUsuarios = useCallback(async () => {
@@ -130,6 +152,7 @@ export default function UsuariosPage() {
       role: usuario.role,
       password: "",
       passwordConfirmation: "",
+      valorHora: usuario.valor_hora ?? "",
     });
     setSucesso("");
     setErro("");
@@ -143,16 +166,41 @@ export default function UsuariosPage() {
       setErro("");
       setSucesso("");
 
-      if (!editingUserId && form.password !== form.passwordConfirmation) {
+      const password = form.password.trim();
+      const passwordConfirmation = form.passwordConfirmation.trim();
+
+      if (!editingUserId && !password) {
+        setErro("Informe a senha inicial.");
+        return;
+      }
+
+      if (password && password !== passwordConfirmation) {
         setErro("A confirmação de senha precisa ser igual à senha informada.");
         return;
+      }
+
+      if (password) {
+        const passwordError = getFirstPasswordPolicyError(password, {
+          name: form.name,
+          email: form.email,
+          confirmation: passwordConfirmation,
+        });
+
+        if (passwordError) {
+          setErro(`Senha inválida: ${passwordError}.`);
+          return;
+        }
       }
 
       const payload = {
         name: form.name.trim(),
         email: form.email.trim(),
         role: form.role,
-        password: form.password.trim() || undefined,
+        password: password || undefined,
+        password_confirmation: password ? passwordConfirmation : undefined,
+        valor_hora: form.valorHora.trim()
+          ? Number(form.valorHora.replace(",", "."))
+          : undefined,
       };
 
       if (editingUserId) {
@@ -162,6 +210,7 @@ export default function UsuariosPage() {
         await criarUsuario({
           ...payload,
           password: payload.password ?? "",
+          password_confirmation: payload.password_confirmation ?? "",
         });
         setSucesso("Usuário criado com sucesso.");
       }
@@ -174,6 +223,7 @@ export default function UsuariosPage() {
         "email",
         "role",
         "password",
+        "valor_hora",
       ]);
 
       setErro(
@@ -217,20 +267,20 @@ export default function UsuariosPage() {
     }
   }
 
-  const cardBg = isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-slate-200";
-  const softBg = isDark ? "bg-zinc-950/70 border-zinc-800" : "bg-slate-50 border-slate-200";
-  const titleText = isDark ? "text-zinc-50" : "text-slate-900";
-  const mutedText = isDark ? "text-zinc-400" : "text-slate-500";
+  const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
+  const softBg = isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200";
+  const titleText = isDark ? "text-slate-50" : "text-slate-900";
+  const mutedText = isDark ? "text-slate-400" : "text-slate-500";
   const inputBg = isDark
-    ? "border-zinc-700 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500"
+    ? "border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500"
     : "border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400";
   const primaryButton = isDark
-    ? "bg-zinc-100 text-zinc-950 hover:bg-white"
+    ? "bg-slate-100 text-slate-950 hover:bg-white"
     : "bg-slate-950 text-white hover:bg-slate-800";
   const secondaryButton = isDark
-    ? "border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+    ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100";
-  const rowHover = isDark ? "hover:bg-zinc-950/80" : "hover:bg-slate-50";
+  const rowHover = isDark ? "hover:bg-slate-950/80" : "hover:bg-slate-50";
   const infoBox = isDark
     ? "border-amber-900 bg-amber-950/60 text-amber-200"
     : "border-amber-200 bg-amber-50 text-amber-800";
@@ -252,8 +302,8 @@ export default function UsuariosPage() {
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
-          accentClass="text-slate-900 dark:text-zinc-50"
-          hint="Usuários conforme busca e filtros"
+          accentClass="text-slate-900 dark:text-slate-50"
+          hint="Usuarios conforme busca e filtros"
         />
         <AdminMetricCard
           value={stats.ativos}
@@ -262,7 +312,7 @@ export default function UsuariosPage() {
           titleText={titleText}
           mutedText={mutedText}
           accentClass="text-emerald-500"
-          hint="Usuários com acesso liberado"
+          hint="Usuarios com acesso liberado"
         />
         <AdminMetricCard
           value={stats.inativos}
@@ -271,7 +321,7 @@ export default function UsuariosPage() {
           titleText={titleText}
           mutedText={mutedText}
           accentClass="text-rose-500"
-          hint="Usuários com acesso bloqueado"
+          hint="Usuarios com acesso bloqueado"
         />
         <AdminMetricCard
           value={stats.administradores}
@@ -284,7 +334,7 @@ export default function UsuariosPage() {
         />
         <AdminMetricCard
           value={stats.tecnicos}
-          label="Técnicos"
+          label="Tecnicos"
           cardBg={cardBg}
           titleText={titleText}
           mutedText={mutedText}
@@ -302,12 +352,12 @@ export default function UsuariosPage() {
         />
       </section>
 
-      <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+      <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading || saving}>
         <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerenciar usuários</h2>
+            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerenciar usuarios</h2>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Adicione, edite, inative e reative os usuários do sistema.
+              Adicione, edite, inative e reative os usuarios do sistema.
             </p>
           </div>
 
@@ -317,7 +367,7 @@ export default function UsuariosPage() {
             className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition ${primaryButton}`}
           >
             <UserPlus className="h-4 w-4" />
-            {showForm ? "Fechar formulário" : "Novo usuário"}
+            {showForm ? "Fechar formulario" : "Novo usuario"}
           </button>
         </div>
 
@@ -328,6 +378,8 @@ export default function UsuariosPage() {
                 ? "border-red-900 bg-red-950 text-red-300"
                 : "border-red-200 bg-red-50 text-red-700"
             }`}
+            role="alert"
+            aria-live="assertive"
           >
             {erro}
           </div>
@@ -340,6 +392,8 @@ export default function UsuariosPage() {
                 ? "border-emerald-900 bg-emerald-950 text-emerald-300"
                 : "border-emerald-200 bg-emerald-50 text-emerald-700"
             }`}
+            role="status"
+            aria-live="polite"
           >
             {sucesso}
           </div>
@@ -350,12 +404,12 @@ export default function UsuariosPage() {
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h3 className={`text-lg font-semibold ${titleText}`}>
-                  {editingUserId ? "Editar usuário" : "Novo usuário"}
+                  {editingUserId ? "Editar usuario" : "Novo usuario"}
                 </h3>
                 <p className={`text-sm ${mutedText}`}>
                   {editingUserId
-                    ? "Atualize os dados do usuário selecionado."
-                    : "Cadastre um novo acesso para a operação."}
+                    ? "Atualize os dados do usuario selecionado."
+                    : "Cadastre um novo acesso para a operacao."}
                 </p>
               </div>
 
@@ -369,56 +423,77 @@ export default function UsuariosPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-              <input
-                type="text"
-                placeholder="Nome"
-                value={form.name}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, name: event.target.value }))
-                }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-              />
-
-              <input
-                type="email"
-                placeholder="Email"
-                value={form.email}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, email: event.target.value }))
-                }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-              />
-
-              <select
-                value={form.role}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    role: event.target.value as PerfilUsuario,
-                  }))
-                }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-              >
-                <option value="administrador">Administrador</option>
-                <option value="tecnico">Técnico</option>
-                <option value="atendente">Atendente</option>
-              </select>
-
-              <input
-                type="password"
-                placeholder={editingUserId ? "Nova senha (opcional)" : "Senha inicial"}
-                value={form.password}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, password: event.target.value }))
-                }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-              />
-
-              {!editingUserId ? (
+            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2" aria-busy={saving}>
+              <label className="block">
+                <span className={`mb-2 block text-sm font-medium ${titleText}`}>Nome</span>
                 <input
+                  id={nomeId}
+                  type="text"
+                  value={form.name}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+                />
+              </label>
+
+              <label className="block">
+                <span className={`mb-2 block text-sm font-medium ${titleText}`}>E-mail</span>
+                <input
+                  id={emailId}
+                  type="email"
+                  autoComplete="email"
+                  value={form.email}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, email: event.target.value }))
+                  }
+                  className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+                />
+              </label>
+
+              <label className="block">
+                <span className={`mb-2 block text-sm font-medium ${titleText}`}>Perfil</span>
+                <select
+                  id={roleId}
+                  value={form.role}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      role: event.target.value as PerfilUsuario,
+                    }))
+                  }
+                  className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+                >
+                  <option value="administrador">Administrador</option>
+                  <option value="tecnico">Tecnico</option>
+                  <option value="atendente">Atendente</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className={`mb-2 block text-sm font-medium ${titleText}`}>
+                  {editingUserId ? "Nova senha (opcional)" : "Senha inicial"}
+                </span>
+                <input
+                  id={senhaId}
                   type="password"
-                  placeholder="Confirmar senha"
+                  autoComplete={editingUserId ? "new-password" : "new-password"}
+                  value={form.password}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, password: event.target.value }))
+                  }
+                  className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+                />
+              </label>
+
+              <label className="block">
+                <span className={`mb-2 block text-sm font-medium ${titleText}`}>
+                  {editingUserId ? "Confirmar nova senha" : "Confirmar senha"}
+                </span>
+                <input
+                  id={confirmarSenhaId}
+                  type="password"
+                  autoComplete="new-password"
                   value={form.passwordConfirmation}
                   onChange={(event) =>
                     setForm((prev) => ({
@@ -428,7 +503,24 @@ export default function UsuariosPage() {
                   }
                   className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
                 />
-              ) : null}
+              </label>
+
+              <label className="block">
+                <span className={`mb-2 block text-sm font-medium ${titleText}`}>
+                  Valor/hora para horas extras (R$)
+                </span>
+                <input
+                  id={valorHoraId}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.valorHora}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, valorHora: event.target.value }))
+                  }
+                  className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+                />
+              </label>
 
               <div
                 className={`rounded-2xl border px-4 py-3 text-sm md:col-span-2 ${
@@ -437,8 +529,34 @@ export default function UsuariosPage() {
                     : "border-blue-200 bg-blue-50 text-blue-800"
                 }`}
               >
-                A senha inicial deve seguir os padrões fortes do sistema. No primeiro acesso, o
-                usuário será obrigado a definir uma nova senha antes de continuar.
+                A senha inicial deve seguir os padroes fortes do sistema. No primeiro acesso, o
+                usuario sera obrigado a definir uma nova senha antes de continuar.
+              </div>
+
+              <div className="grid gap-2 md:col-span-2 md:grid-cols-2 xl:grid-cols-3">
+                {requisitosSenha.map((requisito) => (
+                  <div
+                    key={requisito.id}
+                    className={`rounded-2xl border px-4 py-3 text-sm ${
+                      requisito.ok
+                        ? isDark
+                          ? "border-emerald-900 bg-emerald-950/50 text-emerald-300"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : isDark
+                          ? "border-slate-800 bg-slate-950 text-slate-300"
+                          : "border-slate-200 bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${
+                          requisito.ok ? "bg-emerald-500" : "bg-slate-400"
+                        }`}
+                      />
+                      <span>{requisito.label}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="md:col-span-2">
@@ -451,8 +569,8 @@ export default function UsuariosPage() {
                     {saving
                       ? "Salvando..."
                       : editingUserId
-                        ? "Salvar alterações"
-                        : "Criar usuário"}
+                        ? "Salvar alteracoes"
+                        : "Criar usuario"}
                   </button>
 
                   {editingUserId ? (
@@ -461,7 +579,7 @@ export default function UsuariosPage() {
                       onClick={resetForm}
                       className={`inline-flex items-center justify-center rounded-2xl border px-5 py-3 text-sm font-medium transition ${secondaryButton}`}
                     >
-                      Cancelar edição
+                      Cancelar edicao
                     </button>
                   ) : null}
                 </div>
@@ -470,79 +588,93 @@ export default function UsuariosPage() {
           </div>
         ) : null}
 
-        <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_240px_220px]">
-          <label className="relative block">
+        <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_240px_220px]" role="search" aria-label="Buscar e filtrar usuários">
+          <label className="relative block" htmlFor={buscaId}>
+            <span className="sr-only">Buscar usuários</span>
             <Search
               className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${mutedText}`}
             />
             <input
+              id={buscaId}
               type="text"
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
-              placeholder="Buscar usuários..."
+              placeholder="Buscar usuarios..."
               className={`w-full rounded-2xl border py-3 pl-11 pr-4 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
             />
           </label>
 
-          <select
-            value={perfilFiltro}
-            onChange={(event) =>
-              setPerfilFiltro(event.target.value as PerfilUsuario | "todos")
-            }
-            className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-          >
-            <option value="todos">Todos os perfis</option>
-            <option value="administrador">Administrador</option>
-            <option value="tecnico">Técnico</option>
-            <option value="atendente">Atendente</option>
-          </select>
+          <label className="block" htmlFor={perfilFiltroId}>
+            <span className="sr-only">Filtrar por perfil</span>
+            <select
+              id={perfilFiltroId}
+              value={perfilFiltro}
+              onChange={(event) =>
+                setPerfilFiltro(event.target.value as PerfilUsuario | "todos")
+              }
+              className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+            >
+              <option value="todos">Todos os perfis</option>
+              <option value="administrador">Administrador</option>
+              <option value="tecnico">Tecnico</option>
+              <option value="atendente">Atendente</option>
+            </select>
+          </label>
 
-          <select
-            value={statusFiltro}
-            onChange={(event) =>
-              setStatusFiltro(event.target.value as "todos" | "ativos" | "inativos")
-            }
-            className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-          >
-            <option value="todos">Todos os status</option>
-            <option value="ativos">Apenas ativos</option>
-            <option value="inativos">Apenas inativos</option>
-          </select>
+          <label className="block" htmlFor={statusFiltroId}>
+            <span className="sr-only">Filtrar por status</span>
+            <select
+              id={statusFiltroId}
+              value={statusFiltro}
+              onChange={(event) =>
+                setStatusFiltro(event.target.value as "todos" | "ativos" | "inativos")
+              }
+              className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+            >
+              <option value="todos">Todos os status</option>
+              <option value="ativos">Apenas ativos</option>
+              <option value="inativos">Apenas inativos</option>
+            </select>
+          </label>
         </div>
 
         <div className={`mb-5 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${infoBox}`}>
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            Usuários inativos perdem acesso imediatamente ao sistema. A reativação libera o
-            login novamente, sem apagar o histórico das ordens de serviço.
+            Usuarios inativos perdem acesso imediatamente ao sistema. A reativacao libera o
+            login novamente, sem apagar o historico das ordens de servico.
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-zinc-800">
+        <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1080px] text-sm">
-              <thead className={isDark ? "bg-zinc-950 text-zinc-300" : "bg-slate-50 text-slate-600"}>
+            <table className="w-full min-w-[1180px] text-sm">
+              <caption id={tabelaCaptionId} className="sr-only">
+                Tabela de usuários com nome, e-mail, perfil, valor por hora, status e ações administrativas.
+              </caption>
+              <thead className={isDark ? "bg-slate-950 text-slate-300" : "bg-slate-50 text-slate-600"}>
                 <tr>
-                  <th className="p-4 text-left font-semibold">Nome</th>
-                  <th className="p-4 text-left font-semibold">Email</th>
-                  <th className="p-4 text-left font-semibold">Perfil</th>
-                  <th className="p-4 text-left font-semibold">Status</th>
-                  <th className="p-4 text-left font-semibold">Data de criação</th>
-                  <th className="p-4 text-left font-semibold">Atualizado em</th>
-                  <th className="p-4 text-right font-semibold">Ações</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Nome</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Email</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Perfil</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Valor/hora</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Status</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Data de criacao</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Atualizado em</th>
+                  <th scope="col" className="p-4 text-right font-semibold">Acoes</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center">
-                      <span className={mutedText}>Carregando usuários...</span>
+                    <td colSpan={8} className="p-6 text-center">
+                      <span className={mutedText}>Carregando usuarios...</span>
                     </td>
                   </tr>
                 ) : usuarios.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center">
-                      <span className={mutedText}>Nenhum usuário encontrado.</span>
+                    <td colSpan={8} className="p-6 text-center">
+                      <span className={mutedText}>Nenhum usuario encontrado.</span>
                     </td>
                   </tr>
                 ) : (
@@ -553,18 +685,18 @@ export default function UsuariosPage() {
                     return (
                       <tr
                         key={usuario.id}
-                        className={`border-t border-slate-200 transition dark:border-zinc-800 ${rowHover}`}
+                        className={`border-t border-slate-200 transition dark:border-slate-800 ${rowHover}`}
                       >
-                        <td className="p-4 font-medium">
+                        <th scope="row" className="p-4 text-left font-medium">
                           <div className="flex items-center gap-2">
                             <span>{usuario.name}</span>
                             {isCurrentUser ? (
-                              <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+                              <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                 Atual
                               </span>
                             ) : null}
                           </div>
-                        </td>
+                        </th>
                         <td className="p-4">{usuario.email}</td>
                         <td className="p-4">
                           <span
@@ -572,6 +704,11 @@ export default function UsuariosPage() {
                           >
                             {roleLabel(usuario.role)}
                           </span>
+                        </td>
+                        <td className="p-4">
+                          {usuario.valor_hora
+                            ? `R$ ${Number(usuario.valor_hora).toFixed(2).replace(".", ",")}`
+                            : "-"}
                         </td>
                         <td className="p-4">
                           <span
@@ -591,6 +728,7 @@ export default function UsuariosPage() {
                             <button
                               type="button"
                               onClick={() => startEditing(usuario)}
+                              aria-label={`Editar usuário ${usuario.name}`}
                               className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${secondaryButton}`}
                             >
                               <Pencil className="h-4 w-4" />
@@ -601,11 +739,16 @@ export default function UsuariosPage() {
                               type="button"
                               title={
                                 isCurrentUser && usuario.is_active
-                                  ? "Seu próprio usuário não pode ser inativado."
+                                  ? "Seu proprio usuario nao pode ser inativado."
                                   : undefined
                               }
                               disabled={statusEmProcessamento || (isCurrentUser && usuario.is_active)}
                               onClick={() => void alternarStatusUsuario(usuario)}
+                              aria-label={
+                                usuario.is_active
+                                  ? `Inativar usuário ${usuario.name}`
+                                  : `Reativar usuário ${usuario.name}`
+                              }
                               className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
                                 usuario.is_active
                                   ? "bg-rose-600 hover:bg-rose-700"
@@ -632,10 +775,13 @@ export default function UsuariosPage() {
         </div>
 
         {!loading ? (
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            aria-label="Paginação da lista de usuários"
+          >
             <p className={`text-sm ${mutedText}`}>
               Exibindo {usuarios.length} de {totalUsuarios}{" "}
-              {totalUsuarios === 1 ? "usuário" : "usuários"}.
+              {totalUsuarios === 1 ? "usuario" : "usuarios"}.
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -648,7 +794,7 @@ export default function UsuariosPage() {
                 Anterior
               </button>
               <span className={`text-sm ${mutedText}`}>
-                Página {paginaAtual} de {ultimaPagina}
+                Pagina {paginaAtual} de {ultimaPagina}
               </span>
               <button
                 type="button"
@@ -656,7 +802,7 @@ export default function UsuariosPage() {
                 onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, ultimaPagina))}
                 className={`inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
               >
-                Próxima
+                Proxima
               </button>
             </div>
           </div>
@@ -674,7 +820,7 @@ function roleBadge(role: PerfilUsuario) {
 
 function roleLabel(role: PerfilUsuario) {
   if (role === "administrador") return "Administrador";
-  if (role === "tecnico") return "Técnico";
+  if (role === "tecnico") return "Tecnico";
   return "Atendente";
 }
 
@@ -683,4 +829,3 @@ function formatDate(value?: string) {
 
   return new Date(value).toLocaleDateString("pt-BR");
 }
-

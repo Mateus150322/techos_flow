@@ -1,14 +1,12 @@
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle2,
+  FileDown,
   FileText,
   MapPin,
-  Moon,
   Paperclip,
-  Sun,
-  Upload,
   UserCircle2,
   Wrench,
 } from "lucide-react";
@@ -18,27 +16,32 @@ import {
   listarLinhasEnderecoOperacional,
   formatarStatus,
 } from "./ordemServicoDetalhe.utils";
+import { exportarRelatorioDetalhadoOrdem } from "./ordensServico.service";
 import { AnexoItemCard } from "./components/AnexoItemCard";
 import { EvidenciaUploadPanel } from "./components/EvidenciaUploadPanel";
 import { OrdemServicoAcoesPanel } from "./components/OrdemServicoAcoesPanel";
-import { useOrdemServicoDetalhe } from "./useOrdemServicoDetalhe";
 import { PrioridadeBadge } from "./components/PrioridadeBadge";
 import { StatusBadge } from "./components/StatusBadge";
+import { useOrdemServicoDetalhe } from "./useOrdemServicoDetalhe";
+import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { useTheme } from "@/shared/hooks/useTheme";
+import { getApiErrorMessage } from "@/shared/utils/apiError";
 
 export default function OrdemDetalhePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark } = useTheme();
+  const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
 
   const {
+    currentUser,
     loading,
     error,
     setError,
     os,
     criadaPor,
     tecnicoResponsavel,
-    ultimaExecucaoAberta,
+    execucaoParaFinalizacao,
     osEhDeOutroTecnico,
     podeIniciarExecucao,
     podeFinalizarExecucao,
@@ -69,25 +72,55 @@ export default function OrdemDetalhePage() {
     await enviarEvidencia();
   }
 
-  const pageBg = isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900";
-  const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
-  const innerCardBg = isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200";
-  const titleText = isDark ? "text-white" : "text-slate-900";
-  const mutedText = isDark ? "text-slate-400" : "text-slate-500";
-  const bodyText = isDark ? "text-slate-200" : "text-slate-700";
-  const buttonSecondary = isDark
-    ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
-    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100";
+  async function handleBaixarRelatorio() {
+    if (!os?.id) {
+      return;
+    }
+
+    try {
+      setBaixandoRelatorio(true);
+      setError("");
+
+      const { blob, fileName } = await exportarRelatorioDetalhadoOrdem(os.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (downloadError) {
+      setError(
+        getApiErrorMessage(downloadError, "Não foi possível gerar o relatório PDF da OS.")
+      );
+    } finally {
+      setBaixandoRelatorio(false);
+    }
+  }
+
+  const pageBg = "app-page";
+  const cardBg = "app-card";
+  const innerCardBg = "app-card-soft";
+  const titleText = "text-[var(--text-main)]";
+  const mutedText = "app-muted";
+  const bodyText = "text-[var(--text-main)]";
+  const buttonSecondary =
+    "app-button-outline inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm transition";
   const temAcoesOperacionais =
     podeIniciarExecucao || podeFinalizarExecucao || podeMarcarNaoExecutada;
-  const linhasEndereco = listarLinhasEnderecoOperacional(os?.endereco);
+  const linhasEndereco = useMemo(
+    () => listarLinhasEnderecoOperacional(os?.endereco),
+    [os?.endereco]
+  );
   const enderecoReferencia = linhasEndereco.join("\n");
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${pageBg}`}>
+      <div className={pageBg}>
         <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
+          <div className={`${cardBg} rounded-2xl p-6`}>
             <p className={`text-sm ${mutedText}`}>Carregando detalhes...</p>
           </div>
         </div>
@@ -97,15 +130,15 @@ export default function OrdemDetalhePage() {
 
   if (error && !os) {
     return (
-      <div className={`min-h-screen ${pageBg}`}>
+      <div className={pageBg}>
         <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
-            <p className="text-sm text-red-500">{error}</p>
+          <div className={`${cardBg} rounded-2xl p-6`}>
+            <p className="app-alert-danger rounded-xl px-4 py-3 text-sm">{error}</p>
 
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className={`mt-4 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
+              className={`mt-4 ${buttonSecondary}`}
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar
@@ -118,15 +151,15 @@ export default function OrdemDetalhePage() {
 
   if (!os) {
     return (
-      <div className={`min-h-screen ${pageBg}`}>
+      <div className={pageBg}>
         <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
+          <div className={`${cardBg} rounded-2xl p-6`}>
             <p className={`text-sm ${mutedText}`}>Ordem de serviço não encontrada.</p>
 
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className={`mt-4 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
+              className={`mt-4 ${buttonSecondary}`}
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar
@@ -138,40 +171,40 @@ export default function OrdemDetalhePage() {
   }
 
   return (
-    <div className={`min-h-screen ${pageBg}`}>
+    <div className={pageBg}>
       <div className="mx-auto max-w-7xl px-4 py-6">
-        <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
-          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className={`${cardBg} rounded-[1.75rem] p-4 sm:rounded-3xl sm:p-6`}>
+          <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <StatusBadge status={os.status} />
                 <PrioridadeBadge prioridade={os.prioridade} />
               </div>
 
-              <h1 className={`mt-3 text-3xl font-bold ${titleText}`}>{os.numero}</h1>
+              <h1 className={`mt-3 text-2xl font-bold sm:text-3xl ${titleText}`}>{os.numero}</h1>
               <p className={`mt-2 text-sm ${mutedText}`}>
                 {os.tipo}
                 {os.nome_cliente ? ` - ${os.nome_cliente}` : ""}
               </p>
-              <p className={`mt-2 text-sm capitalize ${bodyText}`}>
-                Status atual: {formatarStatus(os.status)}
-              </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <button
                 type="button"
-                onClick={toggleTheme}
-                className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
+                onClick={handleBaixarRelatorio}
+                disabled={baixandoRelatorio}
+                className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${buttonSecondary}`}
               >
-                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                {isDark ? "Modo claro" : "Modo escuro"}
+                <FileDown className="h-4 w-4" />
+                {baixandoRelatorio ? "Gerando PDF..." : "Relatorio PDF"}
               </button>
+
+              <ThemeToggle />
 
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${buttonSecondary}`}
+                className={`min-h-11 w-full justify-center sm:w-auto ${buttonSecondary}`}
               >
                 <ArrowLeft className="h-4 w-4" />
                 Voltar
@@ -180,38 +213,71 @@ export default function OrdemDetalhePage() {
           </div>
 
           {error && (
-            <div
-              className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-                isDark
-                  ? "border-red-900 bg-red-950 text-red-300"
-                  : "border-red-200 bg-red-50 text-red-700"
-              }`}
-            >
+            <div className="app-alert-danger mb-4 rounded-xl px-4 py-3 text-sm">
               {error}
             </div>
           )}
 
           {osEhDeOutroTecnico && (
-            <div
-              className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-                isDark
-                  ? "border-amber-900 bg-amber-950 text-amber-200"
-                  : "border-amber-200 bg-amber-50 text-amber-700"
-              }`}
-            >
-              Esta OS está atribuída a {tecnicoResponsavel?.name || "outro técnico"}.
+            <div className="app-alert-warning mb-4 rounded-xl px-4 py-3 text-sm">
+              Esta OS esta atribuida a {tecnicoResponsavel?.name || "outro tecnico"}.
             </div>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              <Section title="Descrição da OS" icon={<FileText className="h-4 w-4" />} cardBg={cardBg}>
-                <p className={`whitespace-pre-wrap text-sm ${bodyText}`}>{os.descricao}</p>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <ResumoTopCard
+              label="Data de abertura"
+              value={formatarDataHora(os.data_abertura)}
+              cardBg={innerCardBg}
+              mutedText={mutedText}
+              titleText={titleText}
+            />
+            <ResumoTopCard
+              label="Responsavel"
+              value={tecnicoResponsavel?.name || "Não atribuído"}
+              cardBg={innerCardBg}
+              mutedText={mutedText}
+              titleText={titleText}
+            />
+            <ResumoTopCard
+              label="Criada por"
+              value={criadaPor?.name || "-"}
+              cardBg={innerCardBg}
+              mutedText={mutedText}
+              titleText={titleText}
+            />
+            <ResumoTopCard
+              label="Encerramento"
+              value={formatarDataHora(os.data_encerramento)}
+              cardBg={innerCardBg}
+              mutedText={mutedText}
+              titleText={titleText}
+            />
+          </div>
+
+          <div className="mt-6 grid gap-4 xl:grid-cols-3">
+            <div className="space-y-4 xl:col-span-2">
+              <Section title="Resumo da OS" icon={<FileText className="h-4 w-4" />} cardBg={cardBg}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DetailItem label="Tipo de serviço" value={os.tipo} bodyText={bodyText} mutedText={mutedText} />
+                  <DetailItem label="Cliente" value={os.nome_cliente} bodyText={bodyText} mutedText={mutedText} />
+                  <DetailItem label="Status atual" value={formatarStatus(os.status)} bodyText={bodyText} mutedText={mutedText} />
+                  <DetailItem label="Prioridade" value={String(os.prioridade)} bodyText={bodyText} mutedText={mutedText} />
+                  <DetailItem label="Responsável atual" value={tecnicoResponsavel?.name || "Não atribuído"} bodyText={bodyText} mutedText={mutedText} />
+                  <DetailItem label="Aberto por" value={criadaPor?.name} bodyText={bodyText} mutedText={mutedText} />
+                  <DetailItem
+                    label="Descricao"
+                    value={os.descricao}
+                    bodyText={bodyText}
+                    mutedText={mutedText}
+                    full
+                  />
+                </div>
               </Section>
 
               {temAcoesOperacionais && (
                 <Section
-                  title="Ações da OS"
+                  title="Acoes da OS"
                   icon={<CheckCircle2 className="h-4 w-4" />}
                   cardBg={cardBg}
                 >
@@ -219,20 +285,24 @@ export default function OrdemDetalhePage() {
                     variant="page"
                     isDark={isDark}
                     processandoAcao={processandoAcao}
+                    currentUserId={currentUser.id}
+                    currentUserName={currentUser.name}
                     podeIniciarExecucao={podeIniciarExecucao}
                     podeFinalizarExecucao={podeFinalizarExecucao}
                     podeMarcarNaoExecutada={podeMarcarNaoExecutada}
-                    execucaoAbertaId={ultimaExecucaoAberta?.id}
+                    execucaoAbertaId={execucaoParaFinalizacao?.id}
                     onError={setError}
                     onIniciarExecucao={(observacao) =>
                       iniciar({
                         observacao,
                       })
                     }
-                    onFinalizarExecucao={({ execucaoId, observacao }) =>
+                    onFinalizarExecucao={({ execucaoId, dataFim, observacao, funcionarios }) =>
                       finalizar({
                         execucao_id: execucaoId,
+                        data_fim: dataFim,
                         observacao,
+                        funcionarios,
                       })
                     }
                     onMarcarNaoExecutada={(motivo) =>
@@ -244,12 +314,55 @@ export default function OrdemDetalhePage() {
                 </Section>
               )}
 
+              <Section title="Execucoes" icon={<Wrench className="h-4 w-4" />} cardBg={cardBg}>
+                {os.execucoes?.length ? (
+                  <div className="space-y-3">
+                    {os.execucoes.map((execucao) => (
+                      <div
+                        key={execucao.id}
+                        className={`${innerCardBg} rounded-xl px-4 py-3`}
+                      >
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <DetailItem label="Tecnico" value={execucao.tecnico?.name} bodyText={bodyText} mutedText={mutedText} />
+                          <DetailItem label="Inicio" value={formatarDataHora(execucao.data_inicio)} bodyText={bodyText} mutedText={mutedText} />
+                          <DetailItem label="Fim" value={formatarDataHora(execucao.data_fim)} bodyText={bodyText} mutedText={mutedText} />
+                          <DetailItem
+                            label="Observacao"
+                            value={execucao.observacao || "Sem observacoes registradas."}
+                            bodyText={bodyText}
+                            mutedText={mutedText}
+                            full
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={`text-sm ${mutedText}`}>Nenhuma execucao registrada.</p>
+                )}
+              </Section>
+            </div>
+
+            <div className="space-y-4">
+              <Section title="Endereco" icon={<MapPin className="h-4 w-4" />} cardBg={cardBg}>
+                {linhasEndereco.length ? (
+                  <div className={`${innerCardBg} rounded-xl px-4 py-4`}>
+                    <p className={`text-xs font-medium uppercase tracking-[0.16em] ${mutedText}`}>
+                      Endereco da OS
+                    </p>
+                    <div className={`mt-3 space-y-1 text-sm ${bodyText}`}>
+                      {linhasEndereco.map((linha) => (
+                        <p key={linha}>{linha}</p>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className={`text-sm ${mutedText}`}>Endereco nao informado.</p>
+                )}
+              </Section>
+
               {podeEnviarAnexo && (
-                <Section
-                  title="Enviar evidência"
-                  icon={<Upload className="h-4 w-4" />}
-                  cardBg={cardBg}
-                >
+                <Section title="Nova evidencia" icon={<Paperclip className="h-4 w-4" />} cardBg={cardBg}>
                   <EvidenciaUploadPanel
                     variant="page"
                     isDark={isDark}
@@ -268,56 +381,6 @@ export default function OrdemDetalhePage() {
                   />
                 </Section>
               )}
-
-              <Section title="Execuções" icon={<Wrench className="h-4 w-4" />} cardBg={cardBg}>
-                {os.execucoes?.length ? (
-                  <div className="space-y-3">
-                    {os.execucoes.map((execucao) => (
-                      <div
-                        key={execucao.id}
-                        className={`rounded-xl border px-4 py-3 ${innerCardBg}`}
-                      >
-                        <p className={`text-sm ${bodyText}`}>
-                          <span className={mutedText}>Técnico:</span>{" "}
-                          {execucao.tecnico?.name ?? "-"}
-                        </p>
-                        <p className={`mt-1 text-sm ${bodyText}`}>
-                          <span className={mutedText}>Inicio:</span>{" "}
-                          {formatarDataHora(execucao.data_inicio)}
-                        </p>
-                        <p className={`mt-1 text-sm ${bodyText}`}>
-                          <span className={mutedText}>Fim:</span>{" "}
-                          {formatarDataHora(execucao.data_fim)}
-                        </p>
-                        <p className={`mt-3 text-sm ${bodyText}`}>
-                          {execucao.observacao ?? "Sem observações registradas."}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className={`text-sm ${mutedText}`}>Nenhuma execução registrada.</p>
-                )}
-              </Section>
-            </div>
-
-            <div className="space-y-4">
-              <Section title="Endereço" icon={<MapPin className="h-4 w-4" />} cardBg={cardBg}>
-                {linhasEndereco.length ? (
-                  <div className={`rounded-xl border px-4 py-4 ${innerCardBg}`}>
-                    <p className={`text-xs font-medium uppercase tracking-[0.16em] ${mutedText}`}>
-                      Endereço da OS
-                    </p>
-                    <div className={`mt-3 space-y-1 text-sm ${bodyText}`}>
-                      {linhasEndereco.map((linha) => (
-                        <p key={linha}>{linha}</p>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className={`text-sm ${mutedText}`}>Endereço não informado.</p>
-                )}
-              </Section>
 
               <Section
                 title="Criada por"
@@ -366,12 +429,54 @@ function Section({
   cardBg: string;
 }) {
   return (
-    <div className={`rounded-2xl border p-4 ${cardBg}`}>
+    <div className={`${cardBg} rounded-2xl p-4 sm:p-5`}>
       <div className="flex items-center gap-2">
         {icon}
-        <h2 className="text-lg font-medium">{title}</h2>
+        <h2 className="text-base font-medium text-[var(--text-main)] sm:text-lg">{title}</h2>
       </div>
       <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+function ResumoTopCard({
+  label,
+  value,
+  cardBg,
+  mutedText,
+  titleText,
+}: {
+  label: string;
+  value: string;
+  cardBg: string;
+  mutedText: string;
+  titleText: string;
+}) {
+  return (
+    <div className={`${cardBg} rounded-2xl p-4`}>
+      <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${mutedText}`}>{label}</p>
+      <p className={`mt-2 text-base font-semibold sm:text-lg ${titleText}`}>{value}</p>
+    </div>
+  );
+}
+
+function DetailItem({
+  label,
+  value,
+  bodyText,
+  mutedText,
+  full,
+}: {
+  label: string;
+  value?: string | null;
+  bodyText: string;
+  mutedText: string;
+  full?: boolean;
+}) {
+  return (
+    <div className={full ? "sm:col-span-2" : undefined}>
+      <p className={`text-xs font-medium uppercase tracking-[0.16em] ${mutedText}`}>{label}</p>
+      <p className={`mt-2 whitespace-pre-wrap text-sm ${bodyText}`}>{value || "-"}</p>
     </div>
   );
 }

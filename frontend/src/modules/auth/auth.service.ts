@@ -11,6 +11,7 @@ type UsuarioAutenticado = CurrentUser;
 
 type LoginResponse = {
   token: string;
+  token_expires_at?: string | null;
   user: UsuarioAutenticado;
 };
 
@@ -25,13 +26,28 @@ type AlterarSenhaPrimeiroAcessoResponse = {
   user: UsuarioAutenticado;
 };
 
+type SolicitarRecuperacaoSenhaResponse = {
+  message: string;
+};
+
+type RedefinirSenhaPayload = {
+  email: string;
+  token: string;
+  password: string;
+  password_confirmation: string;
+};
+
+type RedefinirSenhaResponse = {
+  message: string;
+};
+
 export async function login(email: string, password: string) {
   const response = await api.post<LoginResponse>("/login", { email, password });
 
   const token = response.data.token;
   const user = response.data.user;
 
-  saveSession(token, user);
+  saveSession(token, user, response.data.token_expires_at ?? null);
 
   return response.data;
 }
@@ -64,6 +80,20 @@ export async function alterarSenhaPrimeiroAcesso(
   );
 
   updateStoredUser(response.data.user);
+
+  return response.data;
+}
+
+export async function solicitarRecuperacaoSenha(email: string) {
+  const response = await api.post<SolicitarRecuperacaoSenhaResponse>("/esqueci-senha", {
+    email,
+  });
+
+  return response.data;
+}
+
+export async function redefinirSenha(payload: RedefinirSenhaPayload) {
+  const response = await api.post<RedefinirSenhaResponse>("/redefinir-senha", payload);
 
   return response.data;
 }

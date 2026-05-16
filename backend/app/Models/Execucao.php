@@ -20,6 +20,11 @@ class Execucao extends Model
         'observacao'
     ];
 
+    protected $casts = [
+        'data_inicio' => 'datetime',
+        'data_fim' => 'datetime',
+    ];
+
     public function ordemServico()
     {
         return $this->belongsTo(OrdemServico::class, 'os_id');
@@ -28,5 +33,10 @@ class Execucao extends Model
     public function tecnico()
     {
         return $this->belongsTo(User::class, 'tecnico_id');
+    }
+
+    public function execucaoFuncionarios()
+    {
+        return $this->hasMany(ExecucaoFuncionario::class, 'execucao_id');
     }
 }

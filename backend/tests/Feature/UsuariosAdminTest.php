@@ -37,6 +37,7 @@ class UsuariosAdminTest extends TestCase
             'email' => 'nova.atendente@teste.com',
             'role' => 'atendente',
             'password' => 'Temp123!',
+            'password_confirmation' => 'Temp123!',
         ]);
 
         $response
@@ -63,6 +64,7 @@ class UsuariosAdminTest extends TestCase
             'name' => 'Tecnico Atualizado',
             'role' => 'tecnico',
             'password' => 'Nova123!',
+            'password_confirmation' => 'Nova123!',
         ]);
 
         $response

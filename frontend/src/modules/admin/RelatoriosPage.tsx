@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
   CalendarRange,
@@ -34,6 +34,9 @@ const REPORTS_PER_PAGE = 20;
 export default function RelatoriosPage() {
   const { isDark } = useTheme();
   const currentUser = useCurrentUser();
+  const filtrosHintId = useId();
+  const tabelaCaptionId = useId();
+  const atividadeHintId = useId();
 
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -73,21 +76,21 @@ export default function RelatoriosPage() {
     void load();
   }, [filtrosAplicados, paginaAtual]);
 
-  const cardBg = isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-slate-200";
-  const softCard = isDark ? "bg-zinc-950/70 border-zinc-800" : "bg-slate-50 border-slate-200";
-  const titleText = isDark ? "text-zinc-50" : "text-slate-900";
-  const mutedText = isDark ? "text-zinc-400" : "text-slate-500";
+  const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
+  const softCard = isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200";
+  const titleText = isDark ? "text-slate-50" : "text-slate-900";
+  const mutedText = isDark ? "text-slate-400" : "text-slate-500";
   const inputBg = isDark
-    ? "border-zinc-700 bg-zinc-950 text-zinc-100"
+    ? "border-slate-700 bg-slate-950 text-slate-100"
     : "border-slate-200 bg-slate-50 text-slate-900";
   const primaryButton = isDark
-    ? "bg-zinc-100 text-zinc-950 hover:bg-white"
+    ? "bg-slate-100 text-slate-950 hover:bg-white"
     : "bg-slate-950 text-white hover:bg-slate-800";
   const secondaryButton = isDark
-    ? "border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+    ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100";
-  const tableHead = isDark ? "bg-zinc-950 text-zinc-300" : "bg-slate-100 text-slate-600";
-  const rowHover = isDark ? "hover:bg-zinc-950/80" : "hover:bg-slate-50";
+  const tableHead = isDark ? "bg-slate-950 text-slate-300" : "bg-slate-100 text-slate-600";
+  const rowHover = isDark ? "hover:bg-slate-950/80" : "hover:bg-slate-50";
 
   function aplicarFiltros() {
     setFiltrosAplicados({ ...filtros });
@@ -199,9 +202,9 @@ export default function RelatoriosPage() {
         />
       </section>
 
-      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading}>
         <div className="mb-6 flex items-start gap-3">
-          <div className="rounded-2xl bg-slate-950 p-3 text-white dark:bg-zinc-100 dark:text-zinc-950">
+          <div className="rounded-2xl bg-slate-950 p-3 text-white dark:bg-slate-100 dark:text-slate-950">
             <FileText className="h-5 w-5" />
           </div>
           <div>
@@ -212,7 +215,11 @@ export default function RelatoriosPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <p id={filtrosHintId} className={`mb-4 text-sm ${mutedText}`}>
+          Ajuste os filtros, gere o relatório e use os botões de exportação quando o resultado estiver carregado.
+        </p>
+
+        <div className="grid gap-4 lg:grid-cols-2" aria-describedby={filtrosHintId}>
           <label className="block">
             <span className={`mb-2 block text-sm font-medium ${titleText}`}>Tipo de Relatório</span>
             <select
@@ -387,12 +394,14 @@ export default function RelatoriosPage() {
               ? "border-red-900 bg-red-950 text-red-300"
               : "border-red-200 bg-red-50 text-red-700"
           }`}
+          role="alert"
+          aria-live="assertive"
         >
           {erro}
         </div>
       )}
 
-      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading}>
         <div className="mb-5">
           <h3 className={`text-2xl font-semibold ${titleText}`}>{reportDefinition.title}</h3>
           <p className={`mt-1 text-sm ${mutedText}`}>
@@ -413,13 +422,16 @@ export default function RelatoriosPage() {
           <ResumoCard label="Canceladas" value={resumo.canceladas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-zinc-800">
+        <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-sm">
+              <caption id={tabelaCaptionId} className="sr-only">
+                Tabela do relatório atual com as colunas e linhas retornadas para os filtros aplicados.
+              </caption>
               <thead className={tableHead}>
                 <tr>
                   {reportDefinition.columns.map((column) => (
-                    <th key={column.key} className="p-4 text-left font-semibold">
+                    <th key={column.key} scope="col" className="p-4 text-left font-semibold">
                       {column.label}
                     </th>
                   ))}
@@ -444,13 +456,19 @@ export default function RelatoriosPage() {
                   reportDefinition.rows.map((row, index) => (
                     <tr
                       key={`${index}-${row[reportDefinition.columns[0]?.key] ?? "linha"}`}
-                      className={`border-t border-slate-200 transition dark:border-zinc-800 ${rowHover}`}
+                      className={`border-t border-slate-200 transition dark:border-slate-800 ${rowHover}`}
                     >
-                      {reportDefinition.columns.map((column) => (
-                        <td key={column.key} className="p-4">
-                          {row[column.key] ?? "-"}
-                        </td>
-                      ))}
+                      {reportDefinition.columns.map((column, columnIndex) =>
+                        columnIndex === 0 ? (
+                          <th key={column.key} scope="row" className="p-4 text-left font-medium">
+                            {row[column.key] ?? "-"}
+                          </th>
+                        ) : (
+                          <td key={column.key} className="p-4">
+                            {row[column.key] ?? "-"}
+                          </td>
+                        )
+                      )}
                     </tr>
                   ))
                 )}
@@ -465,7 +483,10 @@ export default function RelatoriosPage() {
         </div>
 
         {reportPagination.lastPage > 1 && (
-          <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 text-sm dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 text-sm dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"
+            aria-label="Paginação do relatório"
+          >
             <p className={mutedText}>
               Página {reportPagination.page} de {reportPagination.lastPage}
             </p>
@@ -493,10 +514,14 @@ export default function RelatoriosPage() {
         )}
       </section>
 
-      <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+      <section
+        className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}
+        aria-describedby={atividadeHintId}
+        aria-busy={loading}
+      >
         <div className="mb-5">
           <h3 className={`text-2xl font-semibold ${titleText}`}>Atividade recente</h3>
-          <p className={`mt-1 text-sm ${mutedText}`}>
+          <p id={atividadeHintId} className={`mt-1 text-sm ${mutedText}`}>
             Últimas ordens de serviço atualizadas conforme os filtros aplicados.
           </p>
         </div>

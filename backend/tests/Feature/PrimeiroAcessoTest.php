@@ -49,8 +49,8 @@ class PrimeiroAcessoTest extends TestCase
 
         $response = $this->postJson('/api/v1/me/alterar-senha', [
             'current_password' => 'Temp123!',
-            'password' => 'NovaSenha123!',
-            'password_confirmation' => 'NovaSenha123!',
+            'password' => 'Forte!789',
+            'password_confirmation' => 'Forte!789',
         ]);
 
         $response
@@ -61,7 +61,7 @@ class PrimeiroAcessoTest extends TestCase
         $user->refresh();
 
         $this->assertFalse($user->must_change_password);
-        $this->assertTrue(Hash::check('NovaSenha123!', $user->password));
+        $this->assertTrue(Hash::check('Forte!789', $user->password));
 
         $acessoSistema = $this->getJson('/api/v1/ordens-servico');
         $acessoSistema->assertOk();

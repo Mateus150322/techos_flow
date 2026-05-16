@@ -1,18 +1,17 @@
-import type { ReactNode } from "react";
-import { LogOut, Moon, Sun } from "lucide-react";
+import { LogOut } from "lucide-react";
+
+import { BrandMark } from "@/shared/components/BrandMark";
+import { ThemeToggle } from "@/shared/components/ThemeToggle";
 
 type Props = {
   headerBg: string;
   titleText: string;
   mutedText: string;
   buttonSecondary: string;
-  isDark: boolean;
-  onToggleTheme: () => void;
   onLogout: () => void | Promise<void>;
   userName: string;
   roleLabel: string;
   subtitle: string;
-  icon: ReactNode;
 };
 
 export function PainelOperacionalHeader({
@@ -20,24 +19,22 @@ export function PainelOperacionalHeader({
   titleText,
   mutedText,
   buttonSecondary,
-  isDark,
-  onToggleTheme,
   onLogout,
   userName,
   roleLabel,
   subtitle,
-  icon,
 }: Props) {
   return (
-    <header className={`border-b ${headerBg}`}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white">
-            {icon}
-          </div>
+    <header className={headerBg}>
+      <a href="#conteudo-principal" className="app-skip-link">
+        Pular para o conteúdo principal
+      </a>
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-3 py-4 sm:px-4 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <BrandMark className="h-11 w-11 rounded-xl shadow-sm ring-1 ring-white/10 sm:h-12 sm:w-12" />
 
           <div>
-            <h1 className={`text-2xl font-semibold ${titleText}`}>TechOS Flow</h1>
+            <h1 className={`text-xl font-semibold sm:text-2xl ${titleText}`}>TechOS Flow</h1>
             <p className={`text-sm ${mutedText}`}>{subtitle}</p>
           </div>
         </div>
@@ -48,19 +45,13 @@ export function PainelOperacionalHeader({
             <p className={`text-sm ${mutedText}`}>{roleLabel}</p>
           </div>
 
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            className={`inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm transition ${buttonSecondary}`}
-          >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {isDark ? "Modo claro" : "Modo escuro"}
-          </button>
+          <ThemeToggle />
 
           <button
             type="button"
             onClick={() => void onLogout()}
-            className={`inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm transition ${buttonSecondary}`}
+            aria-label="Sair do sistema"
+            className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm transition sm:w-auto ${buttonSecondary}`}
           >
             <LogOut className="h-4 w-4" />
             Sair

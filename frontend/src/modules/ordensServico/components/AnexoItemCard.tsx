@@ -14,43 +14,35 @@ type Props = {
   enderecoReferencia?: string;
 };
 
-function getClasses(variant: "page" | "modal", isDark: boolean) {
+function getClasses(variant: "page" | "modal") {
   if (variant === "modal") {
     return {
-      outer:
-        "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700",
-      link: "mt-1 block break-all text-blue-600 hover:underline",
-      fallback: "mt-1 break-all text-slate-500",
-      geoCard:
-        "mt-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-slate-600",
-      mapLink: "inline-block text-blue-600 hover:underline",
+      outer: "app-card-soft rounded-2xl px-4 py-3 text-sm text-[var(--text-main)]",
+      link: "mt-1 block break-all text-[var(--primary)] hover:underline",
+      fallback: "app-muted mt-1 break-all",
+      geoCard: "app-card mt-3 rounded-xl px-3 py-3 text-[var(--text-main)]",
+      mapLink: "inline-block text-[var(--primary)] hover:underline",
+      innerTag: "app-card-soft rounded-xl px-3 py-3",
     };
   }
 
   return {
-    outer: `rounded-lg border px-3 py-3 text-sm ${
-      isDark
-        ? "border-slate-800 bg-slate-950 text-slate-200"
-        : "border-slate-200 bg-slate-50 text-slate-700"
-    }`,
-    link: "text-blue-600 hover:underline",
-    fallback: isDark ? "text-slate-400" : "text-slate-500",
-    geoCard: `mt-3 rounded-xl border px-3 py-3 text-sm ${
-      isDark
-        ? "border-slate-800 bg-slate-950 text-slate-300"
-        : "border-slate-200 bg-slate-50 text-slate-700"
-    }`,
-    mapLink: "inline-block text-blue-600 hover:underline",
+    outer: "app-card-soft rounded-lg px-3 py-3 text-sm text-[var(--text-main)]",
+    link: "text-[var(--primary)] hover:underline",
+    fallback: "app-muted",
+    geoCard: "app-card mt-3 rounded-xl px-3 py-3 text-sm text-[var(--text-main)]",
+    mapLink: "inline-block text-[var(--primary)] hover:underline",
+    innerTag: "app-card-soft rounded-xl px-3 py-3",
   };
 }
 
 function GeoInfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+      <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">
         {label}
       </p>
-      <p className="mt-1 text-sm">{value}</p>
+      <p className="mt-1 text-sm text-[var(--text-main)]">{value}</p>
     </div>
   );
 }
@@ -64,7 +56,8 @@ export function AnexoItemCard({
 }: Props) {
   const [baixandoArquivo, setBaixandoArquivo] = useState(false);
   const [erroArquivo, setErroArquivo] = useState("");
-  const classes = getClasses(variant, isDark);
+  void isDark;
+  const classes = getClasses(variant);
   const Wrapper = wrapper;
   const fileLabel = anexo.nome_arquivo || anexo.id;
 
@@ -111,7 +104,7 @@ export function AnexoItemCard({
 
   return (
     <Wrapper className={classes.outer}>
-      <p className="font-medium">{anexo.tipo || "Arquivo"}</p>
+      <p className="font-medium text-[var(--text-main)]">{anexo.tipo || "Arquivo"}</p>
 
       {anexo.id ? (
         <button
@@ -133,27 +126,21 @@ export function AnexoItemCard({
         <p className={classes.fallback}>{anexo.nome_arquivo || "-"}</p>
       )}
 
-      {erroArquivo ? <p className="mt-2 text-xs text-red-600">{erroArquivo}</p> : null}
+      {erroArquivo ? <p className="mt-2 text-xs text-[var(--danger)]">{erroArquivo}</p> : null}
 
       {typeof anexo.latitude === "number" && typeof anexo.longitude === "number" && (
         <div className={classes.geoCard}>
           <div className="flex items-start gap-2">
-            <MapPin className="mt-0.5 h-4 w-4 text-blue-600" />
+            <MapPin className="mt-0.5 h-4 w-4 text-[var(--primary)]" />
             <div className="space-y-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Geolocalização da evidência
+              <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">
+                Geolocalizacao da evidencia
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
+                <GeoInfoItem label="Latitude" value={formatarCoordenada(anexo.latitude)} />
+                <GeoInfoItem label="Longitude" value={formatarCoordenada(anexo.longitude)} />
                 <GeoInfoItem
-                  label="Latitude"
-                  value={formatarCoordenada(anexo.latitude)}
-                />
-                <GeoInfoItem
-                  label="Longitude"
-                  value={formatarCoordenada(anexo.longitude)}
-                />
-                <GeoInfoItem
-                  label="Precisão"
+                  label="Precisao"
                   value={
                     typeof anexo.precisao_metros === "number"
                       ? `${Math.round(anexo.precisao_metros)} m`
@@ -170,21 +157,21 @@ export function AnexoItemCard({
                 />
               </div>
               {anexo.endereco_capturado && (
-                <div className="rounded-xl border border-slate-200/70 bg-white/70 px-3 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Referência
+                <div className={classes.innerTag}>
+                  <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">
+                    Referencia
                   </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm">
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-main)]">
                     {anexo.endereco_capturado}
                   </p>
                 </div>
               )}
               {enderecoReferencia ? (
-                <div className="rounded-xl border border-slate-200/70 bg-white/70 px-3 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Endereço da OS
+                <div className={classes.innerTag}>
+                  <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">
+                    Endereco da OS
                   </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm">
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-main)]">
                     {enderecoReferencia}
                   </p>
                 </div>

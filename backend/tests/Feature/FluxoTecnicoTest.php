@@ -193,6 +193,60 @@ class FluxoTecnicoTest extends TestCase
             ->once();
     }
 
+    public function test_administrador_pode_exportar_pdf_detalhado_da_os(): void
+    {
+        $admin = $this->criarUsuario('administrador');
+        $tecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnico->id);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->get("/api/v1/ordens-servico/{$os->id}/relatorio/pdf");
+
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'application/pdf',
+            (string) $response->headers->get('content-type')
+        );
+        $this->assertStringContainsString(
+            'attachment;',
+            (string) $response->headers->get('content-disposition')
+        );
+        $this->assertStringStartsWith('%PDF-', (string) $response->getContent());
+    }
+
+    public function test_tecnico_responsavel_pode_exportar_pdf_detalhado_da_propria_os(): void
+    {
+        $tecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnico->id);
+
+        Sanctum::actingAs($tecnico);
+
+        $response = $this->get("/api/v1/ordens-servico/{$os->id}/relatorio/pdf");
+
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'application/pdf',
+            (string) $response->headers->get('content-type')
+        );
+        $this->assertStringStartsWith('%PDF-', (string) $response->getContent());
+    }
+
+    public function test_tecnico_nao_pode_exportar_pdf_detalhado_de_os_de_outro_tecnico(): void
+    {
+        $tecnicoResponsavel = $this->criarUsuario('tecnico');
+        $outroTecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnicoResponsavel->id);
+
+        Sanctum::actingAs($outroTecnico);
+
+        $response = $this->getJson("/api/v1/ordens-servico/{$os->id}/relatorio/pdf");
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Acesso negado ao relatório solicitado.');
+    }
+
     public function test_rota_privada_consegue_ler_anexo_legado_do_disco_publico(): void
     {
         Storage::fake('local');
@@ -240,6 +294,67 @@ class FluxoTecnicoTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('data.0.id', $os->id);
+    }
+
+    public function test_tecnico_lista_apenas_os_sem_responsavel_ou_da_propria_responsabilidade(): void
+    {
+        $tecnico = $this->criarUsuario('tecnico');
+        $outroTecnico = $this->criarUsuario('tecnico');
+
+        $osSemResponsavel = $this->criarOs(null, [
+            'numero' => '2026-000101',
+            'status' => 'aberta',
+        ]);
+        $osDoTecnico = $this->criarOs($tecnico->id, [
+            'numero' => '2026-000102',
+            'status' => 'em_execucao',
+        ]);
+        $this->criarOs($outroTecnico->id, [
+            'numero' => '2026-000103',
+            'status' => 'aberta',
+        ]);
+
+        Sanctum::actingAs($tecnico);
+
+        $response = $this->getJson('/api/v1/ordens-servico');
+
+        $response
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonFragment(['id' => $osSemResponsavel->id])
+            ->assertJsonFragment(['id' => $osDoTecnico->id])
+            ->assertJsonMissing(['numero' => '2026-000103']);
+    }
+
+    public function test_tecnico_nao_pode_visualizar_detalhe_de_os_atribuida_a_outro_tecnico(): void
+    {
+        $tecnicoResponsavel = $this->criarUsuario('tecnico');
+        $outroTecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnicoResponsavel->id);
+
+        Sanctum::actingAs($outroTecnico);
+
+        $response = $this->getJson("/api/v1/ordens-servico/{$os->id}");
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Acesso negado a esta ordem de serviço.');
+    }
+
+    public function test_tecnico_pode_visualizar_detalhe_de_os_aberta_sem_responsavel(): void
+    {
+        $tecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs(null, [
+            'status' => 'aberta',
+        ]);
+
+        Sanctum::actingAs($tecnico);
+
+        $response = $this->getJson("/api/v1/ordens-servico/{$os->id}");
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('id', $os->id);
     }
 
     public function test_tecnico_nao_pode_criar_os_geral(): void

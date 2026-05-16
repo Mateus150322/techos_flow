@@ -4,29 +4,26 @@ type Props = {
   titulo: string;
   valor: number;
   icone: ReactNode;
-  cardBg: string;
-  cardAccent: string;
-  mutedText: string;
-  titleText: string;
 };
 
-export function ResumoMetricaCard({
-  titulo,
-  valor,
-  icone,
-  cardBg,
-  cardAccent,
-  mutedText,
-  titleText,
-}: Props) {
+export function ResumoMetricaCard({ titulo, valor, icone }: Props) {
   return (
-    <div className={`rounded-2xl border p-5 shadow-sm ${cardBg}`}>
-      <div className={`rounded-2xl p-4 ${cardAccent}`}>
-        <div className="flex items-center justify-between">
-          <span className={`text-sm ${mutedText}`}>{titulo}</span>
-          {icone}
+    <div className="app-card rounded-[1.5rem] p-3 transition sm:rounded-[1.75rem] sm:p-4">
+      <div className="app-card-soft rounded-[1.2rem] p-3 sm:rounded-[1.35rem] sm:p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <span className="app-muted text-xs font-semibold uppercase tracking-[0.14em]">
+              {titulo}
+            </span>
+            <p className="text-2xl font-bold leading-none text-[var(--primary-dark)] dark:text-[var(--primary-light)] sm:text-3xl">
+              {valor}
+            </p>
+          </div>
+
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--primary)] shadow-sm sm:h-11 sm:w-11">
+            {icone}
+          </div>
         </div>
-        <p className={`mt-3 text-3xl font-bold ${titleText}`}>{valor}</p>
       </div>
     </div>
   );

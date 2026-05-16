@@ -1,4 +1,4 @@
-import { LockKeyhole, LogOut, ShieldCheck } from "lucide-react";
+import { LockKeyhole, LogOut } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -7,11 +7,17 @@ import {
   getDefaultRouteForRole,
   useCurrentUser,
 } from "@/shared/auth/session";
+import { BrandMark } from "@/shared/components/BrandMark";
 import { useTheme } from "@/shared/hooks/useTheme";
 import {
   getApiErrorMessage,
   getFirstApiValidationMessage,
 } from "@/shared/utils/apiError";
+import {
+  getFirstPasswordPolicyError,
+  getPasswordRequirements,
+  isStrongPassword,
+} from "@/shared/utils/passwordPolicy";
 
 export default function PrimeiroAcessoPage() {
   const navigate = useNavigate();
@@ -35,22 +41,31 @@ export default function PrimeiroAcessoPage() {
     : "border-slate-300 bg-slate-50 text-slate-900 placeholder:text-slate-400";
 
   const requisitos = useMemo(
-    () => [
-      { label: "Pelo menos 8 caracteres", ok: password.length >= 8 },
-      { label: "Uma letra maiúscula", ok: /[A-Z]/.test(password) },
-      { label: "Uma letra minúscula", ok: /[a-z]/.test(password) },
-      { label: "Um número", ok: /[0-9]/.test(password) },
-      { label: "Um caractere especial", ok: /[^A-Za-z0-9]/.test(password) },
-      {
-        label: "Confirmação igual à nova senha",
-        ok: password.length > 0 && password === passwordConfirmation,
-      },
-    ],
-    [password, passwordConfirmation]
+    () =>
+      getPasswordRequirements(password, {
+        name: currentUser.name,
+        email: currentUser.email,
+        currentPassword,
+        confirmation: passwordConfirmation,
+      }),
+    [currentPassword, currentUser.email, currentUser.name, password, passwordConfirmation]
   );
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+
+    const passwordError = getFirstPasswordPolicyError(password, {
+      name: currentUser.name,
+      email: currentUser.email,
+      currentPassword,
+      confirmation: passwordConfirmation,
+    });
+
+    if (passwordError) {
+      setErro(`Senha inválida: ${passwordError}.`);
+      setSucesso("");
+      return;
+    }
 
     try {
       setLoading(true);
@@ -95,9 +110,7 @@ export default function PrimeiroAcessoPage() {
           <div className="grid w-full max-w-5xl gap-6 lg:grid-cols-[0.95fr_1.05fr]">
             <section className={`rounded-3xl border p-8 shadow-sm ${panelBg}`}>
               <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white">
-                  <ShieldCheck className="h-7 w-7" />
-                </div>
+                <BrandMark className="h-14 w-14 rounded-2xl shadow-sm" />
 
                 <div>
                   <h1 className={`text-3xl font-semibold ${titleText}`}>Primeiro acesso</h1>
@@ -116,15 +129,15 @@ export default function PrimeiroAcessoPage() {
               >
                 <p className="font-medium">{currentUser.name}</p>
                 <p className="mt-1">
-                  Troque a senha temporária agora. Esse passo é obrigatório só no primeiro acesso
-                  ou quando a senha for redefinida por um administrador.
+                  Troque a senha temporária agora. Esse passo é obrigatório só no
+                  primeiro acesso ou quando a senha for redefinida por um administrador.
                 </p>
               </div>
 
               <div className="mt-6 space-y-3">
                 {requisitos.map((requisito) => (
                   <div
-                    key={requisito.label}
+                    key={requisito.id}
                     className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${
                       requisito.ok
                         ? isDark
@@ -154,7 +167,7 @@ export default function PrimeiroAcessoPage() {
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4" aria-busy={loading}>
                 <label className="block">
                   <span className={`mb-2 block text-sm font-medium ${titleText}`}>
                     Senha atual
@@ -164,7 +177,9 @@ export default function PrimeiroAcessoPage() {
                       className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${mutedText}`}
                     />
                     <input
+                      id="primeiro-acesso-senha-atual"
                       type="password"
+                      autoComplete="current-password"
                       placeholder="Digite a senha temporária"
                       className={`w-full rounded-xl border py-3 pl-11 pr-4 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
                       value={currentPassword}
@@ -182,7 +197,9 @@ export default function PrimeiroAcessoPage() {
                       className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${mutedText}`}
                     />
                     <input
+                      id="primeiro-acesso-nova-senha"
                       type="password"
+                      autoComplete="new-password"
                       placeholder="Digite a nova senha"
                       className={`w-full rounded-xl border py-3 pl-11 pr-4 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
                       value={password}
@@ -200,7 +217,9 @@ export default function PrimeiroAcessoPage() {
                       className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${mutedText}`}
                     />
                     <input
+                      id="primeiro-acesso-confirmacao"
                       type="password"
+                      autoComplete="new-password"
                       placeholder="Repita a nova senha"
                       className={`w-full rounded-xl border py-3 pl-11 pr-4 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
                       value={passwordConfirmation}
@@ -211,6 +230,8 @@ export default function PrimeiroAcessoPage() {
 
                 {erro ? (
                   <div
+                    role="alert"
+                    aria-live="assertive"
                     className={`rounded-xl border px-4 py-3 text-sm ${
                       isDark
                         ? "border-red-900 bg-red-950 text-red-300"
@@ -223,6 +244,8 @@ export default function PrimeiroAcessoPage() {
 
                 {sucesso ? (
                   <div
+                    role="status"
+                    aria-live="polite"
                     className={`rounded-xl border px-4 py-3 text-sm ${
                       isDark
                         ? "border-emerald-900 bg-emerald-950 text-emerald-300"
@@ -257,6 +280,19 @@ export default function PrimeiroAcessoPage() {
                   </button>
                 </div>
               </form>
+
+              {password ? (
+                <p className={`mt-4 text-xs ${mutedText}`}>
+                  {isStrongPassword(password, {
+                    name: currentUser.name,
+                    email: currentUser.email,
+                    currentPassword,
+                    confirmation: passwordConfirmation,
+                  })
+                    ? "Senha forte pronta para uso."
+                    : "Revise os requisitos antes de salvar."}
+                </p>
+              ) : null}
             </section>
           </div>
         </div>

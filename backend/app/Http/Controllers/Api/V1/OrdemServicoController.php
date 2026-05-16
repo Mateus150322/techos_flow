@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Concerns\EnsuresTecnicoResponsavel;
 use App\Http\Controllers\Controller;
 use App\Models\Endereco;
 use App\Models\OrdemServico;
+use App\Models\User;
 use App\Support\Concerns\UsesCaseInsensitiveLike;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
@@ -25,6 +26,7 @@ class OrdemServicoController extends Controller
             'nome_cliente' => 'required|string|max:255',
             'prioridade' => 'required|integer|in:1,2,3',
             'descricao' => 'required|string',
+            'data_abertura' => 'nullable|date',
 
             'endereco.logradouro' => 'required|string|max:255',
             'endereco.numero' => 'required|string|max:50',
@@ -70,6 +72,7 @@ class OrdemServicoController extends Controller
                         'nome_cliente' => $data['nome_cliente'],
                         'descricao' => $data['descricao'],
                         'prioridade' => $data['prioridade'],
+                        'data_abertura' => $data['data_abertura'] ?? now(),
                         'endereco_id' => $endereco->id,
                         'criada_por_id' => $user->id,
                         'tecnico_responsavel_id' => $user->role === 'tecnico' ? $user->id : null,
@@ -93,6 +96,7 @@ class OrdemServicoController extends Controller
     public function index(Request $request)
     {
         $data = $this->validateListFilters($request);
+        $user = $request->user();
 
         $perPage = $data['per_page'] ?? 15;
         $sort = $data['sort'] ?? 'data_abertura';
@@ -114,6 +118,7 @@ class OrdemServicoController extends Controller
         }
 
         $this->applyListFilters($query, $data);
+        $this->applyVisibilityScope($query, $user);
 
         $query->orderBy($sort, $dir);
 
@@ -128,6 +133,7 @@ class OrdemServicoController extends Controller
         $query = OrdemServico::query();
 
         $this->applyListFilters($query, $data);
+        $this->applyVisibilityScope($query, $request->user());
 
         return response()->json([
             'total' => (clone $query)->count(),
@@ -140,10 +146,13 @@ class OrdemServicoController extends Controller
         ]);
     }
 
-    public function filterOptions()
+    public function filterOptions(Request $request)
     {
+        $query = OrdemServico::query();
+        $this->applyVisibilityScope($query, $request->user());
+
         return response()->json([
-            'tipos' => OrdemServico::query()
+            'tipos' => $query
                 ->whereNotNull('tipo')
                 ->orderBy('tipo')
                 ->pluck('tipo')
@@ -158,6 +167,7 @@ class OrdemServicoController extends Controller
         $data = $request->validate([
             'include' => 'nullable|string',
         ]);
+        $user = $request->user();
 
         $include = collect(explode(',', $data['include'] ?? ''))
             ->map(fn ($value) => trim($value))
@@ -182,6 +192,12 @@ class OrdemServicoController extends Controller
         }
 
         $os = $query->where('id', $id)->firstOrFail();
+
+        if (! $this->canViewOrdemServico($user, $os)) {
+            return response()->json([
+                'message' => 'Acesso negado a esta ordem de serviço.',
+            ], 403);
+        }
 
         return response()->json($os);
     }
@@ -339,5 +355,34 @@ class OrdemServicoController extends Controller
                     });
             });
         }
+    }
+
+    private function applyVisibilityScope(Builder $query, User $user): void
+    {
+        if ($user->role !== 'tecnico') {
+            return;
+        }
+
+        $query->where(function (Builder $builder) use ($user) {
+            $builder
+                ->where(function (Builder $openBuilder) {
+                    $openBuilder
+                        ->where('status', 'aberta')
+                        ->whereNull('tecnico_responsavel_id');
+                })
+                ->orWhere('tecnico_responsavel_id', $user->id);
+        });
+    }
+
+    private function canViewOrdemServico(User $user, OrdemServico $ordemServico): bool
+    {
+        if ($user->role !== 'tecnico') {
+            return true;
+        }
+
+        return (
+            $ordemServico->status === 'aberta'
+            && ! $ordemServico->tecnico_responsavel_id
+        ) || $ordemServico->tecnico_responsavel_id === $user->id;
     }
 }

@@ -2,9 +2,12 @@
 
 namespace App\Services\Relatorios;
 
+use App\Models\Anexo;
+use App\Models\ExecucaoFuncionario;
 use App\Models\OrdemServico;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
 class OrdemServicoRelatorioService
@@ -44,6 +47,9 @@ class OrdemServicoRelatorioService
         $statusResumo = $this->buildStatusResumo($resumo);
         $produtividadeTecnicos = $this->buildProdutividadeTecnicos($baseQuery);
         $tiposMaisFrequentes = $this->buildTiposMaisFrequentes($baseQuery, $resumo['total']);
+        $metricasOperacionais = $this->buildMetricasOperacionais($baseQuery);
+        $resumoTiposStatus = $this->buildResumoTiposStatus($baseQuery);
+        $resumoTecnicosOperacional = $this->buildResumoTecnicosOperacional($baseQuery);
         [$reportDefinition, $reportPagination] = $this->buildReportDefinition(
             $tipoRelatorio,
             $baseQuery,
@@ -61,6 +67,9 @@ class OrdemServicoRelatorioService
             'statusResumo' => $statusResumo,
             'produtividadeTecnicos' => $produtividadeTecnicos,
             'tiposMaisFrequentes' => $tiposMaisFrequentes,
+            'metricasOperacionais' => $metricasOperacionais,
+            'resumoTiposStatus' => $resumoTiposStatus,
+            'resumoTecnicosOperacional' => $resumoTecnicosOperacional,
             'reportDefinition' => $reportDefinition,
             'reportPagination' => $reportPagination,
             'atividadeRecente' => (clone $baseQuery)
@@ -140,7 +149,7 @@ class OrdemServicoRelatorioService
         ])->map(fn (array $item) => [
             ...$item,
             'percentual' => $resumo['total'] > 0
-                ? (int) round(($item['quantidade'] / $resumo['total']) * 100)
+                ? round(($item['quantidade'] / $resumo['total']) * 100, 2)
                 : 0,
         ])->values()->all();
     }
@@ -166,6 +175,87 @@ class OrdemServicoRelatorioService
                 'iniciadas' => (int) $row->iniciadas,
                 'finalizadas' => (int) $row->finalizadas,
                 'naoExecutadas' => (int) $row->naoExecutadas,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function buildMetricasOperacionais(Builder $baseQuery): array
+    {
+        $fotosAnexadas = Anexo::query()
+            ->where('tipo', 'foto')
+            ->whereIn('os_id', (clone $baseQuery)->select('ordem_servicos.id'))
+            ->count();
+
+        $horasExtrasMinutos = (int) ExecucaoFuncionario::query()
+            ->join('execucoes', 'execucoes.id', '=', 'execucao_funcionarios.execucao_id')
+            ->join('ordem_servicos', 'ordem_servicos.id', '=', 'execucoes.os_id')
+            ->whereIn('ordem_servicos.id', (clone $baseQuery)->select('ordem_servicos.id'))
+            ->sum(DB::raw('COALESCE(execucao_funcionarios.minutos_extras_50, 0) + COALESCE(execucao_funcionarios.minutos_extras_100, 0)'));
+
+        return [
+            'fotosAnexadas' => (int) $fotosAnexadas,
+            'horasExtrasMinutos' => $horasExtrasMinutos,
+            'horasExtrasFormatadas' => $this->formatarMinutos($horasExtrasMinutos),
+        ];
+    }
+
+    private function buildResumoTiposStatus(Builder $baseQuery): array
+    {
+        return (clone $baseQuery)
+            ->selectRaw('tipo, status, COUNT(*) as quantidade')
+            ->groupBy('tipo', 'status')
+            ->get()
+            ->groupBy('tipo')
+            ->map(function (Collection $items, string $tipo) {
+                $statusMap = $items
+                    ->pluck('quantidade', 'status')
+                    ->map(fn (mixed $value) => (int) $value);
+
+                $abertas = $statusMap->get('aberta', 0);
+                $emExecucao = $statusMap->get('em_execucao', 0);
+                $finalizadas = $statusMap->get('finalizada', 0);
+                $naoExecutadas = $statusMap->get('nao_executada', 0);
+                $canceladas = $statusMap->get('cancelada', 0);
+
+                return [
+                    'tipo' => $tipo,
+                    'abertas' => $abertas,
+                    'emExecucao' => $emExecucao,
+                    'finalizadas' => $finalizadas,
+                    'naoExecutadas' => $naoExecutadas,
+                    'canceladas' => $canceladas,
+                    'total' => $abertas + $emExecucao + $finalizadas + $naoExecutadas + $canceladas,
+                ];
+            })
+            ->sortByDesc('total')
+            ->values()
+            ->all();
+    }
+
+    private function buildResumoTecnicosOperacional(Builder $baseQuery): array
+    {
+        return ExecucaoFuncionario::query()
+            ->join('execucoes', 'execucoes.id', '=', 'execucao_funcionarios.execucao_id')
+            ->join('ordem_servicos', 'ordem_servicos.id', '=', 'execucoes.os_id')
+            ->join('users as funcionarios', 'funcionarios.id', '=', 'execucao_funcionarios.funcionario_id')
+            ->where('funcionarios.role', 'tecnico')
+            ->whereIn('ordem_servicos.id', (clone $baseQuery)->select('ordem_servicos.id'))
+            ->selectRaw("
+                funcionarios.name as tecnico,
+                COUNT(DISTINCT CASE WHEN ordem_servicos.status = 'finalizada' THEN ordem_servicos.id END) as os_finalizadas,
+                COALESCE(SUM(execucao_funcionarios.minutos_trabalhados), 0) as minutos_trabalhados,
+                COALESCE(SUM(COALESCE(execucao_funcionarios.minutos_extras_50, 0) + COALESCE(execucao_funcionarios.minutos_extras_100, 0)), 0) as minutos_extras
+            ")
+            ->groupBy('funcionarios.id', 'funcionarios.name')
+            ->orderByDesc('os_finalizadas')
+            ->orderBy('funcionarios.name')
+            ->get()
+            ->map(fn (object $row) => [
+                'tecnico' => (string) $row->tecnico,
+                'osFinalizadas' => (int) $row->os_finalizadas,
+                'horasTrabalhadas' => $this->formatarMinutos((int) $row->minutos_trabalhados),
+                'horasExtras' => $this->formatarMinutos((int) $row->minutos_extras),
             ])
             ->values()
             ->all();
@@ -548,5 +638,13 @@ class OrdemServicoRelatorioService
         }
 
         return rtrim(mb_substr($texto, 0, 117)) . '...';
+    }
+
+    private function formatarMinutos(int $minutos): string
+    {
+        $horas = intdiv($minutos, 60);
+        $resto = $minutos % 60;
+
+        return sprintf('%dh%02d', $horas, $resto);
     }
 }

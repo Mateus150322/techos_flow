@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\Concerns\UsesCaseInsensitiveLike;
+use App\Support\Security\PasswordPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -85,15 +86,22 @@ class UsuarioController extends Controller
                 'name' => ['required', 'string', 'max:255'],
                 'email' => ['required', 'email', 'max:255', 'unique:users,email'],
                 'role' => ['required', Rule::in(['administrador', 'tecnico', 'atendente'])],
-                'password' => $this->passwordRules(required: true),
+                'valor_hora' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+                'password' => PasswordPolicy::rules(
+                    required: true,
+                    confirmed: true,
+                    name: (string) $request->input('name'),
+                    email: (string) $request->input('email'),
+                ),
             ],
-            $this->passwordValidationMessages()
+            PasswordPolicy::messages()
         );
 
         $user = User::query()->create([
             'name' => $data['name'],
             'email' => $data['email'],
             'role' => $data['role'],
+            'valor_hora' => $data['valor_hora'] ?? null,
             'password' => Hash::make($data['password']),
             'is_active' => true,
             'must_change_password' => true,
@@ -122,10 +130,16 @@ class UsuarioController extends Controller
                     Rule::unique('users', 'email')->ignore($user->id),
                 ],
                 'role' => ['sometimes', 'required', Rule::in(['administrador', 'tecnico', 'atendente'])],
-                'password' => $this->passwordRules(required: false),
+                'valor_hora' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999999.99'],
+                'password' => PasswordPolicy::rules(
+                    required: false,
+                    confirmed: true,
+                    name: (string) $request->input('name', $user->name),
+                    email: (string) $request->input('email', $user->email),
+                ),
                 'is_active' => ['sometimes', 'boolean'],
             ],
-            $this->passwordValidationMessages()
+            PasswordPolicy::messages()
         );
 
         if (array_key_exists('password', $data) && blank($data['password'])) {
@@ -166,29 +180,5 @@ class UsuarioController extends Controller
         $user->update($data);
 
         return response()->json($user->fresh());
-    }
-
-    private function passwordRules(bool $required): array
-    {
-        return array_filter([
-            $required ? 'required' : 'nullable',
-            'string',
-            'min:8',
-            'max:255',
-            'regex:/[a-z]/',
-            'regex:/[A-Z]/',
-            'regex:/[0-9]/',
-            'regex:/[^A-Za-z0-9]/',
-        ]);
-    }
-
-    private function passwordValidationMessages(): array
-    {
-        return [
-            'password.required' => 'Informe a senha.',
-            'password.min' => 'A senha deve ter pelo menos 8 caracteres.',
-            'password.max' => 'A senha deve ter no máximo 255 caracteres.',
-            'password.regex' => 'A senha deve conter letra maiúscula, letra minúscula, número e caractere especial.',
-        ];
     }
 }

@@ -8,6 +8,7 @@ use App\Services\Relatorios\RelatorioExportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Spatie\LaravelPdf\PdfBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RelatorioController extends Controller
@@ -36,7 +37,7 @@ class RelatorioController extends Controller
         string $format,
         OrdemServicoRelatorioService $relatorioService,
         RelatorioExportService $exportService
-    ): Response|StreamedResponse {
+    ): Response|StreamedResponse|PdfBuilder {
         $filters = $this->validatedFilters($request);
 
         if ($format === 'csv') {
@@ -53,6 +54,11 @@ class RelatorioController extends Controller
         $exportService->ensureExportWithinLimits($format, $previewPayload['reportPagination']['total']);
 
         $payload = $relatorioService->buildPayload($filters, true);
+
+        if ($format === 'pdf') {
+            return $exportService->buildPdf($payload, $request->user()?->name ?? 'Sistema');
+        }
+
         $exported = $exportService->export($format, $payload, $request->user()?->name ?? 'Sistema');
 
         return response($exported['content'], 200, [

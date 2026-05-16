@@ -1,0 +1,10 @@
+_pdf_test.html
+_pdf_test.pdf
+_inspect_docx.ps1
+tmp_*.docx
+out/
+
+# Artefatos acadêmicos / TCC
+docs/TCC*
+docs/tcc_media/
+docs/_tmp_*

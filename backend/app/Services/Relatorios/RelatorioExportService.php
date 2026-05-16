@@ -3,6 +3,8 @@
 namespace App\Services\Relatorios;
 
 use Illuminate\Support\Str;
+use Spatie\LaravelPdf\Facades\Pdf;
+use Spatie\LaravelPdf\PdfBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RelatorioExportService
@@ -24,7 +26,7 @@ class RelatorioExportService
                 'fileName' => $this->buildExportFileName($payload['reportDefinition']['title'], 'xlsx'),
             ],
             'pdf' => [
-                'content' => $this->buildPdfContent($payload, $responsavelEmissao),
+                'content' => $this->buildPdf($payload, $responsavelEmissao)->generatePdfContent(),
                 'contentType' => 'application/pdf',
                 'fileName' => $this->buildExportFileName($payload['reportDefinition']['title'], 'pdf'),
             ],
@@ -71,6 +73,28 @@ class RelatorioExportService
             $this->buildExportFileName($reportTitle, 'csv'),
             ['Content-Type' => 'text/csv; charset=UTF-8']
         );
+    }
+
+    public function buildPdf(array $payload, string $responsavelEmissao): PdfBuilder
+    {
+        $title = (string) $payload['reportDefinition']['title'];
+
+        return Pdf::view('pdf.relatorios.ordens-servico', [
+            'payload' => $payload,
+            'responsavelEmissao' => $responsavelEmissao,
+        ])
+            ->driver('dompdf')
+            ->landscape()
+            ->format('a4')
+            ->margins(10, 10, 14, 10)
+            ->meta(
+                title: $title,
+                author: 'TechOS Flow',
+                subject: $title,
+                creator: 'TechOS Flow'
+            )
+            ->name($this->buildExportFileName($title, 'pdf'))
+            ->download();
     }
 
     private function buildExportFileName(string $reportTitle, string $format): string
@@ -209,123 +233,6 @@ class RelatorioExportService
                 [26, 14, 14]
             ),
         ]);
-    }
-
-    private function buildPdfContent(array $payload, string $responsavelEmissao): string
-    {
-        $summaryLines = [
-            'Resumo',
-            sprintf(
-                'Total: %d | Abertas: %d | Em execução: %d',
-                $payload['resumo']['total'],
-                $payload['resumo']['abertas'],
-                $payload['resumo']['emExecucao']
-            ),
-            sprintf(
-                'Finalizadas: %d | Não executadas: %d | Canceladas: %d',
-                $payload['resumo']['finalizadas'],
-                $payload['resumo']['naoExecutadas'],
-                $payload['resumo']['canceladas']
-            ),
-        ];
-        $observacoesFinais = [
-            'Relatório gerado automaticamente pelo TechOS Flow para apoio gerencial.',
-            'Os dados apresentados refletem os filtros aplicados e o estado atual das ordens de serviço.',
-            'Para fins de auditoria interna, recomenda-se anexar este documento ao processo administrativo correspondente.',
-        ];
-
-        $tableLines = $this->buildPdfTableLines($payload['reportDefinition']);
-        $pages = [];
-        $pageNumber = 1;
-        [$content, $cursorY] = $this->startPdfPage(
-            $payload['reportDefinition']['title'],
-            $payload['dataEmissao'],
-            $payload['periodoDescricao'],
-            $payload['filtrosDescricao'],
-            $summaryLines,
-            true,
-            $pageNumber
-        );
-
-        foreach ($tableLines as $line) {
-            if ($cursorY < 52) {
-                $pages[] = $content;
-                $pageNumber++;
-                [$content, $cursorY] = $this->startPdfPage(
-                    $payload['reportDefinition']['title'],
-                    $payload['dataEmissao'],
-                    $payload['periodoDescricao'],
-                    $payload['filtrosDescricao'],
-                    $summaryLines,
-                    false,
-                    $pageNumber
-                );
-            }
-
-            $this->appendPdfLine($content, $cursorY, $line, 'F2', 8, 40, 11);
-        }
-
-        if ($cursorY < 170) {
-            $pages[] = $content;
-            $pageNumber++;
-            [$content, $cursorY] = $this->startPdfPage(
-                $payload['reportDefinition']['title'],
-                $payload['dataEmissao'],
-                $payload['periodoDescricao'],
-                $payload['filtrosDescricao'],
-                $summaryLines,
-                false,
-                $pageNumber
-            );
-        }
-
-        $this->appendPdfDivider($content, $cursorY + 4);
-        $this->appendPdfLine($content, $cursorY, 'Observações finais', 'F1', 12, 40, 18);
-
-        foreach ($observacoesFinais as $observacao) {
-            $this->appendPdfLine($content, $cursorY, $observacao, 'F1', 10, 40, 14);
-        }
-
-        $this->appendPdfLine(
-            $content,
-            $cursorY,
-            'Total de registros: ' . count($payload['reportDefinition']['rows']),
-            'F1',
-            10,
-            40,
-            16
-        );
-        $this->appendPdfLine(
-            $content,
-            $cursorY,
-            'Responsável pela emissão: ' . $responsavelEmissao,
-            'F1',
-            10,
-            40,
-            16
-        );
-        $this->appendPdfLine(
-            $content,
-            $cursorY,
-            'Assinatura/validação: ________________________________________________',
-            'F1',
-            10,
-            40,
-            18
-        );
-        $this->appendPdfLine(
-            $content,
-            $cursorY,
-            'Documento destinado ao acompanhamento institucional das ordens de serviço.',
-            'F1',
-            9,
-            40,
-            12
-        );
-
-        $pages[] = $content;
-
-        return $this->assemblePdfDocument($pages);
     }
 
     private function buildXlsxContentTypesXml(): string
@@ -569,337 +476,6 @@ XML;
         return [$dosTime, $dosDate];
     }
 
-    private function buildPdfTableLines(array $reportDefinition): array
-    {
-        if ($reportDefinition['columns'] === []) {
-            return ['Nenhum dado encontrado para os filtros aplicados.'];
-        }
-
-        $availableChars = 148;
-        $separatorSize = (count($reportDefinition['columns']) - 1) * 3;
-        $columnBudget = max($availableChars - $separatorSize, count($reportDefinition['columns']) * 6);
-        $preferredWidths = [];
-
-        foreach ($reportDefinition['columns'] as $column) {
-            $maxLength = strlen($column['label']);
-
-            foreach ($reportDefinition['rows'] as $row) {
-                $maxLength = max(
-                    $maxLength,
-                    strlen($this->sanitizeTextValue($row[$column['key']] ?? ''))
-                );
-            }
-
-            $preferredWidths[] = min(max($maxLength, 8), $this->columnWidthCap($column['key']));
-        }
-
-        $scaledWidths = $this->scaleColumnWidths($preferredWidths, $columnBudget);
-        $header = [];
-
-        foreach ($reportDefinition['columns'] as $index => $column) {
-            $header[] = $this->padPdfCell($column['label'], $scaledWidths[$index]);
-        }
-
-        $lines = [implode(' | ', $header), str_repeat('-', $availableChars)];
-
-        if ($reportDefinition['rows'] === []) {
-            $lines[] = 'Nenhum dado encontrado para os filtros aplicados.';
-
-            return $lines;
-        }
-
-        foreach ($reportDefinition['rows'] as $row) {
-            $wrappedCells = [];
-            $maxLines = 1;
-
-            foreach ($reportDefinition['columns'] as $index => $column) {
-                $wrappedCells[$index] = $this->wrapPdfCell(
-                    $this->sanitizeTextValue($row[$column['key']] ?? ''),
-                    $scaledWidths[$index]
-                );
-                $maxLines = max($maxLines, count($wrappedCells[$index]));
-            }
-
-            for ($lineIndex = 0; $lineIndex < $maxLines; $lineIndex++) {
-                $lineCells = [];
-
-                foreach ($reportDefinition['columns'] as $index => $column) {
-                    $lineCells[] = $this->padPdfCell(
-                        $wrappedCells[$index][$lineIndex] ?? '',
-                        $scaledWidths[$index]
-                    );
-                }
-
-                $lines[] = implode(' | ', $lineCells);
-            }
-        }
-
-        return $lines;
-    }
-
-    private function columnWidthCap(string $columnKey): int
-    {
-        return match ($columnKey) {
-            'observacoes' => 30,
-            'clienteLocal', 'responsavel' => 18,
-            'tipo' => 16,
-            'status', 'prioridade' => 14,
-            default => 12,
-        };
-    }
-
-    private function scaleColumnWidths(array $preferredWidths, int $budget): array
-    {
-        $count = count($preferredWidths);
-
-        if ($count === 0) {
-            return [];
-        }
-
-        $minimumWidths = array_fill(0, $count, 6);
-        $sumPreferred = array_sum($preferredWidths);
-
-        if ($sumPreferred <= $budget) {
-            return $preferredWidths;
-        }
-
-        $remainingBudget = $budget - array_sum($minimumWidths);
-        $extraPreferred = array_map(
-            fn (int $width, int $index) => max($width - $minimumWidths[$index], 0),
-            $preferredWidths,
-            array_keys($preferredWidths)
-        );
-        $extraTotal = max(array_sum($extraPreferred), 1);
-        $scaled = $minimumWidths;
-        $fractions = [];
-        $allocated = array_sum($minimumWidths);
-
-        foreach ($preferredWidths as $index => $width) {
-            $portion = ($extraPreferred[$index] / $extraTotal) * $remainingBudget;
-            $whole = (int) floor($portion);
-            $scaled[$index] += $whole;
-            $fractions[$index] = $portion - $whole;
-            $allocated += $whole;
-        }
-
-        $leftover = $budget - $allocated;
-
-        arsort($fractions);
-
-        foreach (array_keys($fractions) as $index) {
-            if ($leftover <= 0) {
-                break;
-            }
-
-            $scaled[$index]++;
-            $leftover--;
-        }
-
-        return $scaled;
-    }
-
-    private function wrapPdfCell(string $text, int $width): array
-    {
-        $clean = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
-
-        if ($clean === '') {
-            return [''];
-        }
-
-        $words = preg_split('/\s+/u', $clean) ?: [];
-        $lines = [];
-        $current = '';
-
-        foreach ($words as $word) {
-            if (strlen($word) > $width) {
-                if ($current !== '') {
-                    $lines[] = $current;
-                    $current = '';
-                }
-
-                foreach (str_split($word, $width) as $part) {
-                    $lines[] = $part;
-                }
-
-                continue;
-            }
-
-            $candidate = $current === '' ? $word : "{$current} {$word}";
-
-            if (strlen($candidate) <= $width) {
-                $current = $candidate;
-                continue;
-            }
-
-            $lines[] = $current;
-            $current = $word;
-        }
-
-        if ($current !== '') {
-            $lines[] = $current;
-        }
-
-        return $lines === [] ? [''] : $lines;
-    }
-
-    private function padPdfCell(string $text, int $width): string
-    {
-        $trimmed = substr($text, 0, $width);
-
-        return str_pad($trimmed, $width);
-    }
-
-    private function startPdfPage(
-        string $title,
-        string $dataEmissao,
-        string $periodoDescricao,
-        string $filtrosDescricao,
-        array $summaryLines,
-        bool $firstPage,
-        int $pageNumber
-    ): array {
-        $content = '';
-        $cursorY = 560.0;
-
-        $this->appendPdfLine($content, $cursorY, 'TechOS Flow', 'F1', 18, 40, 24);
-        $this->appendPdfLine($content, $cursorY, 'Relatório administrativo institucional', 'F1', 10, 40, 14);
-        $this->appendPdfLine($content, $cursorY, $title, 'F1', 14, 40, 18);
-        $this->appendPdfLine($content, $cursorY, "Data de emissão: {$dataEmissao}", 'F1', 10, 40, 14);
-        $this->appendPdfLine($content, $cursorY, "Período: {$periodoDescricao}", 'F1', 10, 40, 14);
-        $this->appendPdfLine($content, $cursorY, "Filtros aplicados: {$filtrosDescricao}", 'F1', 10, 40, 14);
-        $this->appendPdfDivider($content, $cursorY + 2);
-        $this->appendPdfFooter($content, $pageNumber);
-        $this->appendPdfLine($content, $cursorY, '', 'F1', 10, 40, 10);
-
-        if ($firstPage) {
-            foreach ($summaryLines as $lineIndex => $line) {
-                $this->appendPdfLine(
-                    $content,
-                    $cursorY,
-                    $line,
-                    'F1',
-                    $lineIndex === 0 ? 12 : 10,
-                    40,
-                    $lineIndex === 0 ? 16 : 14
-                );
-            }
-
-            $this->appendPdfLine($content, $cursorY, '', 'F1', 10, 40, 10);
-            $this->appendPdfLine($content, $cursorY, 'Detalhamento', 'F1', 12, 40, 16);
-        } else {
-            $this->appendPdfLine($content, $cursorY, 'Detalhamento (continuação)', 'F1', 12, 40, 16);
-        }
-
-        $this->appendPdfDivider($content, $cursorY + 2);
-        $this->appendPdfLine($content, $cursorY, '', 'F1', 10, 40, 10);
-
-        return [$content, $cursorY];
-    }
-
-    private function appendPdfLine(
-        string &$content,
-        float &$cursorY,
-        string $text,
-        string $font,
-        int $fontSize,
-        float $x,
-        float $lineHeight
-    ): void {
-        $content .= sprintf(
-            "BT /%s %d Tf 1 0 0 1 %.2F %.2F Tm (%s) Tj ET\n",
-            $font,
-            $fontSize,
-            $x,
-            $cursorY,
-            $this->escapePdfText($text)
-        );
-        $cursorY -= $lineHeight;
-    }
-
-    private function appendPdfDivider(string &$content, float $y): void
-    {
-        $content .= sprintf("%.2F w 40 %.2F m 802 %.2F l S\n", 0.7, $y, $y);
-    }
-
-    private function appendPdfFooter(string &$content, int $pageNumber): void
-    {
-        $this->appendPdfDivider($content, 34);
-        $content .= sprintf(
-            "BT /F1 9 Tf 1 0 0 1 40 20 Tm (%s) Tj ET\n",
-            $this->escapePdfText('TechOS Flow | Documento administrativo interno')
-        );
-        $content .= sprintf(
-            "BT /F1 9 Tf 1 0 0 1 690 20 Tm (%s) Tj ET\n",
-            $this->escapePdfText("Página {$pageNumber}")
-        );
-    }
-
-    private function escapePdfText(string $text): string
-    {
-        $encoded = iconv('UTF-8', 'windows-1252//TRANSLIT//IGNORE', $this->sanitizeTextValue($text));
-
-        if ($encoded === false) {
-            $encoded = $this->sanitizeTextValue($text);
-        }
-
-        return str_replace(
-            ['\\', '(', ')', "\r", "\n"],
-            ['\\\\', '\(', '\)', '', ' '],
-            $encoded
-        );
-    }
-
-    private function assemblePdfDocument(array $pageContents): string
-    {
-        $objects = [
-            1 => '<< /Type /Catalog /Pages 2 0 R >>',
-            3 => '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-            4 => '<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>',
-        ];
-
-        $pageRefs = [];
-        $nextObject = 5;
-
-        foreach ($pageContents as $pageContent) {
-            $contentObject = $nextObject++;
-            $pageObject = $nextObject++;
-            $pageRefs[] = "{$pageObject} 0 R";
-
-            $objects[$contentObject] = "<< /Length " . strlen($pageContent) . " >>\nstream\n{$pageContent}endstream";
-            $objects[$pageObject] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] '
-                . '/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> '
-                . "/Contents {$contentObject} 0 R >>";
-        }
-
-        $objects[2] = '<< /Type /Pages /Count ' . count($pageRefs) . ' /Kids [ ' . implode(' ', $pageRefs) . ' ] >>';
-
-        ksort($objects);
-
-        $pdf = "%PDF-1.4\n";
-        $offsets = [0];
-
-        foreach ($objects as $index => $object) {
-            $offsets[$index] = strlen($pdf);
-            $pdf .= "{$index} 0 obj\n{$object}\nendobj\n";
-        }
-
-        $xrefOffset = strlen($pdf);
-        $objectCount = max(array_keys($objects));
-
-        $pdf .= "xref\n0 " . ($objectCount + 1) . "\n";
-        $pdf .= "0000000000 65535 f \n";
-
-        for ($i = 1; $i <= $objectCount; $i++) {
-            $offset = $offsets[$i] ?? 0;
-            $pdf .= str_pad((string) $offset, 10, '0', STR_PAD_LEFT) . " 00000 n \n";
-        }
-
-        $pdf .= "trailer << /Size " . ($objectCount + 1) . " /Root 1 0 R >>\n";
-        $pdf .= "startxref\n{$xrefOffset}\n%%EOF";
-
-        return $pdf;
-    }
-
     private function sanitizeTextValue(mixed $value): string
     {
         $text = (string) $value;
@@ -915,4 +491,3 @@ XML;
         return preg_replace('/[^\P{C}\t\n\r]/u', '', $text) ?? $text;
     }
 }
-

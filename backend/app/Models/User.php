@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\ResetPasswordLinkNotification;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -28,6 +29,7 @@ class User extends Authenticatable
         'role',
         'is_active',
         'must_change_password',
+        'valor_hora',
     ];
 
     protected $hidden = [
@@ -39,10 +41,21 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'is_active' => 'boolean',
         'must_change_password' => 'boolean',
+        'valor_hora' => 'decimal:2',
     ];
 
     public function ordensCriadas()
     {
         return $this->hasMany(OrdemServico::class, 'criada_por_id');
+    }
+
+    public function execucoesComoFuncionario()
+    {
+        return $this->hasMany(ExecucaoFuncionario::class, 'funcionario_id');
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordLinkNotification($token));
     }
 }

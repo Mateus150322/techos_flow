@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Security\PasswordPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -31,11 +32,18 @@ class AuthController extends Controller
             ], 403);
         }
 
+        $user->tokens()->delete();
+
         $token = $user->createToken('auth_token')->plainTextToken;
+        $expirationMinutes = (int) config('sanctum.expiration', 0);
+        $tokenExpiresAt = $expirationMinutes > 0
+            ? now()->addMinutes($expirationMinutes)->toIso8601String()
+            : null;
 
         return response()->json([
             'user' => $user,
             'token' => $token,
+            'token_expires_at' => $tokenExpiresAt,
         ]);
     }
 
@@ -55,15 +63,26 @@ class AuthController extends Controller
 
     public function changePassword(Request $request): JsonResponse
     {
+        $user = $request->user();
+
         $data = $request->validate(
             [
                 'current_password' => ['required', 'string'],
-                'password' => $this->passwordRules(required: true, confirmed: true),
+                'password' => PasswordPolicy::rules(
+                    required: true,
+                    confirmed: true,
+                    differentFromField: 'current_password',
+                    name: $user?->name,
+                    email: $user?->email,
+                ),
             ],
-            $this->passwordValidationMessages()
+            array_merge(
+                PasswordPolicy::messages(label: 'nova senha'),
+                [
+                    'current_password.required' => 'Informe a senha atual.',
+                ],
+            )
         );
-
-        $user = $request->user();
 
         if (! Hash::check($data['current_password'], $user->password)) {
             return response()->json([
@@ -83,34 +102,5 @@ class AuthController extends Controller
             'message' => 'Senha atualizada com sucesso.',
             'user' => $user->fresh(),
         ]);
-    }
-
-    private function passwordRules(bool $required, bool $confirmed = false): array
-    {
-        return array_filter([
-            $required ? 'required' : 'nullable',
-            'string',
-            'min:8',
-            'max:255',
-            'different:current_password',
-            'regex:/[a-z]/',
-            'regex:/[A-Z]/',
-            'regex:/[0-9]/',
-            'regex:/[^A-Za-z0-9]/',
-            $confirmed ? 'confirmed' : null,
-        ]);
-    }
-
-    private function passwordValidationMessages(): array
-    {
-        return [
-            'password.required' => 'Informe a nova senha.',
-            'password.confirmed' => 'A confirmação da nova senha não confere.',
-            'password.min' => 'A nova senha deve ter pelo menos 8 caracteres.',
-            'password.max' => 'A nova senha deve ter no máximo 255 caracteres.',
-            'password.different' => 'A nova senha deve ser diferente da senha atual.',
-            'password.regex' => 'A nova senha deve conter letra maiúscula, letra minúscula, número e caractere especial.',
-            'current_password.required' => 'Informe a senha atual.',
-        ];
     }
 }

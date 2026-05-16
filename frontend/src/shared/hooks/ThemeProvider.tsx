@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   ThemeContext,
+  THEME_STORAGE_KEY,
   applyTheme,
   getInitialTheme,
   type AppTheme,
@@ -11,13 +12,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<AppTheme>(getInitialTheme);
 
   useEffect(() => {
-    window.localStorage.setItem("theme", theme);
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
     applyTheme(theme);
   }, [theme]);
 
   useEffect(() => {
     function handleStorage(event: StorageEvent) {
-      if (event.key === "theme" && (event.newValue === "light" || event.newValue === "dark")) {
+      if (
+        event.key === THEME_STORAGE_KEY &&
+        (event.newValue === "light" || event.newValue === "dark")
+      ) {
         setTheme(event.newValue);
       }
     }

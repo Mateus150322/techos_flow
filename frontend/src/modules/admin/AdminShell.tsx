@@ -5,49 +5,39 @@ import {
   ClipboardList,
   FileText,
   LogOut,
-  Moon,
-  Sun,
   Users,
-  Wrench,
 } from "lucide-react";
 
 import { logout as logoutSession } from "@/modules/auth/auth.service";
+import { BrandMark } from "@/shared/components/BrandMark";
+import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { type CurrentUser } from "@/shared/auth/session";
 import { useTheme } from "@/shared/hooks/useTheme";
 
 type AdminShellProps = {
   currentUser: CurrentUser;
-  activeTab: "indicadores" | "ordens" | "relatorios" | "usuarios";
+  activeTab: "indicadores" | "ordens" | "relatorios" | "horas_extras" | "usuarios";
   children: ReactNode;
 };
 
-export function AdminShell({
-  currentUser,
-  activeTab,
-  children,
-}: AdminShellProps) {
+export function AdminShell({ currentUser, activeTab, children }: AdminShellProps) {
   const navigate = useNavigate();
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark } = useTheme();
 
   async function handleLogout() {
     await logoutSession();
     navigate("/login");
   }
 
-  const pageBg = isDark ? "bg-zinc-950 text-zinc-100" : "bg-slate-50 text-slate-900";
-  const panelBg = isDark ? "border-zinc-800 bg-zinc-900" : "border-slate-200 bg-white";
-  const softBg = isDark ? "bg-zinc-950/80" : "bg-slate-100";
-  const titleText = isDark ? "text-zinc-50" : "text-slate-900";
-  const mutedText = isDark ? "text-zinc-400" : "text-slate-500";
-  const buttonSecondary = isDark
-    ? "border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
-    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100";
-  const tabActive = isDark
-    ? "bg-zinc-100 text-zinc-950 shadow-sm"
-    : "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200";
-  const tabInactive = isDark
-    ? "text-zinc-300 hover:bg-zinc-800"
-    : "text-slate-700 hover:bg-white";
+  const pageBg = "app-page";
+  const panelBg = "app-header-shell";
+  const softBg = "app-nav-shell";
+  const titleText = isDark ? "text-slate-50" : "text-white";
+  const mutedText = isDark ? "text-slate-400" : "text-slate-100/80";
+  const buttonSecondary =
+    "app-button-outline inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition";
+  const tabActive = "app-tab-active";
+  const tabInactive = "app-tab-inactive";
 
   const tabs = [
     {
@@ -64,13 +54,19 @@ export function AdminShell({
     },
     {
       key: "relatorios",
-      label: "Relatórios",
+      label: "Relatorios",
       icon: FileText,
       to: "/admin/relatorios",
     },
     {
+      key: "horas_extras",
+      label: "Horas Extras",
+      icon: ClipboardList,
+      to: "/admin/horas-extras",
+    },
+    {
       key: "usuarios",
-      label: "Usuários",
+      label: "Usuarios",
       icon: Users,
       to: "/admin/usuarios",
     },
@@ -78,31 +74,27 @@ export function AdminShell({
 
   return (
     <div className={`min-h-screen ${pageBg}`}>
-      <div className="mx-auto max-w-7xl px-4 py-6">
-        <header className={`mb-5 rounded-3xl border px-6 py-5 shadow-sm ${panelBg}`}>
+      <a href="#conteudo-principal" className="app-skip-link">
+        Pular para o conteúdo principal
+      </a>
+      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
+        <header className={`mb-4 px-4 py-4 sm:mb-5 sm:px-6 sm:py-5 ${panelBg}`}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
-                <Wrench className="h-6 w-6" />
-              </div>
+            <div className="flex items-center gap-3 sm:gap-4">
+              <BrandMark className="h-11 w-11 rounded-2xl shadow-sm ring-1 ring-white/10 sm:h-12 sm:w-12" />
 
               <div>
-                <h1 className={`text-2xl font-semibold ${titleText}`}>TechOS Flow</h1>
-                <p className={`text-sm ${mutedText}`}>Sistema de Gerenciamento de OS</p>
+                <h1 className={`text-xl font-semibold sm:text-2xl ${titleText}`}>TechOS Flow</h1>
+                <p className={`text-sm ${mutedText}`}>Painel administrativo do sistema</p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition ${buttonSecondary}`}
-              >
-                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                {isDark ? "Modo claro" : "Modo escuro"}
-              </button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              <div className="order-1 flex gap-3">
+                <ThemeToggle />
+              </div>
 
-              <div className="text-right">
+              <div className="order-3 text-left sm:order-2 sm:text-right">
                 <p className={`text-sm font-medium ${titleText}`}>{currentUser.name}</p>
                 <p className={`text-sm ${mutedText}`}>Administrador</p>
               </div>
@@ -110,7 +102,7 @@ export function AdminShell({
               <button
                 type="button"
                 onClick={() => void handleLogout()}
-                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition ${buttonSecondary}`}
+                className={`order-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm transition sm:order-3 sm:w-auto ${buttonSecondary}`}
               >
                 <LogOut className="h-4 w-4" />
                 Sair
@@ -119,27 +111,32 @@ export function AdminShell({
           </div>
         </header>
 
-        <nav className={`mb-6 inline-flex flex-wrap gap-1 rounded-2xl p-1 ${softBg}`}>
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
+        <nav className="app-touch-scroll mb-5 overflow-x-auto pb-1" aria-label="Navegação administrativa">
+          <div className={`${softBg} flex min-w-max flex-nowrap gap-1`}>
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
 
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => navigate(tab.to)}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition ${
-                  activeTab === tab.key ? tabActive : tabInactive
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => navigate(tab.to)}
+                  aria-current={activeTab === tab.key ? "page" : undefined}
+                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition ${
+                    activeTab === tab.key ? tabActive : tabInactive
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </nav>
 
-        {children}
+        <main id="conteudo-principal" tabIndex={-1}>
+          {children}
+        </main>
       </div>
     </div>
   );

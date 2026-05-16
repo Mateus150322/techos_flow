@@ -1,9 +1,15 @@
 import axios from "axios";
-import { getStoredToken } from "@/shared/auth/session";
+import { clearSession, getStoredToken } from "@/shared/auth/session";
+
+const configuredApiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(
+  /\/+$/,
+  ""
+);
 
 const apiBaseUrl =
-  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, "") ||
-  "http://backend-flow.test/api/v1";
+  configuredApiBaseUrl && configuredApiBaseUrl.length > 0
+    ? configuredApiBaseUrl
+    : "/api/v1";
 
 const api = axios.create({
   baseURL: apiBaseUrl,
@@ -21,6 +27,21 @@ api.interceptors.request.use((config) => {
 
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const requestUrl = String(error?.config?.url ?? "");
+    const hasToken = Boolean(getStoredToken());
+
+    if (hasToken && status === 401 && !requestUrl.includes("/login")) {
+      clearSession();
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export default api;
 export { api };

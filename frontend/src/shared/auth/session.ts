@@ -12,6 +12,7 @@ export type CurrentUser = {
 
 const TOKEN_STORAGE_KEY = "token";
 const USER_STORAGE_KEY = "user";
+const TOKEN_EXPIRES_AT_STORAGE_KEY = "token_expires_at";
 const SESSION_VALIDATED_AT_STORAGE_KEY = "session_validated_at";
 const SESSION_EVENT_NAME = "techosflow:session-changed";
 const SESSION_VALIDATION_TTL_MS = 60_000;
@@ -25,7 +26,31 @@ export function getDefaultRouteForRole(role: UserRole) {
 }
 
 export function getStoredToken() {
-  return localStorage.getItem(TOKEN_STORAGE_KEY);
+  const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+
+  if (!token) {
+    return null;
+  }
+
+  const expiresAt = localStorage.getItem(TOKEN_EXPIRES_AT_STORAGE_KEY);
+
+  if (!expiresAt) {
+    return token;
+  }
+
+  const expiresAtTimestamp = Date.parse(expiresAt);
+
+  if (!Number.isFinite(expiresAtTimestamp)) {
+    localStorage.removeItem(TOKEN_EXPIRES_AT_STORAGE_KEY);
+    return token;
+  }
+
+  if (Date.now() >= expiresAtTimestamp) {
+    clearSession();
+    return null;
+  }
+
+  return token;
 }
 
 function parseStoredUser(raw: string | null, fallbackRole: UserRole = "atendente"): CurrentUser {
@@ -108,9 +133,16 @@ export function hasFreshSessionValidation(ttlMs = SESSION_VALIDATION_TTL_MS) {
   return Date.now() - validatedAt < ttlMs;
 }
 
-export function saveSession(token: string, user: CurrentUser) {
+export function saveSession(token: string, user: CurrentUser, tokenExpiresAt?: string | null) {
   localStorage.setItem(TOKEN_STORAGE_KEY, token);
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+
+  if (tokenExpiresAt) {
+    localStorage.setItem(TOKEN_EXPIRES_AT_STORAGE_KEY, tokenExpiresAt);
+  } else {
+    localStorage.removeItem(TOKEN_EXPIRES_AT_STORAGE_KEY);
+  }
+
   setSessionValidatedAt(Date.now());
   emitSessionChange();
 }
@@ -124,6 +156,7 @@ export function updateStoredUser(user: CurrentUser) {
 export function clearSession() {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
   localStorage.removeItem(USER_STORAGE_KEY);
+  localStorage.removeItem(TOKEN_EXPIRES_AT_STORAGE_KEY);
   clearSessionValidatedAt();
   emitSessionChange();
 }

@@ -9,6 +9,7 @@ export type UsuarioAdmin = {
   email: string;
   role: PerfilUsuario;
   is_active: boolean;
+  valor_hora?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -43,6 +44,8 @@ export type CriarUsuarioPayload = {
   email: string;
   role: PerfilUsuario;
   password: string;
+  password_confirmation: string;
+  valor_hora?: number;
 };
 
 export type AtualizarUsuarioPayload = {
@@ -50,7 +53,9 @@ export type AtualizarUsuarioPayload = {
   email?: string;
   role?: PerfilUsuario;
   password?: string;
+  password_confirmation?: string;
   is_active?: boolean;
+  valor_hora?: number | null;
 };
 
 export async function listarUsuarios(params?: ListarUsuariosParams) {

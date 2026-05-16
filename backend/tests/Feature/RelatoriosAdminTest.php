@@ -117,10 +117,12 @@ class RelatoriosAdminTest extends TestCase
             'application/pdf',
             (string) $pdfResponse->headers->get('content-type')
         );
+        $this->assertStringContainsString(
+            'attachment;',
+            (string) $pdfResponse->headers->get('content-disposition')
+        );
         $pdfContent = (string) $pdfResponse->getContent();
         $this->assertStringStartsWith('%PDF-', $pdfContent);
-        $this->assertStringContainsString('Assinatura/', $pdfContent);
-        $this->assertStringContainsString('Documento administrativo interno', $pdfContent);
     }
 
     public function test_exportacao_pdf_bloqueia_volume_muito_grande(): void

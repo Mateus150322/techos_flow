@@ -9,20 +9,25 @@ export type ThemeContextValue = {
   toggleTheme: () => void;
 };
 
+export const THEME_STORAGE_KEY = "techos-theme";
+const LEGACY_THEME_STORAGE_KEY = "theme";
+
 export const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function getInitialTheme(): AppTheme {
   if (typeof window === "undefined") {
-    return "dark";
+    return "light";
   }
 
-  const savedTheme = window.localStorage.getItem("theme");
+  const savedTheme =
+    window.localStorage.getItem(THEME_STORAGE_KEY) ??
+    window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
 
   if (savedTheme === "light" || savedTheme === "dark") {
     return savedTheme;
   }
 
-  return "dark";
+  return "light";
 }
 
 export function applyTheme(theme: AppTheme) {
@@ -36,7 +41,4 @@ export function applyTheme(theme: AppTheme) {
   root.classList.toggle("dark", isDark);
   root.setAttribute("data-theme", theme);
   root.style.colorScheme = theme;
-
-  document.body.style.backgroundColor = isDark ? "#020617" : "#f8fafc";
-  document.body.style.color = isDark ? "#f8fafc" : "#0f172a";
 }

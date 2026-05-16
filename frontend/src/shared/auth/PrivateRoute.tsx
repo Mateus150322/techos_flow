@@ -9,6 +9,7 @@ import {
   getStoredToken,
   hasFreshSessionValidation,
   useCurrentUser,
+  type UserRole,
 } from "./session";
 
 type RedirectState = {
@@ -16,7 +17,12 @@ type RedirectState = {
   authMessage?: string;
 };
 
-export default function PrivateRoute({ children }: { children: ReactNode }) {
+type PrivateRouteProps = {
+  children: ReactNode;
+  allowedRoles?: UserRole[];
+};
+
+export default function PrivateRoute({ children, allowedRoles }: PrivateRouteProps) {
   const location = useLocation();
   const token = getStoredToken();
   const currentUser = useCurrentUser();
@@ -88,7 +94,7 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-100">
-        <div className="text-sm text-zinc-400">Verificando sessao...</div>
+        <div className="text-sm text-zinc-400">Verificando sessão...</div>
       </div>
     );
   }
@@ -107,6 +113,10 @@ export default function PrivateRoute({ children }: { children: ReactNode }) {
   }
 
   if (!currentUser.must_change_password && location.pathname === "/primeiro-acesso") {
+    return <Navigate to={getDefaultRouteForRole(currentUser.role)} replace />;
+  }
+
+  if (allowedRoles?.length && !allowedRoles.includes(currentUser.role)) {
     return <Navigate to={getDefaultRouteForRole(currentUser.role)} replace />;
   }
 

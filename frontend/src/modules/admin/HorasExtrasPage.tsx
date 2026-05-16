@@ -1,0 +1,526 @@
+import { useEffect, useId, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
+import { CalendarRange, Download, FileDown, FileSpreadsheet, TimerReset, Users } from "lucide-react";
+
+import { AdminShell } from "./AdminShell";
+import { AdminMetricCard } from "./components/AdminMetricCard";
+import {
+  buscarRelatorioHorasExtras,
+  exportarRelatorioHorasExtras,
+  type HoraExtraExportFormat,
+  type HorasExtrasResponse,
+} from "./horasExtras.service";
+import { useCurrentUser } from "@/shared/auth/session";
+import { useTheme } from "@/shared/hooks/useTheme";
+import { getApiErrorMessage } from "@/shared/utils/apiError";
+
+const ROWS_PER_PAGE = 20;
+
+export default function HorasExtrasPage() {
+  const currentUser = useCurrentUser();
+  const { isDark } = useTheme();
+  const anoAtual = new Date().getFullYear();
+  const filtrosHintId = useId();
+  const tabelaCaptionId = useId();
+  const destaqueHintId = useId();
+
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [dados, setDados] = useState<HorasExtrasResponse | null>(null);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [exportandoFormato, setExportandoFormato] = useState<HoraExtraExportFormat | null>(null);
+  const [filtros, setFiltros] = useState({
+    funcionarioId: "todos",
+    dataInicio: "",
+    dataFim: "",
+    mes: "",
+    ano: String(anoAtual),
+  });
+  const [filtrosAplicados, setFiltrosAplicados] = useState({
+    funcionarioId: "todos",
+    dataInicio: "",
+    dataFim: "",
+    mes: "",
+    ano: String(anoAtual),
+  });
+
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+        setErro("");
+
+        const response = await buscarRelatorioHorasExtras({
+          funcionarioId:
+            filtrosAplicados.funcionarioId !== "todos" ? filtrosAplicados.funcionarioId : undefined,
+          dataInicio: filtrosAplicados.mes ? undefined : filtrosAplicados.dataInicio || undefined,
+          dataFim: filtrosAplicados.mes ? undefined : filtrosAplicados.dataFim || undefined,
+          mes: filtrosAplicados.mes || undefined,
+          ano: filtrosAplicados.mes ? filtrosAplicados.ano : undefined,
+          page: paginaAtual,
+          perPage: ROWS_PER_PAGE,
+        });
+
+        setDados(response);
+      } catch (error) {
+        setErro(getApiErrorMessage(error, "Não foi possível carregar o relatório de horas extras."));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void load();
+  }, [filtrosAplicados, paginaAtual]);
+
+  const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
+  const softCard = isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200";
+  const titleText = isDark ? "text-slate-50" : "text-slate-900";
+  const mutedText = isDark ? "text-slate-400" : "text-slate-500";
+  const inputBg = isDark
+    ? "border-slate-700 bg-slate-950 text-slate-100"
+    : "border-slate-200 bg-slate-50 text-slate-900";
+  const primaryButton = isDark
+    ? "bg-slate-100 text-slate-950 hover:bg-white"
+    : "bg-slate-950 text-white hover:bg-slate-800";
+  const secondaryButton = isDark
+    ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
+    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100";
+  const tableHead = isDark ? "bg-slate-950 text-slate-300" : "bg-slate-100 text-slate-600";
+  const rowHover = isDark ? "hover:bg-slate-950/80" : "hover:bg-slate-50";
+
+  const anosDisponiveis = useMemo(
+    () =>
+      Array.from({ length: 6 }, (_, index) => String(anoAtual - 3 + index)).sort((a, b) =>
+        a > b ? -1 : 1
+      ),
+    [anoAtual]
+  );
+
+  function aplicarFiltros() {
+    setPaginaAtual(1);
+    setFiltrosAplicados({ ...filtros });
+  }
+
+  async function handleExportar(formato: HoraExtraExportFormat) {
+    try {
+      setErro("");
+      setExportandoFormato(formato);
+
+      const { blob, fileName } = await exportarRelatorioHorasExtras(formato, {
+        funcionarioId:
+          filtrosAplicados.funcionarioId !== "todos" ? filtrosAplicados.funcionarioId : undefined,
+        dataInicio: filtrosAplicados.mes ? undefined : filtrosAplicados.dataInicio || undefined,
+        dataFim: filtrosAplicados.mes ? undefined : filtrosAplicados.dataFim || undefined,
+        mes: filtrosAplicados.mes || undefined,
+        ano: filtrosAplicados.mes ? filtrosAplicados.ano : undefined,
+      });
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setErro(getApiErrorMessage(error, "Não foi possível exportar o relatório de horas extras."));
+    } finally {
+      setExportandoFormato(null);
+    }
+  }
+
+  if (currentUser.role === "tecnico") {
+    return <Navigate to="/tecnico" replace />;
+  }
+
+  if (currentUser.role !== "administrador") {
+    return <Navigate to="/" replace />;
+  }
+
+  const resumo = dados?.resumo ?? {
+    total_funcionarios: 0,
+    total_horas_extras_50_minutos: 0,
+    total_horas_extras_50: "0h00",
+    total_horas_extras_100_minutos: 0,
+    total_horas_extras_100: "0h00",
+    total_extras_minutos: 0,
+    total_extras: "0h00",
+    total_horas_pagas_minutos: 0,
+    total_horas_pagas: "0h00",
+    total_horas_convertidas_folga_minutos: 0,
+    total_horas_convertidas_folga: "0h00",
+    total_dias_folga_gerados: 0,
+    saldo_total_banco_minutos: 0,
+    saldo_total_banco: "0h00",
+    total_estimado_financeiro: 0,
+  };
+
+  return (
+    <AdminShell currentUser={currentUser} activeTab="horas_extras">
+      <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard
+          value={resumo.total_extras}
+          label="Horas extras do período"
+          cardBg={cardBg}
+          titleText={titleText}
+          mutedText={mutedText}
+          accentClass="text-blue-500"
+          hint="Soma de 50% e 100%"
+        />
+        <AdminMetricCard
+          value={resumo.saldo_total_banco}
+          label="Saldo total banco"
+          cardBg={cardBg}
+          titleText={titleText}
+          mutedText={mutedText}
+          accentClass="text-amber-500"
+          hint="Horas remanescentes para folga"
+        />
+        <AdminMetricCard
+          value={resumo.total_dias_folga_gerados}
+          label="Dias de folga"
+          cardBg={cardBg}
+          titleText={titleText}
+          mutedText={mutedText}
+          accentClass="text-emerald-500"
+          hint="Dias gerados a partir do excedente"
+        />
+        <AdminMetricCard
+          value={`R$ ${resumo.total_estimado_financeiro.toFixed(2).replace(".", ",")}`}
+          label="Estimativa financeira"
+          cardBg={cardBg}
+          titleText={titleText}
+          mutedText={mutedText}
+          accentClass="text-violet-500"
+          hint="Valor estimado das horas pagas"
+        />
+      </section>
+
+      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading}>
+        <div className="mb-6 flex items-start gap-3">
+          <div className="rounded-2xl bg-slate-950 p-3 text-white dark:bg-slate-100 dark:text-slate-950">
+            <TimerReset className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className={`text-2xl font-semibold ${titleText}`}>Relatório de Horas Extras</h2>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              Acompanhe horas extras 50%, 100%, banco de folgas e estimativa financeira por funcionário.
+            </p>
+          </div>
+        </div>
+
+        <p id={filtrosHintId} className={`mb-4 text-sm ${mutedText}`}>
+          Filtre por funcionário, período ou mês e use os botões de exportação quando o resultado estiver carregado.
+        </p>
+
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-5" aria-describedby={filtrosHintId}>
+          <label className="block xl:col-span-2">
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Funcionário</span>
+            <select
+              value={filtros.funcionarioId}
+              onChange={(event) =>
+                setFiltros((prev) => ({ ...prev, funcionarioId: event.target.value }))
+              }
+              className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+            >
+              <option value="todos">Todos os funcionários</option>
+              {(dados?.funcionarios ?? []).map((funcionario) => (
+                <option key={funcionario.id} value={funcionario.id}>
+                  {funcionario.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Mês</span>
+            <select
+              value={filtros.mes}
+              onChange={(event) =>
+                setFiltros((prev) => ({ ...prev, mes: event.target.value, dataInicio: "", dataFim: "" }))
+              }
+              className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+            >
+              <option value="">Período livre</option>
+              {[
+                ["01", "Janeiro"],
+                ["02", "Fevereiro"],
+                ["03", "Março"],
+                ["04", "Abril"],
+                ["05", "Maio"],
+                ["06", "Junho"],
+                ["07", "Julho"],
+                ["08", "Agosto"],
+                ["09", "Setembro"],
+                ["10", "Outubro"],
+                ["11", "Novembro"],
+                ["12", "Dezembro"],
+              ].map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Ano</span>
+            <select
+              value={filtros.ano}
+              onChange={(event) => setFiltros((prev) => ({ ...prev, ano: event.target.value }))}
+              className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+            >
+              {anosDisponiveis.map((ano) => (
+                <option key={ano} value={ano}>
+                  {ano}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={aplicarFiltros}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium transition ${primaryButton}`}
+            >
+              <CalendarRange className="h-4 w-4" />
+              Aplicar filtros
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <label className="block">
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Data inicial</span>
+            <input
+              type="date"
+              value={filtros.dataInicio}
+              onChange={(event) =>
+                setFiltros((prev) => ({ ...prev, dataInicio: event.target.value, mes: "" }))
+              }
+              className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+            />
+          </label>
+
+          <label className="block">
+            <span className={`mb-2 block text-sm font-medium ${titleText}`}>Data final</span>
+            <input
+              type="date"
+              value={filtros.dataFim}
+              onChange={(event) =>
+                setFiltros((prev) => ({ ...prev, dataFim: event.target.value, mes: "" }))
+              }
+              className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+            />
+          </label>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <button
+            type="button"
+            disabled={!dados || exportandoFormato !== null}
+            onClick={() => void handleExportar("csv")}
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
+          >
+            <Download className="h-4 w-4" />
+            {exportandoFormato === "csv" ? "Exportando CSV..." : "Exportar CSV"}
+          </button>
+
+          <button
+            type="button"
+            disabled={!dados || exportandoFormato !== null}
+            onClick={() => void handleExportar("xlsx")}
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            {exportandoFormato === "xlsx" ? "Exportando Excel..." : "Exportar Excel"}
+          </button>
+
+          <button
+            type="button"
+            disabled={!dados || exportandoFormato !== null}
+            onClick={() => void handleExportar("pdf")}
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
+          >
+            <FileDown className="h-4 w-4" />
+            {exportandoFormato === "pdf" ? "Exportando PDF..." : "Exportar PDF"}
+          </button>
+        </div>
+      </section>
+
+      {erro ? (
+        <div
+          className={`mb-6 rounded-2xl border px-4 py-3 text-sm ${
+            isDark
+              ? "border-red-900 bg-red-950 text-red-300"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+          role="alert"
+          aria-live="assertive"
+        >
+          {erro}
+        </div>
+      ) : null}
+
+      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading}>
+        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className={`text-2xl font-semibold ${titleText}`}>Consolidado por funcionário</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              Período: {dados?.periodo_descricao ?? "-"} | Emissão: {dados?.data_emissao ?? "-"}
+            </p>
+          </div>
+
+          <div className={`rounded-2xl border px-4 py-3 text-sm ${softCard}`} aria-describedby={destaqueHintId}>
+            <p className={`font-medium ${titleText}`}>Funcionários com mais horas extras</p>
+            <p id={destaqueHintId} className="sr-only">
+              Lista resumida dos funcionários com maior volume de horas extras no período filtrado.
+            </p>
+            {(dados?.indicadores.top_funcionarios ?? []).length === 0 ? (
+              <p className={`mt-2 ${mutedText}`}>Sem destaques no período.</p>
+            ) : (
+              <ul className="mt-2 space-y-1">
+                {(dados?.indicadores.top_funcionarios ?? []).map((item) => (
+                  <li key={item.funcionario_id} className={`flex items-center justify-between gap-4 ${mutedText}`}>
+                    <span>{item.funcionario_nome}</span>
+                    <span className={titleText}>{item.total_extras}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1100px] text-sm">
+              <caption id={tabelaCaptionId} className="sr-only">
+                Consolidado por funcionário com horas extras de 50%, 100%, horas pagas, folga, saldo em banco e estimativa financeira.
+              </caption>
+              <thead className={tableHead}>
+                <tr>
+                  <th scope="col" className="p-4 text-left font-semibold">Funcionário</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Horas 50%</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Horas 100%</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Total extras</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Horas pagas</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Folga</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Dias de folga</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Saldo banco</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Estimativa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="p-6 text-center">
+                      <span className={mutedText}>Carregando relatório...</span>
+                    </td>
+                  </tr>
+                ) : (dados?.rows ?? []).length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-6 text-center">
+                      <span className={mutedText}>Nenhum lançamento encontrado para os filtros aplicados.</span>
+                    </td>
+                  </tr>
+                ) : (
+                  (dados?.rows ?? []).map((row) => (
+                    <tr
+                      key={row.funcionario_id}
+                      className={`border-t border-slate-200 transition dark:border-slate-800 ${rowHover}`}
+                    >
+                      <th scope="row" className="p-4 text-left font-medium">{row.funcionario_nome}</th>
+                      <td className="p-4">{row.horas_extras_50}</td>
+                      <td className="p-4">{row.horas_extras_100}</td>
+                      <td className="p-4">{row.total_extras}</td>
+                      <td className="p-4">{row.horas_pagas}</td>
+                      <td className="p-4">{row.horas_convertidas_folga}</td>
+                      <td className="p-4">{row.dias_folga_gerados}</td>
+                      <td className="p-4">{row.saldo_banco}</td>
+                      <td className="p-4">{`R$ ${row.valor_estimado_financeiro.toFixed(2).replace(".", ",")}`}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {(dados?.pagination.last_page ?? 1) > 1 ? (
+          <div
+            className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            aria-label="Paginação do relatório de horas extras"
+          >
+            <p className={`text-sm ${mutedText}`}>
+              Página {dados?.pagination.page ?? 1} de {dados?.pagination.last_page ?? 1}
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={loading || (dados?.pagination.page ?? 1) <= 1}
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                className={`rounded-2xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${secondaryButton}`}
+              >
+                Página anterior
+              </button>
+              <button
+                type="button"
+                disabled={loading || (dados?.pagination.page ?? 1) >= (dados?.pagination.last_page ?? 1)}
+                onClick={() =>
+                  setPaginaAtual((prev) => Math.min(prev + 1, dados?.pagination.last_page ?? prev))
+                }
+                className={`rounded-2xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${secondaryButton}`}
+              >
+                Próxima página
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+        <div className="mb-5 flex items-center gap-3">
+          <div className="rounded-2xl bg-slate-100 p-3 text-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className={`text-xl font-semibold ${titleText}`}>Leitura administrativa</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              As primeiras 48 horas extras do mês entram no cálculo financeiro. O excedente vai para o banco de folgas.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <InfoBox label="Horas 50%" value={resumo.total_horas_extras_50} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <InfoBox label="Horas 100%" value={resumo.total_horas_extras_100} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <InfoBox label="Horas pagas" value={resumo.total_horas_pagas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <InfoBox label="Horas em folga" value={resumo.total_horas_convertidas_folga} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+        </div>
+      </section>
+    </AdminShell>
+  );
+}
+
+function InfoBox({
+  label,
+  value,
+  cardBg,
+  titleText,
+  mutedText,
+}: {
+  label: string;
+  value: string;
+  cardBg: string;
+  titleText: string;
+  mutedText: string;
+}) {
+  return (
+    <div className={`rounded-2xl border p-4 ${cardBg}`}>
+      <p className={`text-sm ${mutedText}`}>{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${titleText}`}>{value}</p>
+    </div>
+  );
+}

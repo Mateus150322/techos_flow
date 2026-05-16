@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 type Status =
   | "aberta"
   | "em_execucao"
@@ -10,24 +12,48 @@ type Props = {
 };
 
 export function StatusBadge({ status }: Props) {
-  const styles: Record<Status, string> = {
-    aberta: "bg-yellow-100 text-yellow-800",
-    em_execucao: "bg-blue-100 text-blue-800",
-    finalizada: "bg-green-100 text-green-800",
-    nao_executada: "bg-red-100 text-red-800",
-    cancelada: "bg-gray-200 text-gray-700",
+  const styles: Record<Status, CSSProperties> = {
+    aberta: {
+      borderColor: "color-mix(in srgb, var(--primary) 26%, transparent)",
+      backgroundColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+      color: "var(--primary)",
+    },
+    em_execucao: {
+      borderColor: "color-mix(in srgb, var(--warning) 26%, transparent)",
+      backgroundColor: "color-mix(in srgb, var(--warning) 12%, transparent)",
+      color: "var(--warning)",
+    },
+    finalizada: {
+      borderColor: "color-mix(in srgb, var(--success) 26%, transparent)",
+      backgroundColor: "var(--success-soft)",
+      color: "var(--success)",
+    },
+    nao_executada: {
+      borderColor: "color-mix(in srgb, var(--danger) 26%, transparent)",
+      backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)",
+      color: "var(--danger)",
+    },
+    cancelada: {
+      borderColor: "color-mix(in srgb, var(--text-muted) 22%, transparent)",
+      backgroundColor: "var(--neutral-soft)",
+      color: "var(--text-muted)",
+    },
   };
 
   const labels: Record<Status, string> = {
     aberta: "Aberta",
-    em_execucao: "Em execução",
+    em_execucao: "Em execucao",
     finalizada: "Finalizada",
-    nao_executada: "Não executada",
+    nao_executada: "Nao executada",
     cancelada: "Cancelada",
   };
 
   return (
-    <span className={`rounded-full px-2 py-1 text-xs font-medium ${styles[status]}`}>
+    <span
+      className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold"
+      style={styles[status]}
+    >
+      <span className="h-2 w-2 rounded-full bg-current" />
       {labels[status]}
     </span>
   );

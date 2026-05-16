@@ -56,12 +56,12 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
   const finalizadas = resumo?.finalizadas ?? 0;
   const total = resumo?.total ?? 0;
 
-  const cardBg = isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-slate-200";
-  const softBg = isDark ? "bg-zinc-950/80 border-zinc-800" : "bg-slate-50 border-slate-200";
-  const titleText = isDark ? "text-zinc-50" : "text-slate-900";
-  const mutedText = isDark ? "text-zinc-400" : "text-slate-500";
-  const barTrack = isDark ? "bg-zinc-800" : "bg-slate-200";
-  const centerCircleBg = isDark ? "bg-zinc-950" : "bg-slate-50";
+  const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
+  const softBg = isDark ? "bg-slate-950/80 border-slate-800" : "bg-slate-50 border-slate-200";
+  const titleText = isDark ? "text-slate-50" : "text-slate-900";
+  const mutedText = isDark ? "text-slate-400" : "text-slate-500";
+  const barTrack = isDark ? "bg-slate-800" : "bg-slate-200";
+  const centerCircleBg = isDark ? "bg-slate-950" : "bg-slate-50";
 
   return (
     <AdminShell currentUser={currentUser} activeTab="indicadores">

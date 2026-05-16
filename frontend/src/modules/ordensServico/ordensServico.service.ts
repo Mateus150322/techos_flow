@@ -25,9 +25,29 @@ export type Usuario = {
   name: string;
   email: string;
   role: "administrador" | "tecnico" | "atendente";
+  valor_hora?: string | null;
 };
 
 export type OrdemServicoUsuarioRelacionamento = Usuario | null | undefined;
+
+export type FuncionarioDisponivel = {
+  id: string;
+  name: string;
+  role: "administrador" | "tecnico";
+};
+
+export type ExecucaoFuncionario = {
+  id: string;
+  execucao_id: string;
+  funcionario_id: string;
+  data_inicio: string | null;
+  data_fim: string | null;
+  minutos_trabalhados?: number;
+  minutos_normais?: number;
+  minutos_extras_50?: number;
+  minutos_extras_100?: number;
+  funcionario?: Usuario;
+};
 
 export type Execucao = {
   id: string;
@@ -37,6 +57,8 @@ export type Execucao = {
   data_fim: string | null;
   observacao: string | null;
   tecnico?: Usuario;
+  execucao_funcionarios?: ExecucaoFuncionario[];
+  execucaoFuncionarios?: ExecucaoFuncionario[];
 };
 
 export type Anexo = {
@@ -110,6 +132,7 @@ export type CriarOrdemAtendentePayload = {
   nome_cliente: string;
   prioridade: number;
   descricao: string;
+  data_abertura?: string;
   endereco: {
     logradouro: string;
     numero: string;
@@ -169,6 +192,11 @@ export type FinalizarExecucaoPayload = {
   execucao_id: string;
   data_fim?: string;
   observacao?: string;
+  funcionarios?: Array<{
+    funcionario_id: string;
+    data_inicio?: string;
+    data_fim?: string;
+  }>;
 };
 
 export async function iniciarExecucao(
@@ -280,7 +308,36 @@ export async function obterArquivoAnexo(anexoId: string) {
   };
 }
 
+export async function exportarRelatorioDetalhadoOrdem(osId: string) {
+  const response = await api.get<Blob>(`/ordens-servico/${osId}/relatorio/pdf`, {
+    responseType: "blob",
+  });
+
+  const disposition = String(response.headers["content-disposition"] ?? "");
+  const fileNameMatch =
+    disposition.match(/filename\*=UTF-8''([^;]+)/i) ?? disposition.match(/filename="?([^"]+)"?/i);
+  const fileName = fileNameMatch?.[1]
+    ? decodeURIComponent(fileNameMatch[1])
+    : `relatorio-os-${osId}.pdf`;
+
+  return {
+    blob: response.data,
+    fileName,
+    mimeType: String(response.headers["content-type"] ?? "application/pdf"),
+  };
+}
+
 export async function aceitarOrdem(osId: string) {
   const { data } = await api.post(`/ordens-servico/${osId}/aceitar`);
   return data;
+}
+
+export async function listarFuncionariosDisponiveis(q?: string) {
+  const { data } = await api.get<{ data: FuncionarioDisponivel[] }>("/funcionarios", {
+    params: {
+      q: q?.trim() || undefined,
+    },
+  });
+
+  return data.data ?? [];
 }

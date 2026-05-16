@@ -1,0 +1,255 @@
+# Manual Técnico do Projeto
+
+## 1. Objetivo
+
+Este manual descreve como preparar, executar, manter e evoluir o TechOS Flow em ambiente de desenvolvimento e como adaptar o projeto para produção.
+
+## 2. Requisitos de ambiente
+
+### Backend
+
+- PHP 8.2 ou superior
+- Composer
+- PostgreSQL
+- extensões necessárias do Laravel: `pdo_pgsql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `gd`, `zip`
+
+### Frontend
+
+- Node.js 20 ou superior recomendado
+- npm
+
+## 3. Estrutura do projeto
+
+```text
+techos-flow/
+  backend/
+  frontend/
+  docs/
+  scripts/
+```
+
+## 4. Configuração do backend
+
+### 4.1 Instalação
+
+```bash
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
+```
+
+### 4.2 Banco de dados
+
+Configurar no `.env`:
+
+```env
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=techos_flow
+DB_USERNAME=A_preencher
+DB_PASSWORD=A_preencher
+```
+
+### 4.3 Migrations e seeders
+
+```bash
+php artisan migrate
+php artisan db:seed
+```
+
+## 5. Configuração do frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+```
+
+### 5.1 Desenvolvimento com proxy do Vite
+
+O projeto pode operar com `VITE_API_URL` vazio e usar o proxy do Vite para encaminhar chamadas ao backend.
+
+Exemplo de ambiente local:
+
+```env
+VITE_API_URL=
+VITE_API_PROXY_TARGET=http://127.0.0.1
+VITE_API_PROXY_HOST=backend-flow.test
+VITE_APP_HOST=techosflow.test
+```
+
+Executar:
+
+```bash
+npm run dev
+```
+
+## 5.2 Domínios locais de desenvolvimento
+
+O ambiente local atual usa:
+
+- frontend: `http://techosflow.test:5173`
+- backend: `http://backend-flow.test`
+
+Isso depende de entradas locais no arquivo `hosts` da máquina.
+
+## 5.3 Execução com Docker
+
+Na raiz do projeto:
+
+```bash
+docker compose up --build
+```
+
+Serviços disponíveis:
+
+- frontend em `http://localhost:5173`
+- backend em `http://localhost:8000`
+- PostgreSQL em `localhost:5432`
+
+Comandos úteis:
+
+```bash
+docker compose down
+docker compose exec backend php artisan migrate --force
+docker compose exec backend php artisan test
+docker compose exec frontend npm run lint
+docker compose exec frontend npm run test:a11y
+```
+
+Observações:
+
+- o container `backend` espera o PostgreSQL ficar saudável antes de subir;
+- por padrão, as migrations são executadas no início do backend;
+- o frontend usa proxy interno para falar com o backend sem expor URL de API no navegador durante o desenvolvimento;
+- essa estrutura Docker atual é voltada para desenvolvimento, não para produção final.
+
+## 6. Variáveis de ambiente principais
+
+### Backend
+
+- `APP_NAME`
+- `APP_ENV`
+- `APP_DEBUG`
+- `APP_URL`
+- `FRONTEND_URL`
+- `DB_*`
+- `SESSION_DRIVER`
+- `FILESYSTEM_DISK`
+- `SANCTUM_STATEFUL_DOMAINS`
+- `MAIL_*`
+
+### Frontend
+
+- `VITE_API_URL`
+- `VITE_API_PROXY_TARGET`
+- `VITE_API_PROXY_HOST`
+- `VITE_APP_HOST`
+
+## 7. E-mail e recuperação de senha
+
+O projeto já possui fluxo de recuperação de senha por e-mail.
+
+Exemplo de configuração SMTP atualmente compatível com o projeto:
+
+```env
+MAIL_MAILER=smtp
+MAIL_SCHEME=smtps
+MAIL_HOST=smtp.zoho.com
+MAIL_PORT=465
+MAIL_USERNAME=suporte@techosflow.com.br
+MAIL_PASSWORD=A_preencher
+MAIL_FROM_ADDRESS=suporte@techosflow.com.br
+MAIL_FROM_NAME="TechOS Flow"
+```
+
+## 8. Comandos úteis
+
+### Backend
+
+```bash
+php artisan serve
+php artisan migrate
+php artisan db:seed
+php artisan test
+php artisan route:list
+php artisan config:clear
+php artisan anexos:revisar-retencao --days=365 --limit=50
+```
+
+### Frontend
+
+```bash
+npm run dev
+npm run lint
+npx tsc -b
+npm run build
+npm run test:a11y
+```
+
+## 9. Qualidade contínua do frontend
+
+O projeto possui uma suíte inicial de acessibilidade para validar partes críticas da interface:
+
+- shell administrativo;
+- alternância de tema;
+- tabela operacional de OS;
+- relatório de horas extras;
+- gestão de usuários;
+- modal técnico de detalhe da OS.
+
+Execução local:
+
+```bash
+cd frontend
+npm run test:a11y
+```
+
+Pipeline GitLab:
+
+- o arquivo [.gitlab-ci.yml](c:/Users/VAIO/Documents/projetos/techos-flow/.gitlab-ci.yml) executa:
+  - `npm run lint`
+  - `npx tsc -b`
+  - `npm run test:a11y`
+
+## 10. Padrões adotados
+
+- backend com controllers, middlewares, models, notifications e services;
+- frontend modularizado por domínio;
+- API versionada em `/api/v1`;
+- UUID nas entidades principais;
+- validação centralizada no backend;
+- uso de Tailwind no frontend;
+- autenticação por Sanctum;
+- regras críticas protegidas por perfil e pelo backend.
+
+## 11. Instruções de manutenção
+
+- sempre executar migrations antes de validar fluxo novo no backend;
+- revisar impacto em perfis ao alterar rotas protegidas;
+- manter coerência entre nomes e contratos do backend e do frontend;
+- atualizar documentação ao alterar regras de negócio;
+- preservar proteção dos anexos privados;
+- validar `lint`, `tsc` e `php artisan test` antes de consolidar mudanças.
+
+## 12. Checklist de validação local
+
+1. Subir banco PostgreSQL.
+2. Configurar `.env` do backend.
+3. Rodar migrations e seeders.
+4. Instalar dependências do frontend.
+5. Configurar ambiente do Vite.
+6. Subir backend e frontend.
+7. Testar login, recuperação de senha e fluxos básicos.
+
+## 13. Itens a preencher conforme ambiente institucional
+
+- domínio oficial do backend;
+- domínio oficial do frontend;
+- política de backup;
+- SMTP de produção;
+- observabilidade e monitoramento;
+- credenciais e segredos por ambiente;
+- estratégia final de storage para anexos em produção.

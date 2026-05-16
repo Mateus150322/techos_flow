@@ -21,16 +21,26 @@ export function AdminMetricCard({
   accentClass,
   icon,
 }: Props) {
+  void cardBg;
   return (
-    <div className={`rounded-3xl border p-5 shadow-sm ${cardBg}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className={`text-sm ${mutedText}`}>{label}</p>
-          <p className={`mt-3 text-4xl font-semibold ${accentClass ?? titleText}`}>{value}</p>
+    <div className="app-card rounded-2xl p-4 shadow-sm transition">
+      <div className="app-card-soft rounded-2xl p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${mutedText}`}>
+              {label}
+            </p>
+            <p className={`text-3xl font-bold leading-none ${accentClass ?? titleText}`}>{value}</p>
+          </div>
+
+          {icon ? (
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-sm">
+              {icon}
+            </div>
+          ) : null}
         </div>
-        {icon ? <div className="mt-1">{icon}</div> : null}
+        {hint ? <p className={`mt-4 text-sm ${mutedText}`}>{hint}</p> : null}
       </div>
-      {hint ? <p className={`mt-4 text-sm ${mutedText}`}>{hint}</p> : null}
     </div>
   );
 }

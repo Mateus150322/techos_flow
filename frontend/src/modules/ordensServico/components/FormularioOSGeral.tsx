@@ -1,7 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Loader2, PlusCircle } from "lucide-react";
 
-import { useTheme } from "@/shared/hooks/useTheme";
 import {
   getApiErrorMessage,
   getApiValidationErrors,
@@ -12,6 +11,8 @@ import {
 } from "../ordensServico.service";
 
 type FormularioOSData = {
+  dataAbertura: string;
+  horaAbertura: string;
   tipoServico: string;
   nomeCliente: string;
   prioridade: string;
@@ -29,9 +30,22 @@ type FormularioOSGeralProps = {
   onCriada?: (ordem: OrdemServicoDetalhe) => void;
   titulo?: string;
   descricao?: string;
+  mobileNavOffset?: boolean;
 };
 
+function getDataAtualLocal() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function getHoraAtualLocal() {
+  return new Date().toTimeString().slice(0, 5);
+}
+
 const initialForm: FormularioOSData = {
+  dataAbertura: getDataAtualLocal(),
+  horaAbertura: getHoraAtualLocal(),
   tipoServico: "",
   nomeCliente: "",
   prioridade: "2",
@@ -47,11 +61,10 @@ const initialForm: FormularioOSData = {
 
 export default function FormularioOSGeral({
   onCriada,
-  titulo = "Nova Ordem de Serviço",
+  titulo = "Nova Ordem de Servico",
   descricao = "Preencha os dados para criar uma nova OS.",
+  mobileNavOffset = false,
 }: FormularioOSGeralProps) {
-  const { isDark } = useTheme();
-
   const [form, setForm] = useState<FormularioOSData>(initialForm);
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -80,7 +93,17 @@ export default function FormularioOSGeral({
     return value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 2);
   }
 
+  function montarDataAbertura() {
+    if (!form.dataAbertura || !form.horaAbertura) {
+      return "";
+    }
+
+    return `${form.dataAbertura}T${form.horaAbertura}`;
+  }
+
   function validarFormulario() {
+    if (!form.dataAbertura) return "Informe a data de abertura.";
+    if (!form.horaAbertura) return "Informe a hora de abertura.";
     if (!form.tipoServico.trim()) return "Informe o tipo de serviço.";
     if (!form.nomeCliente.trim()) return "Informe o nome do cliente.";
     if (!form.prioridade.trim()) return "Informe a prioridade.";
@@ -112,6 +135,7 @@ export default function FormularioOSGeral({
       setEnviando(true);
 
       const ordemCriada = await criarOrdem({
+        data_abertura: montarDataAbertura(),
         tipo_servico: form.tipoServico.trim(),
         nome_cliente: form.nomeCliente.trim(),
         prioridade: Number(form.prioridade),
@@ -127,14 +151,19 @@ export default function FormularioOSGeral({
         },
       });
 
-      setForm(initialForm);
+      setForm({
+        ...initialForm,
+        dataAbertura: getDataAtualLocal(),
+        horaAbertura: getHoraAtualLocal(),
+      });
       onCriada?.(ordemCriada);
     } catch (error) {
       const errors = getApiValidationErrors(error);
       const message = getApiErrorMessage(error, "");
 
       setErro(
-        errors?.tipo_servico?.[0] ||
+        errors?.data_abertura?.[0] ||
+          errors?.tipo_servico?.[0] ||
           errors?.nome_cliente?.[0] ||
           errors?.prioridade?.[0] ||
           errors?.descricao?.[0] ||
@@ -152,203 +181,189 @@ export default function FormularioOSGeral({
     }
   }
 
-  const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
-  const inputBg = isDark
-    ? "bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-500"
-    : "bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400";
-  const sectionCard = isDark
-    ? "rounded-2xl border border-slate-800 bg-slate-950/70 p-5"
-    : "rounded-2xl border border-slate-200 bg-slate-50 p-5";
-  const mutedText = isDark ? "text-slate-400" : "text-slate-500";
-  const titleText = isDark ? "text-white" : "text-slate-900";
-
   return (
-    <div className={`rounded-2xl border p-6 shadow-sm ${cardBg}`}>
+    <div className="app-card rounded-[1.5rem] p-4 sm:rounded-[1.85rem] sm:p-6">
       <div className="mb-6">
-        <h2 className={`text-2xl font-semibold ${titleText}`}>{titulo}</h2>
-        <p className={`mt-2 text-sm ${mutedText}`}>{descricao}</p>
-        <p className={`mt-3 text-xs uppercase tracking-[0.16em] ${mutedText}`}>
-          Campos marcados com * são obrigatórios
+        <h2 className="text-xl font-semibold text-[var(--text-main)] sm:text-2xl">{titulo}</h2>
+        <p className="app-muted mt-2 text-sm">{descricao}</p>
+        <p className="app-muted mt-3 text-xs uppercase tracking-[0.16em]">
+          Campos marcados com * sao obrigatorios
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {erro && (
-          <div
-            className={`rounded-xl border px-4 py-3 text-sm ${
-              isDark
-                ? "border-red-900 bg-red-950 text-red-300"
-                : "border-red-200 bg-red-50 text-red-700"
-            }`}
-          >
-            {erro}
-          </div>
-        )}
+      <form
+        onSubmit={handleSubmit}
+        className={`space-y-6 ${mobileNavOffset ? "pb-40" : "pb-24"} sm:space-y-8 sm:pb-0`}
+        aria-busy={enviando}
+      >
+        {erro ? (
+          <div className="app-alert-danger rounded-xl px-4 py-3 text-sm" role="alert" aria-live="assertive">{erro}</div>
+        ) : null}
 
-        <section className={sectionCard}>
+        <section className="app-section-soft rounded-[1.2rem] p-4 sm:rounded-[1.35rem] sm:p-5">
           <div className="mb-5">
-            <h3 className={`text-xl font-semibold ${titleText}`}>Dados da OS</h3>
-            <p className={`mt-1 text-sm ${mutedText}`}>
-              Identifique o tipo da solicitação e o cliente atendido.
+            <h3 className="text-lg font-semibold text-[var(--text-main)] sm:text-xl">Dados da OS</h3>
+            <p className="app-muted mt-1 text-sm">
+              Registre a abertura da OS e identifique a solicitacao.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div>
-              <label htmlFor="tipoServico" className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Tipo de Serviço *
-              </label>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-6">
+            <FormField label="Data de abertura *" htmlFor="dataAbertura">
+              <input
+                id="dataAbertura"
+                type="date"
+                value={form.dataAbertura}
+                onChange={(event) => updateField("dataAbertura", event.target.value)}
+                disabled={enviando}
+                className="app-input px-4 py-3 disabled:opacity-60"
+              />
+            </FormField>
+
+            <FormField label="Hora de abertura *" htmlFor="horaAbertura">
+              <input
+                id="horaAbertura"
+                type="time"
+                value={form.horaAbertura}
+                onChange={(event) => updateField("horaAbertura", event.target.value)}
+                disabled={enviando}
+                className="app-input px-4 py-3 disabled:opacity-60"
+              />
+            </FormField>
+
+            <FormField label="Tipo de servico *" htmlFor="tipoServico">
               <select
                 id="tipoServico"
                 value={form.tipoServico}
                 onChange={(event) => updateField("tipoServico", event.target.value)}
                 disabled={enviando}
-                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+                className="app-input px-4 py-3 disabled:opacity-60"
               >
                 <option value="">Selecione o tipo</option>
-                <option value="manutencao">Manutenção</option>
-                <option value="instalacao">Instalação</option>
+                <option value="manutencao">Manutencao</option>
+                <option value="instalacao">Instalacao</option>
                 <option value="vistoria">Vistoria</option>
                 <option value="leitura">Leitura</option>
                 <option value="reparo">Reparo</option>
               </select>
-            </div>
+            </FormField>
 
-            <div className="md:col-span-2">
-              <label htmlFor="nomeCliente" className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Nome do Cliente *
-              </label>
+            <FormField label="Prioridade *" htmlFor="prioridade">
+              <select
+                id="prioridade"
+                value={form.prioridade}
+                onChange={(event) => updateField("prioridade", event.target.value)}
+                disabled={enviando}
+                className="app-input px-4 py-3 disabled:opacity-60"
+              >
+                <option value="1">Alta</option>
+                <option value="2">Media</option>
+                <option value="3">Baixa</option>
+              </select>
+            </FormField>
+          </div>
+
+          <div className="mt-4 sm:mt-6">
+            <FormField label="Nome do cliente *" htmlFor="nomeCliente">
               <input
                 id="nomeCliente"
                 type="text"
                 value={form.nomeCliente}
                 onChange={(event) => updateField("nomeCliente", event.target.value)}
                 disabled={enviando}
-                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+                className="app-input px-4 py-3 disabled:opacity-60"
               />
-            </div>
+            </FormField>
           </div>
 
-          <div className="mt-6 max-w-sm">
-            <label htmlFor="prioridade" className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Prioridade *
-            </label>
-            <select
-              id="prioridade"
-              value={form.prioridade}
-              onChange={(event) => updateField("prioridade", event.target.value)}
-              disabled={enviando}
-              className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
-            >
-              <option value="1">Alta</option>
-              <option value="2">Média</option>
-              <option value="3">Baixa</option>
-            </select>
-          </div>
-
-          <div className="mt-6">
-            <label htmlFor="descricao" className={`mb-2 block text-sm font-medium ${titleText}`}>
-              Descrição do Serviço *
-            </label>
-            <textarea
-              id="descricao"
-              rows={4}
-              value={form.descricao}
-              onChange={(event) => updateField("descricao", event.target.value)}
-              placeholder="Descreva o serviço a ser realizado"
-              disabled={enviando}
-              className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
-            />
+          <div className="mt-4 sm:mt-6">
+            <FormField label="Descricao do servico *" htmlFor="descricao">
+              <textarea
+                id="descricao"
+                rows={4}
+                value={form.descricao}
+                onChange={(event) => updateField("descricao", event.target.value)}
+                placeholder="Descreva o servico a ser realizado"
+                disabled={enviando}
+                className="app-input px-4 py-3 disabled:opacity-60"
+              />
+            </FormField>
           </div>
         </section>
 
-        <section className={sectionCard}>
+        <section className="app-section-soft rounded-[1.2rem] p-4 sm:rounded-[1.35rem] sm:p-5">
           <div className="mb-5">
-            <h3 className={`text-xl font-semibold ${titleText}`}>Endereço do cliente</h3>
-            <p className={`mt-1 text-sm ${mutedText}`}>
-              Informe o local que será usado como referência para atendimento.
+            <h3 className="text-xl font-semibold text-[var(--text-main)]">
+              Endereco do cliente
+            </h3>
+            <p className="app-muted mt-1 text-sm">
+              Informe o local que sera usado como referencia para atendimento.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
             <div className="md:col-span-2">
-              <label htmlFor="logradouro" className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Logradouro *
-              </label>
-              <input
-                id="logradouro"
-                type="text"
-                value={form.logradouro}
-                onChange={(event) => updateField("logradouro", event.target.value)}
-                disabled={enviando}
-                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
-              />
+              <FormField label="Logradouro *" htmlFor="logradouro">
+                <input
+                  id="logradouro"
+                  type="text"
+                  value={form.logradouro}
+                  onChange={(event) => updateField("logradouro", event.target.value)}
+                  disabled={enviando}
+                  className="app-input px-4 py-3 disabled:opacity-60"
+                />
+              </FormField>
             </div>
 
-            <div>
-              <label htmlFor="numero" className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Número *
-              </label>
+            <FormField label="Numero *" htmlFor="numero">
               <input
                 id="numero"
                 type="text"
                 value={form.numero}
                 onChange={(event) => updateField("numero", event.target.value)}
                 disabled={enviando}
-                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+                className="app-input px-4 py-3 disabled:opacity-60"
               />
-            </div>
+            </FormField>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <label htmlFor="complemento" className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Complemento
-              </label>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+            <FormField label="Complemento" htmlFor="complemento">
               <input
                 id="complemento"
                 type="text"
                 value={form.complemento}
                 onChange={(event) => updateField("complemento", event.target.value)}
                 disabled={enviando}
-                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+                className="app-input px-4 py-3 disabled:opacity-60"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="bairro" className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Bairro *
-              </label>
+            <FormField label="Bairro *" htmlFor="bairro">
               <input
                 id="bairro"
                 type="text"
                 value={form.bairro}
                 onChange={(event) => updateField("bairro", event.target.value)}
                 disabled={enviando}
-                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+                className="app-input px-4 py-3 disabled:opacity-60"
               />
-            </div>
+            </FormField>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div>
-              <label htmlFor="cidade" className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Cidade *
-              </label>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+            <FormField label="Cidade *" htmlFor="cidade">
               <input
                 id="cidade"
                 type="text"
                 value={form.cidade}
                 onChange={(event) => updateField("cidade", event.target.value)}
                 disabled={enviando}
-                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+                className="app-input px-4 py-3 disabled:opacity-60"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="estado" className={`mb-2 block text-sm font-medium ${titleText}`}>
-                Estado *
-              </label>
+            <FormField label="Estado *" htmlFor="estado">
               <input
                 id="estado"
                 type="text"
@@ -356,14 +371,11 @@ export default function FormularioOSGeral({
                 onChange={(event) => updateField("estado", formatarEstado(event.target.value))}
                 maxLength={2}
                 disabled={enviando}
-                className={`w-full rounded-xl border px-4 py-3 uppercase outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+                className="app-input px-4 py-3 uppercase disabled:opacity-60"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="cep" className={`mb-2 block text-sm font-medium ${titleText}`}>
-                CEP *
-              </label>
+            <FormField label="CEP *" htmlFor="cep">
               <input
                 id="cep"
                 type="text"
@@ -372,30 +384,57 @@ export default function FormularioOSGeral({
                 placeholder="00000-000"
                 maxLength={9}
                 disabled={enviando}
-                className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${inputBg}`}
+                className="app-input px-4 py-3 disabled:opacity-60"
               />
-            </div>
+            </FormField>
           </div>
         </section>
 
-        <button
-          type="submit"
-          disabled={enviando}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        <div
+          className={`fixed inset-x-0 z-20 border-t border-[var(--border)] bg-[color-mix(in_srgb,var(--bg-card)_92%,transparent)] px-4 py-3 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none ${
+            mobileNavOffset
+              ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
+              : "bottom-0"
+          }`}
         >
-          {enviando ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Salvando...
-            </>
-          ) : (
-            <>
-              <PlusCircle size={18} />
-              Criar Ordem de Serviço
-            </>
-          )}
-        </button>
+          <div className="mx-auto max-w-7xl">
+            <button
+              type="submit"
+              disabled={enviando}
+              className="app-button-primary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {enviando ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <PlusCircle size={18} />
+                  Criar Ordem de Servico
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </form>
+    </div>
+  );
+}
+
+function FormField({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <label htmlFor={htmlFor} className="mb-2 block text-sm font-medium text-[var(--text-main)]">{label}</label>
+      {children}
     </div>
   );
 }
