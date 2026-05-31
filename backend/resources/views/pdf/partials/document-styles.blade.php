@@ -160,6 +160,10 @@
     overflow: hidden;
   }
 
+  .panel-soft {
+    background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  }
+
   .panel-body {
     padding: 12px;
   }
@@ -223,6 +227,17 @@
     background: #f8fbff;
   }
 
+  .data-table-compact th,
+  .data-table-compact td {
+    padding: 6px 7px;
+    font-size: 10px;
+  }
+
+  .operational-table td {
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
   .total-row td {
     font-weight: 700;
     background: #eef4ff !important;
@@ -233,6 +248,56 @@
     padding: 12px 14px;
     line-height: 1.55;
     color: #1e293b;
+  }
+
+  .filter-summary {
+    line-height: 1.5;
+  }
+
+  .summary-copy {
+    margin-top: 6px;
+    color: #1e293b;
+    font-size: 12px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.25;
+    border: 1px solid transparent;
+  }
+
+  .badge-info {
+    background: #e0f2fe;
+    color: #075985;
+    border-color: #bae6fd;
+  }
+
+  .badge-success {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
+  }
+
+  .badge-warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+  }
+
+  .badge-danger {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+  }
+
+  .badge-neutral {
+    background: #e5e7eb;
+    color: #374151;
+    border-color: #d1d5db;
   }
 
   .notes {
@@ -328,8 +393,22 @@
     padding-right: 12px;
   }
 
+  .two-column-grid-stack td {
+    display: block;
+    width: 100%;
+    padding-right: 0;
+  }
+
+  .two-column-grid-stack tr td + td {
+    padding-top: 12px;
+  }
+
   .stack-gap {
     margin-top: 12px;
+  }
+
+  .page-break-before {
+    page-break-before: always;
   }
 
   .placeholder-text {
@@ -340,6 +419,35 @@
   .photo-grid td {
     width: 33.33%;
     padding-right: 10px;
+  }
+
+  .report-os-sheet {
+    page-break-before: always;
+  }
+
+  .report-os-panel-body {
+    padding: 9px;
+  }
+
+  .report-os-summary {
+    font-size: 9px;
+    line-height: 1.3;
+  }
+
+  .report-os-context {
+    padding: 6px 8px;
+    font-size: 9px;
+    line-height: 1.3;
+  }
+
+  .report-photo-placeholder-cell {
+    border: 0;
+    padding: 0;
+    background: transparent !important;
+  }
+
+  .photo-grid tr + tr td {
+    padding-top: 10px;
   }
 
   .photo-card {
@@ -375,6 +483,171 @@
     padding-top: 58px;
     font-size: 10px;
     color: #64748b;
+  }
+
+  .photo-meta {
+    margin-top: 10px;
+    padding: 8px 9px;
+    border: 1px solid #e5edf9;
+    border-radius: 10px;
+    background: #f8fbff;
+  }
+
+  .report-photo-grid {
+    table-layout: fixed;
+  }
+
+  .report-photo-grid td {
+    width: 50%;
+    padding-right: 10px;
+  }
+
+  .report-photo-grid .photo-card {
+    padding: 8px;
+  }
+
+  .report-photo-grid .photo-label {
+    margin-bottom: 6px;
+    font-size: 10px;
+  }
+
+  .report-photo-grid .photo-frame {
+    min-height: 146px;
+    max-height: 158px;
+    padding: 6px;
+    overflow: hidden;
+  }
+
+  .report-photo-grid .photo-frame img {
+    width: 100%;
+    max-width: 100%;
+    max-height: 146px;
+    height: auto;
+    object-fit: contain;
+    border-radius: 6px;
+  }
+
+  .report-photo-grid .photo-meta {
+    margin-top: 6px;
+    padding: 6px 7px;
+  }
+
+  .report-photo-grid .photo-meta-title {
+    margin-bottom: 4px;
+    font-size: 8px;
+  }
+
+  .report-photo-grid .photo-meta-row {
+    margin-bottom: 2px;
+  }
+
+  .report-photo-grid .photo-meta-label {
+    font-size: 7px;
+  }
+
+  .report-photo-grid .photo-meta-value,
+  .report-photo-grid .photo-meta-empty {
+    font-size: 8px;
+    line-height: 1.25;
+  }
+
+  .report-photo-grid .photo-meta-block {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+
+  .report-single-evidence-label {
+    margin-bottom: 8px;
+    font-size: 11px;
+  }
+
+  .report-single-evidence-grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .report-single-evidence-grid td {
+    vertical-align: top;
+  }
+
+  .report-single-evidence-photo-cell {
+    width: 56%;
+    padding-right: 12px;
+  }
+
+  .report-single-evidence-meta-cell {
+    width: 44%;
+    padding-right: 0;
+  }
+
+  .report-single-evidence-frame {
+    min-height: 220px;
+    max-height: 240px;
+    padding: 8px;
+    overflow: hidden;
+  }
+
+  .report-single-evidence-frame img {
+    width: 100%;
+    max-width: 100%;
+    max-height: 220px;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  .report-single-evidence-meta {
+    margin-top: 0;
+    min-height: 220px;
+    padding: 8px 9px;
+  }
+
+  .photo-meta-title {
+    margin-bottom: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #153d7a;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .photo-meta-row {
+    margin-bottom: 4px;
+  }
+
+  .photo-meta-label {
+    display: block;
+    font-size: 9px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .photo-meta-value {
+    display: block;
+    margin-top: 1px;
+    font-size: 10px;
+    color: #0f172a;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  .photo-meta-block {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #d7e3f8;
+  }
+
+  .photo-meta-address {
+    white-space: normal;
+  }
+
+  .photo-meta-empty {
+    font-size: 10px;
+    color: #64748b;
+    font-style: italic;
   }
 
   .mt-0 { margin-top: 0; }

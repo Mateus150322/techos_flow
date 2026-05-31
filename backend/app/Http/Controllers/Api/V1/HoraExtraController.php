@@ -97,7 +97,8 @@ class HoraExtraController extends Controller
     private function validatedFilters(Request $request): array
     {
         $data = $request->validate([
-            'funcionario_id' => ['nullable', 'uuid', 'exists:users,id'],
+            'funcionario_id' => ['nullable', 'uuid'],
+            'participante_id' => ['nullable', 'uuid'],
             'data_inicio' => ['nullable', 'date'],
             'data_fim' => ['nullable', 'date', 'after_or_equal:data_inicio'],
             'mes' => ['nullable', 'integer', 'between:1,12'],

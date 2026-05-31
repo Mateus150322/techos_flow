@@ -12,6 +12,11 @@ use Illuminate\Support\Collection;
 
 class OrdemServicoRelatorioService
 {
+    public function __construct(
+        private readonly OperationalContextFormatter $operationalContextFormatter
+    ) {
+    }
+
     public function buildPayload(array $filters, bool $forExport = false): array
     {
         $tipoRelatorio = $filters['tipo_relatorio'] ?? 'geral';
@@ -48,6 +53,10 @@ class OrdemServicoRelatorioService
         $produtividadeTecnicos = $this->buildProdutividadeTecnicos($baseQuery);
         $tiposMaisFrequentes = $this->buildTiposMaisFrequentes($baseQuery, $resumo['total']);
         $metricasOperacionais = $this->buildMetricasOperacionais($baseQuery);
+        $resumoOperacional = $this->buildResumoOperacional($baseQuery, $resumo, $metricasOperacionais);
+        $gargalosOperacionais = $this->buildGargalosOperacionais($resumoOperacional);
+        $filaOperacional = $this->buildFilaOperacional($baseQuery);
+        $cargaTecnicos = $this->buildCargaTecnicos($baseQuery);
         $resumoTiposStatus = $this->buildResumoTiposStatus($baseQuery);
         $resumoTecnicosOperacional = $this->buildResumoTecnicosOperacional($baseQuery);
         [$reportDefinition, $reportPagination] = $this->buildReportDefinition(
@@ -64,6 +73,10 @@ class OrdemServicoRelatorioService
             'tipos' => $tipos,
             'tecnicos' => $tecnicos,
             'resumo' => $resumo,
+            'resumoOperacional' => $resumoOperacional,
+            'gargalosOperacionais' => $gargalosOperacionais,
+            'filaOperacional' => $filaOperacional,
+            'cargaTecnicos' => $cargaTecnicos,
             'statusResumo' => $statusResumo,
             'produtividadeTecnicos' => $produtividadeTecnicos,
             'tiposMaisFrequentes' => $tiposMaisFrequentes,
@@ -72,9 +85,23 @@ class OrdemServicoRelatorioService
             'resumoTecnicosOperacional' => $resumoTecnicosOperacional,
             'reportDefinition' => $reportDefinition,
             'reportPagination' => $reportPagination,
+            'ordensExportacao' => $forExport
+                ? $this->buildOrdensExportacao($tipoRelatorio, $baseQuery)
+                : [],
             'atividadeRecente' => (clone $baseQuery)
-                ->select(['id', 'numero', 'nome_cliente', 'tipo', 'status', 'data_abertura'])
-                ->orderByDesc('data_abertura')
+                ->with(['tecnicoResponsavel:id,name'])
+                ->select([
+                    'id',
+                    'numero',
+                    'nome_cliente',
+                    'tipo',
+                    'status',
+                    'prioridade',
+                    'data_abertura',
+                    'updated_at',
+                    'tecnico_responsavel_id',
+                ])
+                ->orderByDesc('updated_at')
                 ->limit(5)
                 ->get()
                 ->map(fn (OrdemServico $ordem) => [
@@ -83,7 +110,10 @@ class OrdemServicoRelatorioService
                     'nome_cliente' => $ordem->nome_cliente,
                     'tipo' => $ordem->tipo,
                     'status' => $ordem->status,
+                    'prioridade' => (int) $ordem->prioridade,
                     'data_abertura' => $ordem->data_abertura,
+                    'atualizado_em' => $ordem->updated_at,
+                    'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsável',
                 ])
                 ->values(),
             'periodoDescricao' => $this->buildPeriodoDescricao($dataInicio, $dataFim),
@@ -96,6 +126,59 @@ class OrdemServicoRelatorioService
             ),
             'dataEmissao' => now()->format('d/m/Y'),
         ];
+    }
+
+    private function buildOrdensExportacao(string $tipoRelatorio, Builder $baseQuery): array
+    {
+        if ($tipoRelatorio === 'status' || $tipoRelatorio === 'produtividade' || $tipoRelatorio === 'tipo') {
+            return [];
+        }
+
+        if ($tipoRelatorio === 'operacional') {
+            return $this->buildOperationalOrderQuery($baseQuery)
+                ->get()
+                ->map(function (OrdemServico $ordem) {
+                    $detalhes = $this->operationalContextFormatter->extractOperationalDetails($ordem);
+
+                return [
+                    'id' => $ordem->id,
+                    'numero' => $ordem->numero,
+                    'tipo' => (string) $ordem->tipo,
+                    'status' => $this->formatStatus((string) $ordem->status),
+                    'prioridade' => $this->formatPrioridade((int) $ordem->prioridade),
+                    'clienteLocal' => $detalhes['local'] !== '-' ? $detalhes['local'] : ($ordem->nome_cliente ?? '-'),
+                    'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsável',
+                    'abertura' => $this->formatDate($ordem->data_abertura),
+                    'encerramento' => $this->formatDate($ordem->data_encerramento),
+                    'contexto' => $detalhes['contexto'],
+                ];
+            })
+            ->values()
+            ->all();
+        }
+
+        return (clone $baseQuery)
+            ->with(['tecnicoResponsavel:id,name'])
+            ->orderByDesc('data_abertura')
+            ->get()
+            ->map(fn (OrdemServico $ordem) => [
+                'id' => $ordem->id,
+                'numero' => $ordem->numero,
+                'tipo' => (string) $ordem->tipo,
+                'status' => $this->formatStatus((string) $ordem->status),
+                'prioridade' => $this->formatPrioridade((int) $ordem->prioridade),
+                'clienteLocal' => $ordem->nome_cliente ?? '-',
+                'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsável',
+                'abertura' => $this->formatDate($ordem->data_abertura),
+                'encerramento' => $this->formatDate($ordem->data_encerramento),
+                'contexto' => $this->operationalContextFormatter->formatContextoOperacional(
+                    $ordem->motivo_nao_execucao,
+                    $ordem->descricao,
+                    $ordem->observacoes
+                ),
+            ])
+            ->values()
+            ->all();
     }
 
     private function buildBaseQuery(array $filters): Builder
@@ -198,6 +281,143 @@ class OrdemServicoRelatorioService
             'horasExtrasMinutos' => $horasExtrasMinutos,
             'horasExtrasFormatadas' => $this->formatarMinutos($horasExtrasMinutos),
         ];
+    }
+
+    private function buildResumoOperacional(
+        Builder $baseQuery,
+        array $resumo,
+        array $metricasOperacionais
+    ): array {
+        $limiteAbertas = now()->copy()->subHours(48);
+        $limiteExecucoes = now()->copy()->subHours(24);
+
+        $semResponsavel = (clone $baseQuery)
+            ->where('status', 'aberta')
+            ->whereNull('tecnico_responsavel_id')
+            ->count();
+
+        $criticasAtivas = (clone $baseQuery)
+            ->whereIn('status', ['aberta', 'em_execucao'])
+            ->where('prioridade', 1)
+            ->count();
+
+        $abertas48h = (clone $baseQuery)
+            ->where('status', 'aberta')
+            ->where('data_abertura', '<=', $limiteAbertas)
+            ->count();
+
+        $execucao24h = (clone $baseQuery)
+            ->where('status', 'em_execucao')
+            ->whereHas('execucoes', function (Builder $query) use ($limiteExecucoes) {
+                $query
+                    ->whereNull('data_fim')
+                    ->where('data_inicio', '<=', $limiteExecucoes);
+            })
+            ->count();
+
+        return [
+            'filaAtiva' => $resumo['abertas'] + $resumo['emExecucao'],
+            'semResponsavel' => $semResponsavel,
+            'criticasAtivas' => $criticasAtivas,
+            'abertas48h' => $abertas48h,
+            'execucao24h' => $execucao24h,
+            'fotosAnexadas' => (int) $metricasOperacionais['fotosAnexadas'],
+            'horasExtrasFormatadas' => (string) $metricasOperacionais['horasExtrasFormatadas'],
+        ];
+    }
+
+    private function buildGargalosOperacionais(array $resumoOperacional): array
+    {
+        return [
+            [
+                'id' => 'sem-responsavel',
+                'label' => 'OS sem responsável',
+                'quantidade' => $resumoOperacional['semResponsavel'],
+                'descricao' => 'Ordens abertas aguardando aceite ou atribuição técnica.',
+                'nivel' => $resumoOperacional['semResponsavel'] > 0 ? 'critico' : 'ok',
+            ],
+            [
+                'id' => 'criticas-ativas',
+                'label' => 'Alta prioridade ativa',
+                'quantidade' => $resumoOperacional['criticasAtivas'],
+                'descricao' => 'Ordens de alta prioridade ainda abertas ou em execução.',
+                'nivel' => $resumoOperacional['criticasAtivas'] > 0 ? 'critico' : 'ok',
+            ],
+            [
+                'id' => 'abertas-48h',
+                'label' => 'Abertas há mais de 48h',
+                'quantidade' => $resumoOperacional['abertas48h'],
+                'descricao' => 'Ordens abertas com risco de represamento operacional.',
+                'nivel' => $resumoOperacional['abertas48h'] > 0 ? 'atencao' : 'ok',
+            ],
+            [
+                'id' => 'execucao-24h',
+                'label' => 'Em execução há mais de 24h',
+                'quantidade' => $resumoOperacional['execucao24h'],
+                'descricao' => 'Execuções longas que exigem revisão ou acompanhamento.',
+                'nivel' => $resumoOperacional['execucao24h'] > 0 ? 'atencao' : 'ok',
+            ],
+        ];
+    }
+
+    private function buildFilaOperacional(Builder $baseQuery): array
+    {
+        $agora = now();
+
+        return $this->buildOperationalOrderQuery($baseQuery)
+            ->limit(8)
+            ->get()
+            ->map(function (OrdemServico $ordem) use ($agora) {
+                $idadeHoras = $ordem->data_abertura?->diffInHours($agora) ?? 0;
+
+                return [
+                    'id' => $ordem->id,
+                    'numero' => $ordem->numero,
+                    'tipo' => $ordem->tipo,
+                    'clienteLocal' => $ordem->nome_cliente ?? '-',
+                    'status' => $ordem->status,
+                    'prioridade' => $this->formatPrioridade((int) $ordem->prioridade),
+                    'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsável',
+                    'idadeHoras' => $idadeHoras,
+                    'idadeDescricao' => $this->formatarIdadeHoras($idadeHoras),
+                    'contexto' => $this->operationalContextFormatter->formatContextoOperacional(
+                        $ordem->motivo_nao_execucao,
+                        $ordem->descricao,
+                        $ordem->observacoes
+                    ),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function buildCargaTecnicos(Builder $baseQuery): array
+    {
+        return (clone $baseQuery)
+            ->whereNotNull('ordem_servicos.tecnico_responsavel_id')
+            ->leftJoin('users as tecnicos', 'tecnicos.id', '=', 'ordem_servicos.tecnico_responsavel_id')
+            ->selectRaw("
+                COALESCE(tecnicos.name, 'Sem responsável') as tecnico,
+                SUM(CASE WHEN ordem_servicos.status = 'aberta' THEN 1 ELSE 0 END) as abertas,
+                SUM(CASE WHEN ordem_servicos.status = 'em_execucao' THEN 1 ELSE 0 END) as em_execucao,
+                SUM(CASE WHEN ordem_servicos.status IN ('aberta', 'em_execucao') THEN 1 ELSE 0 END) as total_ativas,
+                SUM(CASE WHEN ordem_servicos.prioridade = 1 AND ordem_servicos.status IN ('aberta', 'em_execucao') THEN 1 ELSE 0 END) as criticas
+            ")
+            ->groupBy('ordem_servicos.tecnico_responsavel_id', 'tecnicos.name')
+            ->havingRaw("SUM(CASE WHEN ordem_servicos.status IN ('aberta', 'em_execucao') THEN 1 ELSE 0 END) > 0")
+            ->orderByDesc('total_ativas')
+            ->orderByDesc('criticas')
+            ->orderBy('tecnicos.name')
+            ->get()
+            ->map(fn (object $row) => [
+                'tecnico' => (string) $row->tecnico,
+                'abertas' => (int) $row->abertas,
+                'emExecucao' => (int) $row->em_execucao,
+                'criticas' => (int) $row->criticas,
+                'totalAtivas' => (int) $row->total_ativas,
+            ])
+            ->values()
+            ->all();
     }
 
     private function buildResumoTiposStatus(Builder $baseQuery): array
@@ -346,8 +566,42 @@ class OrdemServicoRelatorioService
             ], $this->singlePagePagination(count($rows))];
         }
 
+        if ($tipoRelatorio === 'operacional') {
+            $columns = $this->operationalReportColumnsV2();
+            $query = $this->buildOperationalOrderQuery($baseQuery);
+
+            if ($forExport) {
+                $rows = $this->mapOrdensOperacionaisToRows($query->get());
+
+                return [[
+                    'title' => 'Fila Operacional Priorizada',
+                    'columns' => $columns,
+                    'rows' => $rows,
+                ], $this->singlePagePagination(count($rows))];
+            }
+
+            $perPage = (int) ($filters['per_page'] ?? 20);
+            $page = (int) ($filters['page'] ?? 1);
+            $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+            $rows = $this->mapOrdensOperacionaisToRows(collect($paginator->items()));
+
+            return [[
+                'title' => 'Fila Operacional Priorizada',
+                'columns' => $columns,
+                'rows' => $rows,
+            ], [
+                'page' => $paginator->currentPage(),
+                'perPage' => $paginator->perPage(),
+                'lastPage' => $paginator->lastPage(),
+                'total' => $paginator->total(),
+            ]];
+        }
+
         $query = (clone $baseQuery)
-            ->with(['tecnicoResponsavel:id,name'])
+            ->with([
+                'tecnicoResponsavel:id,name',
+                'endereco:id,rua,numero,complemento,bairro,cidade,estado',
+            ])
             ->orderByDesc('data_abertura');
 
         $title = $tipoRelatorio === 'periodo'
@@ -399,6 +653,10 @@ class OrdemServicoRelatorioService
         $tipoRelatorio = $filters['tipo_relatorio'] ?? 'geral';
 
         return match ($tipoRelatorio) {
+            'operacional' => [
+                'title' => 'Fila Operacional Priorizada',
+                'columns' => $this->operationalReportColumnsV2(),
+            ],
             'status' => [
                 'title' => 'Relatório por Status',
                 'columns' => [
@@ -440,6 +698,14 @@ class OrdemServicoRelatorioService
     {
         $tipoRelatorio = $filters['tipo_relatorio'] ?? 'geral';
         $baseQuery = $this->buildBaseQuery($filters);
+
+        if ($tipoRelatorio === 'operacional') {
+            foreach ($this->buildOperationalOrderQuery($baseQuery)->cursor() as $ordem) {
+                $emitRow($this->mapOrdemOperacionalToRow($ordem));
+            }
+
+            return;
+        }
 
         if ($tipoRelatorio === 'status') {
             $resumo = $this->buildResumo($this->buildStatusCountMap($baseQuery));
@@ -495,6 +761,7 @@ class OrdemServicoRelatorioService
                 'ordem_servicos.data_encerramento',
                 'ordem_servicos.motivo_nao_execucao',
                 'ordem_servicos.descricao',
+                'ordem_servicos.observacoes',
                 'tecnicos.name as tecnico_nome',
             ])
             ->orderByDesc('ordem_servicos.data_abertura');
@@ -509,9 +776,10 @@ class OrdemServicoRelatorioService
                 'abertura' => $this->formatDate($row->data_abertura),
                 'encerramento' => $this->formatDate($row->data_encerramento),
                     'responsavel' => $row->tecnico_nome ?: 'Sem responsável',
-                'observacoes' => $this->formatContextoOperacional(
+                'observacoes' => $this->operationalContextFormatter->formatContextoOperacional(
                     $row->motivo_nao_execucao,
-                    $row->descricao
+                    $row->descricao,
+                    $row->observacoes
                 ),
             ]);
         }
@@ -528,11 +796,50 @@ class OrdemServicoRelatorioService
             'abertura' => $this->formatDate($ordem->data_abertura),
             'encerramento' => $this->formatDate($ordem->data_encerramento),
             'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsável',
-            'observacoes' => $this->formatContextoOperacional(
+            'observacoes' => $this->operationalContextFormatter->formatContextoOperacional(
                 $ordem->motivo_nao_execucao,
-                $ordem->descricao
+                $ordem->descricao,
+                $ordem->observacoes
             ),
         ])->values()->all();
+    }
+
+    private function buildOperationalOrderQuery(Builder $baseQuery): Builder
+    {
+        return (clone $baseQuery)
+            ->with(['tecnicoResponsavel:id,name'])
+            ->whereIn('status', ['aberta', 'em_execucao'])
+            ->orderByRaw('CASE prioridade WHEN 1 THEN 0 WHEN 2 THEN 1 ELSE 2 END')
+            ->orderByRaw("CASE status WHEN 'aberta' THEN 0 ELSE 1 END")
+            ->orderBy('data_abertura');
+    }
+
+    private function mapOrdensOperacionaisToRows(Collection $ordens): array
+    {
+        return $ordens
+            ->map(fn (OrdemServico $ordem) => $this->mapOrdemOperacionalToRow($ordem))
+            ->values()
+            ->all();
+    }
+
+    private function mapOrdemOperacionalToRow(OrdemServico $ordem): array
+    {
+        $idadeHoras = $ordem->data_abertura?->diffInHours(now()) ?? 0;
+        $detalhes = $this->operationalContextFormatter->extractOperationalDetails($ordem);
+
+        return [
+            'numero' => $ordem->numero,
+            'tipo' => $ordem->tipo,
+            'local' => $detalhes['local'],
+            'origem' => $detalhes['origem'],
+            'status' => $this->formatStatus($ordem->status),
+            'prioridade' => $this->formatPrioridade((int) $ordem->prioridade),
+            'servico' => $detalhes['servico'],
+            'equipamento' => $detalhes['equipamento'],
+            'responsavel' => $ordem->tecnicoResponsavel?->name ?? 'Sem responsável',
+            'idade' => $this->formatarIdadeHoras($idadeHoras),
+            'contexto' => $detalhes['contexto'],
+        ];
     }
 
     private function singlePagePagination(int $total): array
@@ -568,7 +875,8 @@ class OrdemServicoRelatorioService
         string $prioridade,
         string $tecnicoId,
         Collection $tecnicos
-    ): string {
+    ): string
+    {
         $tecnicoSelecionado = $tecnicos->firstWhere('id', $tecnicoId);
         $tecnico = is_array($tecnicoSelecionado) ? ($tecnicoSelecionado['name'] ?? 'Todos') : 'Todos';
 
@@ -623,21 +931,115 @@ class OrdemServicoRelatorioService
         ];
     }
 
-    private function formatContextoOperacional(?string $motivoNaoExecucao, ?string $descricao): string
+    private function operationalReportColumnsV2(): array
     {
-        $texto = trim((string) ($motivoNaoExecucao ?: $descricao ?: ''));
+        return [
+            ['key' => 'numero', 'label' => 'Número da OS'],
+            ['key' => 'tipo', 'label' => 'Tipo de serviço'],
+            ['key' => 'local', 'label' => 'Unidade / Local'],
+            ['key' => 'origem', 'label' => 'Origem da solicitação'],
+            ['key' => 'status', 'label' => 'Status'],
+            ['key' => 'prioridade', 'label' => 'Prioridade'],
+            ['key' => 'servico', 'label' => 'Serviço solicitado'],
+            ['key' => 'equipamento', 'label' => 'Equipamento'],
+            ['key' => 'responsavel', 'label' => 'Responsável técnico'],
+            ['key' => 'idade', 'label' => 'Tempo em fila'],
+            ['key' => 'contexto', 'label' => 'Resumo operacional'],
+        ];
+    }
+
+    private function operationalReportColumns(): array
+    {
+        return [
+            ['key' => 'numero', 'label' => 'Número da OS'],
+            ['key' => 'tipo', 'label' => 'Tipo de serviço'],
+            ['key' => 'clienteLocal', 'label' => 'Cliente/Local'],
+            ['key' => 'status', 'label' => 'Status'],
+            ['key' => 'prioridade', 'label' => 'Prioridade'],
+            ['key' => 'responsavel', 'label' => 'Responsável técnico'],
+            ['key' => 'idade', 'label' => 'Tempo em fila'],
+            ['key' => 'contexto', 'label' => 'Contexto operacional'],
+        ];
+    }
+    private function extractOperationalDetails(OrdemServico $ordem): array
+    {
+        $campos = $this->extractStructuredContext($ordem->descricao);
+        $contexto = $this->formatContextoOperacional(
+            $ordem->motivo_nao_execucao,
+            $ordem->descricao,
+            $ordem->observacoes
+        );
+
+        $localPartes = array_filter([
+            $campos['unidade'] ?? null,
+            $campos['local'] ?? null,
+        ]);
+
+        if ($localPartes === []) {
+            $localPartes = array_filter([
+                $ordem->endereco?->rua,
+                $ordem->endereco?->numero,
+                $ordem->endereco?->bairro,
+            ]);
+        }
+
+        $origemPartes = array_filter([
+            $campos['setor'] ?? null,
+            $campos['encarregado'] ?? null,
+        ]);
+
+        if ($origemPartes === []) {
+            $origemPartes = array_filter([$ordem->nome_cliente]);
+        }
+
+        $servico = $campos['servico'] ?? $campos['tipo_manutencao'] ?? '';
+        if ($servico === '') {
+            $servico = $contexto !== '-' ? $contexto : $ordem->tipo;
+        }
+
+        $equipamento = $campos['equipamento'] ?? '';
+        if ($equipamento === '') {
+            $equipamento = $campos['diagnostico'] ?? '-';
+        }
+
+        return [
+            'local' => $localPartes !== [] ? implode(' / ', $localPartes) : '-',
+            'origem' => $origemPartes !== [] ? implode(' / ', $origemPartes) : 'Não informado',
+            'servico' => $this->limitContext($this->sanitizeContextText($servico), 80),
+            'equipamento' => $this->limitContext($this->sanitizeContextText($equipamento), 70),
+            'contexto' => $contexto,
+        ];
+    }
+
+    private function formatContextoOperacional(
+        ?string $motivoNaoExecucao,
+        ?string $descricao,
+        ?string $observacoes = null
+    ): string {
+        $motivo = $this->sanitizeContextText($motivoNaoExecucao);
+
+        if ($motivo !== '') {
+            return $this->limitContext("Não executada: {$motivo}");
+        }
+
+        $campos = $this->extractStructuredContext($descricao);
+        $resumoEstruturado = $this->buildStructuredContextSummary($campos);
+
+        if ($resumoEstruturado !== '') {
+            return $this->limitContext($resumoEstruturado);
+        }
+
+        $texto = $this->sanitizeContextText($observacoes ?: $descricao ?: '');
 
         if ($texto === '') {
             return '-';
         }
 
-        $texto = preg_replace('/\s+/u', ' ', $texto) ?? $texto;
-
-        if (mb_strlen($texto) <= 120) {
-            return $texto;
+        if (str_contains(mb_strtolower($texto), 'seeder')) {
+            return 'Registro inicial de demonstracao.';
         }
 
-        return rtrim(mb_substr($texto, 0, 117)) . '...';
+        return $this->limitContext($texto);
     }
 
     private function formatarMinutos(int $minutos): string
@@ -647,4 +1049,134 @@ class OrdemServicoRelatorioService
 
         return sprintf('%dh%02d', $horas, $resto);
     }
+
+    private function formatarIdadeHoras(int $horas): string
+    {
+        if ($horas < 24) {
+            return "{$horas}h";
+        }
+
+        $dias = intdiv($horas, 24);
+        $restoHoras = $horas % 24;
+
+        if ($restoHoras === 0) {
+            return "{$dias}d";
+        }
+
+        return "{$dias}d {$restoHoras}h";
+    }
+
+    private function extractStructuredContext(?string $descricao): array
+    {
+        $texto = trim((string) $descricao);
+
+        if ($texto === '') {
+            return [];
+        }
+
+        $campos = [];
+
+        foreach (preg_split("/\r\n|\n|\r/", $texto) ?: [] as $linha) {
+            $linha = trim($linha);
+
+            if ($linha === '' || !str_contains($linha, ':')) {
+                continue;
+            }
+
+            [$chave, $valor] = array_pad(explode(':', $linha, 2), 2, '');
+            $chaveNormalizada = $this->normalizeContextKey($chave);
+            $valor = $this->sanitizeContextText($valor);
+
+            if ($chaveNormalizada === '' || $valor === '') {
+                continue;
+            }
+
+            $campos[$chaveNormalizada] = $valor;
+        }
+
+        return $campos;
+    }
+
+    private function buildStructuredContextSummary(array $campos): string
+    {
+        if ($campos === []) {
+            return '';
+        }
+
+        $partes = [];
+        $unidade = $campos['unidade'] ?? '';
+        $local = $campos['local'] ?? '';
+        $tipoManutencao = $campos['tipo_manutencao'] ?? '';
+        $servico = $campos['servico'] ?? '';
+        $equipamento = $campos['equipamento'] ?? '';
+        $diagnostico = $campos['diagnostico'] ?? '';
+
+        if ($unidade !== '' || $local !== '') {
+            $partes[] = trim(implode(' / ', array_filter([$unidade, $local])));
+        }
+
+        if ($tipoManutencao !== '') {
+            $partes[] = ucfirst(mb_strtolower($tipoManutencao));
+        }
+
+        if ($servico !== '') {
+            $partes[] = 'Serviço: ' . $servico;
+        }
+
+        if ($equipamento !== '') {
+            $partes[] = 'Equip.: ' . $equipamento;
+        }
+
+        if ($diagnostico !== '') {
+            $partes[] = 'Diag.: ' . $diagnostico;
+        }
+
+        if ($partes === []) {
+            foreach (['setor', 'encarregado', 'procedimento', 'material', 'material_utilizado'] as $campo) {
+                if (!empty($campos[$campo])) {
+                    $partes[] = ucfirst(str_replace('_', ' ', $campo)) . ': ' . $campos[$campo];
+                }
+
+                if (count($partes) >= 2) {
+                    break;
+                }
+            }
+        }
+
+        return implode(' • ', $partes);
+    }
+
+    private function normalizeContextKey(string $chave): string
+    {
+        $normalizada = mb_strtolower(trim($chave));
+        $normalizada = str_replace(
+            ['Ã£', 'Ã¡', 'Ã ', 'Ã¢', 'Ã©', 'Ãª', 'Ã­', 'Ã³', 'Ã´', 'Ãµ', 'Ãº', 'Ã§'],
+            ['a', 'a', 'a', 'a', 'e', 'e', 'i', 'o', 'o', 'o', 'u', 'c'],
+            $normalizada
+        );
+        $normalizada = preg_replace('/[^a-z0-9]+/u', '_', $normalizada) ?? $normalizada;
+
+        return trim($normalizada, '_');
+    }
+
+    private function sanitizeContextText(?string $texto): string
+    {
+        $texto = trim((string) $texto);
+        $texto = preg_replace('/\s+/u', ' ', $texto) ?? $texto;
+
+        return trim($texto, " \t\n\r\0\x0B,;.-");
+    }
+
+    private function limitContext(string $texto, int $limite = 110): string
+    {
+        if (mb_strlen($texto) <= $limite) {
+            return $texto;
+        }
+
+        return rtrim(mb_substr($texto, 0, $limite - 3)) . '...';
+    }
 }
+
+
+
+

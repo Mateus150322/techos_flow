@@ -7,7 +7,8 @@
 </head>
 <body>
 @php
-    $fotos = collect($payload['fotos'] ?? [])->pad(3, ['titulo' => 'Evidência', 'src' => null]);
+    $fotos = collect($payload['fotos'] ?? []);
+    $fotoLinhas = $fotos->chunk(3);
     $mostrarHorasExtras = (bool) ($payload['mostrar_horas_extras'] ?? false);
 @endphp
 
@@ -22,7 +23,7 @@
             </td>
             <td class="brand-skyline" style="width:180px;">
                 Operação e controle<br>
-                ordens de serviço
+                de ordens de serviço
             </td>
         </tr>
     </table>
@@ -87,7 +88,7 @@
     </div>
 
     <div class="section">
-        <table class="two-column-grid">
+        <table class="two-column-grid two-column-grid-stack">
             <tr>
                 <td>
                     <div class="panel">
@@ -141,7 +142,7 @@
                 <td style="{{ $mostrarHorasExtras ? '' : 'width:100%; padding-right:0;' }}">
                     <div class="panel">
                         <div class="panel-header">Equipe participante</div>
-                        <table class="simple-table">
+                        <table class="simple-table data-table-compact operational-table">
                             <thead>
                                 <tr>
                                     <th>Nome</th>
@@ -173,7 +174,7 @@
                     <td>
                         <div class="panel">
                             <div class="panel-header">Horas extras da OS</div>
-                            <table class="simple-table">
+                            <table class="simple-table data-table-compact operational-table">
                                 <thead>
                                     <tr>
                                         <th>Funcionário</th>
@@ -211,25 +212,105 @@
     </div>
 
     <div class="section">
-        <h2 class="section-title">Evidências / Fotos da OS</h2>
-        <table class="photo-grid">
-            <tr>
-                @foreach ($fotos as $foto)
-                    <td>
-                        <div class="photo-card">
-                            <p class="photo-label">{{ $foto['titulo'] }}</p>
-                            <div class="photo-frame">
-                                @if (!empty($foto['src']))
-                                    <img src="{{ $foto['src'] }}" alt="{{ $foto['titulo'] }}">
-                                @else
-                                    <div class="photo-empty">Sem imagem registrada</div>
-                                @endif
-                            </div>
-                        </div>
-                    </td>
+        <h2 class="section-title">Evidências fotográficas</h2>
+
+        @if ($fotos->isEmpty())
+            <div class="text-panel placeholder-text">Nenhuma evidência fotográfica registrada para esta ordem de serviço.</div>
+        @else
+            <table class="photo-grid">
+                @foreach ($fotoLinhas as $linha)
+                    <tr>
+                        @foreach ($linha as $foto)
+                            <td>
+                                <div class="photo-card">
+                                    <p class="photo-label">{{ $foto['titulo'] }}</p>
+                                    <div class="photo-frame">
+                                        @if (!empty($foto['src']))
+                                            <img src="{{ $foto['src'] }}" alt="{{ $foto['titulo'] }}">
+                                        @else
+                                            <div class="photo-empty">Sem imagem registrada</div>
+                                        @endif
+                                    </div>
+
+                                    @if (!empty($foto['src']))
+                                        <div class="photo-meta">
+                                            <div class="photo-meta-title">Geolocalização da evidência</div>
+
+                                            @if (!empty($foto['capturada_em']))
+                                                <div class="photo-meta-row">
+                                                    <span class="photo-meta-label">Capturada em</span>
+                                                    <span class="photo-meta-value">{{ $foto['capturada_em'] }}</span>
+                                                </div>
+                                            @endif
+
+                                            @if (!empty($foto['registrada_por']))
+                                                <div class="photo-meta-row">
+                                                    <span class="photo-meta-label">Registrada por</span>
+                                                    <span class="photo-meta-value">{{ $foto['registrada_por'] }}</span>
+                                                </div>
+                                            @endif
+
+                                            @if (!empty($foto['coordenadas']))
+                                                <div class="photo-meta-row">
+                                                    <span class="photo-meta-label">Coordenadas</span>
+                                                    <span class="photo-meta-value">{{ $foto['coordenadas'] }}</span>
+                                                </div>
+                                            @endif
+
+                                            @if (!empty($foto['precisao']))
+                                                <div class="photo-meta-row">
+                                                    <span class="photo-meta-label">Precisão</span>
+                                                    <span class="photo-meta-value">{{ $foto['precisao'] }}</span>
+                                                </div>
+                                            @endif
+
+                                            @if (!empty($foto['rua']))
+                                                <div class="photo-meta-row">
+                                                    <span class="photo-meta-label">Rua</span>
+                                                    <span class="photo-meta-value">{{ $foto['rua'] }}</span>
+                                                </div>
+                                            @endif
+
+                                            @if (!empty($foto['bairro']))
+                                                <div class="photo-meta-row">
+                                                    <span class="photo-meta-label">Bairro</span>
+                                                    <span class="photo-meta-value">{{ $foto['bairro'] }}</span>
+                                                </div>
+                                            @endif
+
+                                            @if (!empty($foto['cidade_estado']))
+                                                <div class="photo-meta-row">
+                                                    <span class="photo-meta-label">Cidade/UF</span>
+                                                    <span class="photo-meta-value">{{ $foto['cidade_estado'] }}</span>
+                                                </div>
+                                            @endif
+
+                                            @if (!empty($foto['endereco_capturado']))
+                                                <div class="photo-meta-block">
+                                                    <div class="photo-meta-label">Endereço capturado</div>
+                                                    <div class="photo-meta-value photo-meta-address">{{ $foto['endereco_capturado'] }}</div>
+                                                </div>
+                                            @endif
+
+                                            @if (
+                                                empty($foto['coordenadas']) &&
+                                                empty($foto['precisao']) &&
+                                                empty($foto['endereco_capturado']) &&
+                                                empty($foto['rua']) &&
+                                                empty($foto['bairro']) &&
+                                                empty($foto['cidade_estado'])
+                                            )
+                                                <div class="photo-meta-empty">Sem geolocalização registrada nesta evidência.</div>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                            </td>
+                        @endforeach
+                    </tr>
                 @endforeach
-            </tr>
-        </table>
+            </table>
+        @endif
     </div>
 
     <div class="section">

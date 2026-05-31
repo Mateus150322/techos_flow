@@ -23,6 +23,16 @@ class RelatorioController extends Controller
             'tipos' => $payload['tipos'],
             'tecnicos' => $payload['tecnicos'],
             'resumo' => $payload['resumo'],
+            'resumoOperacional' => $payload['resumoOperacional'],
+            'gargalosOperacionais' => $payload['gargalosOperacionais'],
+            'filaOperacional' => $payload['filaOperacional'],
+            'cargaTecnicos' => $payload['cargaTecnicos'],
+            'metricasOperacionais' => $payload['metricasOperacionais'],
+            'statusResumo' => $payload['statusResumo'],
+            'produtividadeTecnicos' => $payload['produtividadeTecnicos'],
+            'tiposMaisFrequentes' => $payload['tiposMaisFrequentes'],
+            'resumoTiposStatus' => $payload['resumoTiposStatus'],
+            'resumoTecnicosOperacional' => $payload['resumoTecnicosOperacional'],
             'reportDefinition' => $payload['reportDefinition'],
             'reportPagination' => $payload['reportPagination'],
             'atividadeRecente' => $payload['atividadeRecente'],
@@ -74,7 +84,7 @@ class RelatorioController extends Controller
         }
 
         return $request->validate([
-            'tipo_relatorio' => 'nullable|in:geral,status,produtividade,tipo,periodo',
+            'tipo_relatorio' => 'nullable|in:operacional,geral,status,produtividade,tipo,periodo',
             'status' => 'nullable|in:aberta,em_execucao,finalizada,nao_executada,cancelada,todos',
             'tipo' => 'nullable|string|max:255',
             'prioridade' => 'nullable|in:1,2,3,todas',

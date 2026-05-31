@@ -3,14 +3,35 @@
 namespace App\Services\Relatorios;
 
 use App\Models\Anexo;
+use App\Models\ExecucaoFuncionario;
 use App\Models\OrdemServico;
+use App\Services\Storage\AnexoStorageService;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Spatie\LaravelPdf\Facades\Pdf;
 use Spatie\LaravelPdf\PdfBuilder;
 
 class OrdemServicoDetalhadaPdfService
 {
+    private const FOTO_TITULOS = [
+        'Evidencia 1',
+        'Evidencia 2',
+        'Evidencia 3',
+        'Evidencia 4',
+        'Evidencia 5',
+        'Evidencia 6',
+        'Evidencia 7',
+        'Evidencia 8',
+        'Evidencia 9',
+        'Evidencia 10',
+        'Evidencia 11',
+        'Evidencia 12',
+    ];
+
+    public function __construct(
+        private readonly AnexoStorageService $anexoStorage
+    ) {
+    }
+
     public function buildPdf(
         OrdemServico $ordemServico,
         string $responsavelEmissao,
@@ -22,6 +43,7 @@ class OrdemServicoDetalhadaPdfService
             'tecnicoResponsavel',
             'execucoes.tecnico',
             'execucoes.execucaoFuncionarios.funcionario',
+            'execucoes.execucaoFuncionarios.colaboradorOperacional',
             'anexos.submetidoPor',
         ]);
 
@@ -52,9 +74,6 @@ class OrdemServicoDetalhadaPdfService
         $execucaoPrincipal = $ordemServico->execucoes->first();
         $execucaoFuncionarios = collect($execucaoPrincipal?->execucaoFuncionarios ?? []);
         $camposDescricao = $this->parseCamposDescricao((string) $ordemServico->descricao);
-        $linhasEsquerda = $this->buildLinhasEsquerda($ordemServico, $execucaoPrincipal, $execucaoFuncionarios);
-        $linhasDireita = $this->buildLinhasDireita($camposDescricao, $execucaoPrincipal);
-        $fotos = $this->buildFotos($ordemServico->anexos);
 
         return [
             'numero' => $ordemServico->numero,
@@ -65,22 +84,27 @@ class OrdemServicoDetalhadaPdfService
             'prioridade' => $this->formatPrioridade((int) $ordemServico->prioridade),
             'prioridadeTone' => $this->prioridadeTone((int) $ordemServico->prioridade),
             'descricaoSolicitacao' => $camposDescricao['descricao_os'] ?: (string) $ordemServico->descricao,
-            'execucaoServico' => $camposDescricao['procedimento'] ?: ($execucaoPrincipal?->observacao ?: 'Execução sem observações registradas.'),
+            'execucaoServico' => $camposDescricao['procedimento']
+                ?: ($execucaoPrincipal?->observacao ?: 'Execução sem observações registradas.'),
             'conclusaoTecnica' => $this->buildConclusaoTecnica($camposDescricao, $execucaoPrincipal),
-            'linhas_esquerda' => $linhasEsquerda,
-            'linhas_direita' => $linhasDireita,
+            'linhas_esquerda' => $this->buildLinhasEsquerda(
+                $ordemServico,
+                $execucaoPrincipal,
+                $execucaoFuncionarios
+            ),
+            'linhas_direita' => $this->buildLinhasDireita($camposDescricao, $execucaoPrincipal),
             'equipe' => $this->buildEquipeRows($execucaoFuncionarios, $execucaoPrincipal),
             'mostrar_horas_extras' => $mostrarHorasExtras,
             'horas_extras' => $mostrarHorasExtras
                 ? $this->buildHorasExtrasRows($execucaoFuncionarios)
                 : [],
-            'fotos' => $fotos,
+            'fotos' => $this->buildFotos($ordemServico->anexos),
             'data_emissao' => now()->format('d/m/Y H:i'),
         ];
     }
 
     /**
-     * @param Collection<int, \App\Models\ExecucaoFuncionario> $execucaoFuncionarios
+     * @param Collection<int, ExecucaoFuncionario> $execucaoFuncionarios
      * @return array<int, array{label:string,value:string}>
      */
     private function buildLinhasEsquerda(
@@ -89,10 +113,8 @@ class OrdemServicoDetalhadaPdfService
         Collection $execucaoFuncionarios
     ): array {
         $endereco = $ordemServico->endereco;
-        $primeiraGeo = $ordemServico->anexos
-            ->first(fn (Anexo $anexo) => $anexo->latitude !== null && $anexo->longitude !== null);
         $equipe = $execucaoFuncionarios
-            ->map(fn ($item) => $item->funcionario?->name)
+            ->map(fn (ExecucaoFuncionario $item) => $item->participanteNome())
             ->filter()
             ->unique()
             ->implode(', ');
@@ -100,22 +122,31 @@ class OrdemServicoDetalhadaPdfService
         return array_values(array_filter([
             $this->linha('Data de abertura', $this->formatDateTime($ordemServico->data_abertura)),
             $this->linha('Data de início', $this->formatDateTime($execucaoPrincipal?->data_inicio)),
-            $this->linha('Data de finalização', $this->formatDateTime($execucaoPrincipal?->data_fim ?? $ordemServico->data_encerramento)),
+            $this->linha(
+                'Data de finalização',
+                $this->formatDateTime($execucaoPrincipal?->data_fim ?? $ordemServico->data_encerramento)
+            ),
             $this->linha('Criada por', $ordemServico->criadaPor?->name),
             $this->linha('Técnico responsável', $ordemServico->tecnicoResponsavel?->name),
             $this->linha('Equipe participante', $equipe),
-            $this->linha('Endereço', trim(implode(', ', array_filter([
-                $endereco?->rua,
-                $endereco?->numero,
-            ])))),
+            $this->linha(
+                'Endereço cadastral da OS',
+                trim(implode(', ', array_filter([
+                    $endereco?->rua,
+                    $endereco?->numero,
+                ])))
+            ),
             $this->linha('Bairro', $endereco?->bairro),
-            $this->linha('Cidade', trim(implode(' - ', array_filter([
-                $endereco?->cidade,
-                $endereco?->estado,
-            ])))),
+            $this->linha(
+                'Cidade',
+                trim(implode(' - ', array_filter([
+                    $endereco?->cidade,
+                    $endereco?->estado,
+                ])))
+            ),
             $this->linha('CEP', $this->formatCep((string) ($endereco?->cep ?? ''))),
-            $this->linha('Latitude', $endereco?->latitude ?? $primeiraGeo?->latitude),
-            $this->linha('Longitude', $endereco?->longitude ?? $primeiraGeo?->longitude),
+            $this->linha('Latitude da OS', $this->formatCoordinate($endereco?->latitude)),
+            $this->linha('Longitude da OS', $this->formatCoordinate($endereco?->longitude)),
         ], fn (mixed $item) => $item !== null));
     }
 
@@ -129,16 +160,16 @@ class OrdemServicoDetalhadaPdfService
             $this->linha('Equipamento', $camposDescricao['equipamento'] ?? ''),
             $this->linha('Unidade', $camposDescricao['unidade'] ?? ''),
             $this->linha('Categoria', $camposDescricao['tipo_manutencao'] ?? ''),
-            $this->linha('Local', $camposDescricao['local'] ?? ''),
+            $this->linha('Local operacional', $camposDescricao['local'] ?? ''),
             $this->linha('Setor', $camposDescricao['setor'] ?? ''),
             $this->linha('Encarregado', $camposDescricao['encarregado'] ?? ''),
             $this->linha('Diagnóstico', $camposDescricao['diagnostico'] ?? ''),
-            $this->linha('Observação', $execucaoPrincipal?->observacao ?? ''),
+            $this->linha('Observação da execução', $execucaoPrincipal?->observacao ?? ''),
         ], fn (mixed $item) => $item !== null));
     }
 
     /**
-     * @param Collection<int, \App\Models\ExecucaoFuncionario> $execucaoFuncionarios
+     * @param Collection<int, ExecucaoFuncionario> $execucaoFuncionarios
      * @return array<int, array<string, string>>
      */
     private function buildEquipeRows(Collection $execucaoFuncionarios, mixed $execucaoPrincipal): array
@@ -146,7 +177,7 @@ class OrdemServicoDetalhadaPdfService
         if ($execucaoFuncionarios->isEmpty() && $execucaoPrincipal?->tecnico) {
             return [[
                 'nome' => $execucaoPrincipal->tecnico->name ?? 'Técnico responsável',
-                'funcao' => 'Responsável',
+                'funcao' => 'Responsável técnico',
                 'horario' => $this->formatHorarioIntervalo(
                     $execucaoPrincipal->data_inicio,
                     $execucaoPrincipal->data_fim
@@ -157,10 +188,12 @@ class OrdemServicoDetalhadaPdfService
         }
 
         return $execucaoFuncionarios
-            ->map(function ($item, int $index) {
+            ->map(function (ExecucaoFuncionario $item) use ($execucaoPrincipal) {
                 return [
-                    'nome' => $item->funcionario?->name ?? 'Funcionário',
-                    'funcao' => $index === 0 ? 'Responsável' : 'Participante',
+                    'nome' => $item->participanteNome(),
+                    'funcao' => $this->isResponsavelTecnico($item, $execucaoPrincipal)
+                        ? 'Responsável técnico'
+                        : $item->participanteFuncao(),
                     'horario' => $this->formatHorarioIntervalo($item->data_inicio, $item->data_fim),
                     'horas_trabalhadas' => $this->formatMinutes((int) $item->minutos_trabalhados),
                     'hora_extra' => $this->formatMinutes(
@@ -173,15 +206,15 @@ class OrdemServicoDetalhadaPdfService
     }
 
     /**
-     * @param Collection<int, \App\Models\ExecucaoFuncionario> $execucaoFuncionarios
+     * @param Collection<int, ExecucaoFuncionario> $execucaoFuncionarios
      * @return array<int, array<string, string>>
      */
     private function buildHorasExtrasRows(Collection $execucaoFuncionarios): array
     {
         return $execucaoFuncionarios
-            ->map(function ($item) {
+            ->map(function (ExecucaoFuncionario $item) {
                 return [
-                    'funcionario' => $item->funcionario?->name ?? 'Funcionário',
+                    'funcionario' => $item->participanteNome(),
                     'data' => optional($item->data_inicio)?->format('d/m/Y') ?? '-',
                     'entrada' => optional($item->data_inicio)?->format('H:i') ?? '-',
                     'saida' => optional($item->data_fim)?->format('H:i') ?? '-',
@@ -196,20 +229,26 @@ class OrdemServicoDetalhadaPdfService
 
     /**
      * @param Collection<int, Anexo> $anexos
-     * @return array<int, array{titulo:string,src:string|null}>
+     * @return array<int, array<string, string|null>>
      */
     private function buildFotos(Collection $anexos): array
     {
-        $titulos = ['Antes', 'Durante', 'Depois'];
-
         return $anexos
             ->filter(fn (Anexo $anexo) => $anexo->tipo === 'foto')
-            ->take(3)
+            ->sortByDesc(fn (Anexo $anexo) => $anexo->latitude !== null && $anexo->longitude !== null)
             ->values()
-            ->map(function (Anexo $anexo, int $index) use ($titulos) {
+            ->map(function (Anexo $anexo, int $index) {
                 return [
-                    'titulo' => $titulos[$index] ?? ('Evidência ' . ($index + 1)),
+                    'titulo' => self::FOTO_TITULOS[$index] ?? ('Evidência ' . ($index + 1)),
                     'src' => $this->buildImageDataUri($anexo),
+                    'registrada_por' => $anexo->submetidoPor?->name,
+                    'capturada_em' => $this->formatDateTime($anexo->geolocalizacao_capturada_em),
+                    'coordenadas' => $this->buildCoordenadas($anexo),
+                    'precisao' => $this->formatPrecisao($anexo->precisao_metros),
+                    'rua' => $anexo->rua_capturada,
+                    'bairro' => $anexo->bairro_capturado,
+                    'cidade_estado' => $this->buildCidadeEstado($anexo),
+                    'endereco_capturado' => $this->buildEnderecoCapturado($anexo),
                 ];
             })
             ->all();
@@ -217,19 +256,23 @@ class OrdemServicoDetalhadaPdfService
 
     private function buildImageDataUri(Anexo $anexo): ?string
     {
-        $disk = $this->resolveStorageDisk($anexo->caminho);
+        $disk = $this->anexoStorage->resolveDisk($anexo->caminho);
 
         if (! $disk) {
             return null;
         }
 
-        $mime = Storage::disk($disk)->mimeType($anexo->caminho);
+        $mime = $this->anexoStorage->mimeType((string) $anexo->caminho, $disk);
 
         if (! is_string($mime) || ! str_starts_with($mime, 'image/')) {
             return null;
         }
 
-        $content = Storage::disk($disk)->get($anexo->caminho);
+        $content = $this->anexoStorage->get((string) $anexo->caminho, $disk);
+
+        if (! is_string($content)) {
+            return null;
+        }
 
         return 'data:' . $mime . ';base64,' . base64_encode($content);
     }
@@ -405,20 +448,72 @@ class OrdemServicoDetalhadaPdfService
         return substr($digits, 0, 5) . '-' . substr($digits, 5);
     }
 
-    private function resolveStorageDisk(?string $path): ?string
+    private function formatCoordinate(mixed $value): ?string
     {
-        if (! $path) {
+        if ($value === null || $value === '') {
             return null;
         }
 
-        if (Storage::disk('local')->exists($path)) {
-            return 'local';
+        return number_format((float) $value, 6, ',', '.');
+    }
+
+    private function buildCoordenadas(Anexo $anexo): ?string
+    {
+        $latitude = $this->formatCoordinate($anexo->latitude);
+        $longitude = $this->formatCoordinate($anexo->longitude);
+
+        if (! $latitude || ! $longitude) {
+            return null;
         }
 
-        if (Storage::disk('public')->exists($path)) {
-            return 'public';
+        return $latitude . ' / ' . $longitude;
+    }
+
+    private function formatPrecisao(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
         }
 
-        return null;
+        return number_format((float) $value, 1, ',', '.') . ' m';
+    }
+
+    private function buildCidadeEstado(Anexo $anexo): ?string
+    {
+        $cidadeEstado = trim(implode(' - ', array_filter([
+            $anexo->cidade_capturada,
+            $anexo->estado_capturado,
+        ])));
+
+        return $cidadeEstado !== '' ? $cidadeEstado : null;
+    }
+
+    private function buildEnderecoCapturado(Anexo $anexo): ?string
+    {
+        if (! empty($anexo->endereco_capturado)) {
+            return $anexo->endereco_capturado;
+        }
+
+        $partes = array_filter([
+            $anexo->rua_capturada,
+            $anexo->bairro_capturado,
+            $anexo->cidade_capturada,
+            $anexo->estado_capturado,
+        ]);
+
+        if ($partes === []) {
+            return null;
+        }
+
+        return implode(', ', $partes);
+    }
+
+    private function isResponsavelTecnico(
+        ExecucaoFuncionario $item,
+        mixed $execucaoPrincipal
+    ): bool {
+        return $item->participanteTipoVinculo() === 'usuario'
+            && $item->funcionario_id !== null
+            && $execucaoPrincipal?->tecnico_id === $item->funcionario_id;
     }
 }

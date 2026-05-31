@@ -21,16 +21,23 @@ class RelatorioHoraExtraService
     public function build(array $filters): array
     {
         [$inicio, $fim] = $this->resolvePeriodo($filters);
+        $participanteId = $filters['funcionario_id'] ?? $filters['participante_id'] ?? null;
 
         $query = ExecucaoFuncionario::query()
-            ->with(['funcionario', 'execucao.ordemServico.endereco'])
-            ->whereHas('funcionario', function (Builder $builder) {
-                $builder->whereIn('role', ['tecnico', 'administrador']);
+            ->with(['funcionario', 'colaboradorOperacional', 'execucao.ordemServico.endereco'])
+            ->where(function (Builder $builder) {
+                $builder
+                    ->whereNotNull('funcionario_id')
+                    ->orWhereNotNull('colaborador_operacional_id');
             })
             ->orderBy('data_inicio');
 
-        if (!empty($filters['funcionario_id'])) {
-            $query->where('funcionario_id', $filters['funcionario_id']);
+        if (is_string($participanteId) && $participanteId !== '') {
+            $query->where(function (Builder $builder) use ($participanteId) {
+                $builder
+                    ->where('funcionario_id', $participanteId)
+                    ->orWhere('colaborador_operacional_id', $participanteId);
+            });
         }
 
         if ($fim) {
@@ -85,7 +92,8 @@ class RelatorioHoraExtraService
         return [
             'title' => 'Relatório de Horas Extras',
             'columns' => [
-                ['key' => 'funcionario_nome', 'label' => 'Funcionário'],
+                ['key' => 'funcionario_nome', 'label' => 'Participante'],
+                ['key' => 'funcao', 'label' => 'Função'],
                 ['key' => 'horas_extras_50', 'label' => 'Horas extras 50%'],
                 ['key' => 'horas_extras_100', 'label' => 'Horas extras 100%'],
                 ['key' => 'total_extras', 'label' => 'Total extras'],
@@ -98,6 +106,7 @@ class RelatorioHoraExtraService
             'rows' => collect($payload['rows'])
                 ->map(fn (array $row) => [
                     'funcionario_nome' => $row['funcionario_nome'],
+                    'funcao' => $row['funcao'],
                     'horas_extras_50' => $this->formatarMinutos($row['horas_extras_50_minutos']),
                     'horas_extras_100' => $this->formatarMinutos($row['horas_extras_100_minutos']),
                     'total_extras' => $this->formatarMinutos($row['total_extras_minutos']),
@@ -116,7 +125,7 @@ class RelatorioHoraExtraService
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, \App\Models\ExecucaoFuncionario> $registros
+     * @param Collection<int, ExecucaoFuncionario> $registros
      * @return array<int, array<string, mixed>>
      */
     private function consolidarLinhas(Collection $registros, ?CarbonImmutable $inicio, ?CarbonImmutable $fim): array
@@ -124,6 +133,12 @@ class RelatorioHoraExtraService
         $entries = [];
 
         foreach ($registros as $registro) {
+            $participanteId = $registro->participanteId();
+
+            if (! $participanteId) {
+                continue;
+            }
+
             $periodoInicio = CarbonImmutable::parse($registro->data_inicio);
             $periodoFim = CarbonImmutable::parse($registro->data_fim);
             $segmentos = $this->horaExtraService->quebrarPorDia(
@@ -136,9 +151,13 @@ class RelatorioHoraExtraService
             foreach ($segmentos as $segmento) {
                 $data = CarbonImmutable::parse($segmento['data']);
                 $entries[] = [
-                    'funcionario_id' => $registro->funcionario_id,
-                    'funcionario_nome' => $registro->funcionario?->name ?? 'Funcionário',
-                    'valor_hora' => (float) ($registro->funcionario?->valor_hora ?? 0),
+                    'participante_key' => $registro->participanteTipoVinculo() . ':' . $participanteId,
+                    'funcionario_id' => $participanteId,
+                    'funcionario_nome' => $registro->participanteNome(),
+                    'tipo_vinculo' => $registro->participanteTipoVinculo(),
+                    'role' => $registro->participanteCategoria(),
+                    'funcao' => $registro->participanteFuncao(),
+                    'valor_hora' => $registro->participanteValorHora(),
                     'data' => $data,
                     'competencia' => $data->format('Y-m'),
                     'in_selected_range' => $this->estaNoPeriodoSelecionado($data, $inicio, $fim),
@@ -148,15 +167,20 @@ class RelatorioHoraExtraService
             }
         }
 
-        $porFuncionario = collect($entries)->groupBy('funcionario_id');
+        $porFuncionario = collect($entries)->groupBy('participante_key');
         $linhas = [];
 
-        foreach ($porFuncionario as $funcionarioId => $itemsFuncionario) {
+        foreach ($porFuncionario as $itemsFuncionario) {
             $carryBanco = 0;
             $temSelecionado = false;
+            $primeiro = $itemsFuncionario->first();
+
             $linha = [
-                'funcionario_id' => $funcionarioId,
-                'funcionario_nome' => (string) ($itemsFuncionario->first()['funcionario_nome'] ?? 'Funcionário'),
+                'funcionario_id' => (string) ($primeiro['funcionario_id'] ?? ''),
+                'funcionario_nome' => (string) ($primeiro['funcionario_nome'] ?? 'Participante'),
+                'tipo_vinculo' => (string) ($primeiro['tipo_vinculo'] ?? 'usuario'),
+                'role' => (string) ($primeiro['role'] ?? 'tecnico'),
+                'funcao' => (string) ($primeiro['funcao'] ?? 'Participante'),
                 'horas_extras_50_minutos' => 0,
                 'horas_extras_100_minutos' => 0,
                 'total_extras_minutos' => 0,
@@ -191,7 +215,7 @@ class RelatorioHoraExtraService
                     $diasGerados = intdiv($availableBank, HoraExtraService::MINUTOS_POR_DIA_FOLGA);
                     $carryBanco = $availableBank % HoraExtraService::MINUTOS_POR_DIA_FOLGA;
 
-                    if (!$entry['in_selected_range']) {
+                    if (! $entry['in_selected_range']) {
                         continue;
                     }
 
@@ -248,6 +272,7 @@ class RelatorioHoraExtraService
             ->map(fn (array $row) => [
                 'funcionario_id' => $row['funcionario_id'],
                 'funcionario_nome' => $row['funcionario_nome'],
+                'funcao' => $row['funcao'],
                 'total_extras_minutos' => $row['total_extras_minutos'],
             ])
             ->values()
@@ -255,21 +280,38 @@ class RelatorioHoraExtraService
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, \App\Models\ExecucaoFuncionario> $registros
+     * @param Collection<int, ExecucaoFuncionario> $registros
      * @return array<int, array<string, string>>
      */
     private function listarFuncionariosFiltro(Collection $registros): array
     {
         return $registros
-            ->map(fn (ExecucaoFuncionario $registro) => $registro->funcionario)
+            ->map(function (ExecucaoFuncionario $registro) {
+                $id = $registro->participanteId();
+
+                if (! $id) {
+                    return null;
+                }
+
+                return [
+                    'key' => $registro->participanteTipoVinculo() . ':' . $id,
+                    'id' => $id,
+                    'name' => $registro->participanteNome(),
+                    'role' => $registro->participanteCategoria(),
+                    'funcao' => $registro->participanteFuncao(),
+                    'tipo_vinculo' => $registro->participanteTipoVinculo(),
+                ];
+            })
             ->filter()
-            ->unique('id')
+            ->unique('key')
             ->sortBy('name')
             ->values()
-            ->map(fn ($funcionario) => [
-                'id' => $funcionario->id,
-                'name' => $funcionario->name,
-                'role' => $funcionario->role,
+            ->map(fn (array $participante) => [
+                'id' => $participante['id'],
+                'name' => $participante['name'],
+                'role' => $participante['role'],
+                'funcao' => $participante['funcao'],
+                'tipo_vinculo' => $participante['tipo_vinculo'],
             ])
             ->all();
     }
@@ -280,7 +322,7 @@ class RelatorioHoraExtraService
      */
     private function resolvePeriodo(array $filters): array
     {
-        if (!empty($filters['mes']) && !empty($filters['ano'])) {
+        if (! empty($filters['mes']) && ! empty($filters['ano'])) {
             $inicio = CarbonImmutable::create(
                 (int) $filters['ano'],
                 (int) $filters['mes'],
@@ -290,11 +332,11 @@ class RelatorioHoraExtraService
             return [$inicio, $inicio->endOfMonth()->endOfDay()];
         }
 
-        $inicio = !empty($filters['data_inicio'])
+        $inicio = ! empty($filters['data_inicio'])
             ? CarbonImmutable::parse((string) $filters['data_inicio'])->startOfDay()
             : null;
 
-        $fim = !empty($filters['data_fim'])
+        $fim = ! empty($filters['data_fim'])
             ? CarbonImmutable::parse((string) $filters['data_fim'])->endOfDay()
             : null;
 
@@ -306,7 +348,7 @@ class RelatorioHoraExtraService
      */
     private function descricaoPeriodo(?CarbonImmutable $inicio, ?CarbonImmutable $fim, array $filters): string
     {
-        if (!empty($filters['mes']) && !empty($filters['ano'])) {
+        if (! empty($filters['mes']) && ! empty($filters['ano'])) {
             return sprintf('%02d/%04d', (int) $filters['mes'], (int) $filters['ano']);
         }
 
@@ -357,4 +399,3 @@ class RelatorioHoraExtraService
         return sprintf('%dh%02d', $horas, $resto);
     }
 }
-

@@ -11,6 +11,14 @@
     $formatarMinutos = static function (int $minutos): string {
         return sprintf('%dh%02d', intdiv($minutos, 60), $minutos % 60);
     };
+
+    $destinoBadgeClass = static function (?string $destino): string {
+        return match (mb_strtolower(trim((string) $destino))) {
+            'folga', 'banco', 'banco de folgas' => 'badge-success',
+            'pagamento', 'pagas', 'pago' => 'badge-info',
+            default => 'badge-neutral',
+        };
+    };
 @endphp
 
 <div class="page-shell">
@@ -23,7 +31,7 @@
                 <div class="brand-name">TechOS <span class="accent">Flow</span></div>
             </td>
             <td class="brand-skyline" style="width:180px;">
-                Gestão de pessoas<br>
+                gestão de pessoas<br>
                 horas extras e folgas
             </td>
         </tr>
@@ -56,7 +64,18 @@
     </table>
 
     <div class="section">
-        <h2 class="section-title">Resumo Geral</h2>
+        <div class="panel panel-soft">
+            <div class="panel-header">Leitura gerencial</div>
+            <div class="panel-body">
+                <div class="summary-copy">
+                    O relatório consolida horas extras registradas no período, com separação entre adicional de 50%, adicional de 100%, pagamento direto e conversão em banco de folgas.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Resumo executivo</h2>
         <table class="metric-grid">
             <tr>
                 <td><div class="metric-card"><div class="metric-label">Funcionários</div><div class="metric-value">{{ $resumo['total_funcionarios'] }}</div></div></td>
@@ -70,29 +89,57 @@
     </div>
 
     <div class="section">
-        <h2 class="section-title">Indicadores Consolidados</h2>
-        <div class="panel">
-            <table class="simple-table">
-                <tbody>
-                    <tr>
-                        <td class="info-label">Total extras</td>
-                        <td>{{ $formatarMinutos($resumo['total_extras_minutos']) }}</td>
-                        <td class="info-label">Horas convertidas em folga</td>
-                        <td>{{ $formatarMinutos($resumo['total_horas_convertidas_folga_minutos']) }}</td>
-                    </tr>
-                    <tr>
-                        <td class="info-label">Dias de folga gerados</td>
-                        <td>{{ $resumo['total_dias_folga_gerados'] }}</td>
-                        <td class="info-label">Estimativa financeira</td>
-                        <td>R$ {{ number_format((float) $resumo['total_estimado_financeiro'], 2, ',', '.') }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <h2 class="section-title">Indicadores consolidados</h2>
+        <table class="two-column-grid">
+            <tr>
+                <td>
+                    <div class="panel">
+                        <div class="panel-header">Banco de folgas</div>
+                        <table class="simple-table">
+                            <tbody>
+                                <tr>
+                                    <td class="info-label">Horas convertidas em folga</td>
+                                    <td>{{ $formatarMinutos($resumo['total_horas_convertidas_folga_minutos']) }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">Dias de folga gerados</td>
+                                    <td>{{ $resumo['total_dias_folga_gerados'] }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">Saldo total do banco</td>
+                                    <td>{{ $formatarMinutos($resumo['saldo_total_banco_minutos']) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+                <td>
+                    <div class="panel">
+                        <div class="panel-header">Pagamento e custo</div>
+                        <table class="simple-table">
+                            <tbody>
+                                <tr>
+                                    <td class="info-label">Total de horas extras</td>
+                                    <td>{{ $formatarMinutos($resumo['total_extras_minutos']) }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">Horas pagas</td>
+                                    <td>{{ $formatarMinutos($resumo['total_horas_pagas_minutos']) }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">Estimativa financeira</td>
+                                    <td>R$ {{ number_format((float) $resumo['total_estimado_financeiro'], 2, ',', '.') }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+        </table>
     </div>
 
     <div class="section">
-        <h2 class="section-title">Relatório Individual por Funcionário</h2>
+        <h2 class="section-title">Relatório individual por funcionário</h2>
         <div class="panel">
             <table class="data-table">
                 <thead>
@@ -106,7 +153,17 @@
                     @forelse ($payload['rows'] as $row)
                         <tr>
                             @foreach ($payload['columns'] as $column)
-                                <td>{{ $row[$column['key']] ?? '-' }}</td>
+                                @php
+                                    $value = $row[$column['key']] ?? '-';
+                                    $key = (string) ($column['key'] ?? '');
+                                @endphp
+                                <td>
+                                    @if (str_contains(mb_strtolower($key), 'destino'))
+                                        <span class="badge {{ $destinoBadgeClass($value) }}">{{ $value }}</span>
+                                    @else
+                                        {{ $value }}
+                                    @endif
+                                </td>
                             @endforeach
                         </tr>
                     @empty
@@ -122,7 +179,7 @@
     </div>
 
     <div class="section">
-        <h2 class="section-title">Observações Finais</h2>
+        <h2 class="section-title">Observações finais</h2>
         <div class="text-panel">
             <ul class="notes">
                 <li>Relatório gerado automaticamente pelo TechOS Flow para acompanhamento gerencial das horas extras.</li>

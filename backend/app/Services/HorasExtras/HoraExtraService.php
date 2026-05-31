@@ -39,6 +39,7 @@ class HoraExtraService
             return ExecucaoFuncionario::query()->create([
                 'execucao_id' => $execucao->id,
                 'funcionario_id' => $participante['funcionario_id'],
+                'colaborador_operacional_id' => $participante['colaborador_operacional_id'],
                 'data_inicio' => $inicio,
                 'data_fim' => $fim,
                 'minutos_trabalhados' => $metricas['minutos_trabalhados'],
@@ -114,7 +115,7 @@ class HoraExtraService
 
     /**
      * @param array<int, array<string, mixed>> $participantes
-     * @return array<int, array<string, string>>
+     * @return array<int, array<string, string|null>>
      */
     public function normalizarParticipantes(Execucao $execucao, array $participantes): array
     {
@@ -132,7 +133,12 @@ class HoraExtraService
                     : CarbonImmutable::parse($execucao->data_fim);
 
                 return [
-                    'funcionario_id' => (string) $participante['funcionario_id'],
+                    'funcionario_id' => isset($participante['funcionario_id']) && $participante['funcionario_id'] !== null
+                        ? (string) $participante['funcionario_id']
+                        : null,
+                    'colaborador_operacional_id' => isset($participante['colaborador_operacional_id']) && $participante['colaborador_operacional_id'] !== null
+                        ? (string) $participante['colaborador_operacional_id']
+                        : null,
                     'data_inicio' => $inicio->toISOString(),
                     'data_fim' => $fim->toISOString(),
                 ];
@@ -143,15 +149,28 @@ class HoraExtraService
         )) {
             $normalizados->prepend([
                 'funcionario_id' => $execucao->tecnico_id,
+                'colaborador_operacional_id' => null,
                 'data_inicio' => $inicioPrincipal,
                 'data_fim' => $fimPrincipal,
             ]);
         }
 
         return $normalizados
-            ->unique('funcionario_id')
+            ->unique(fn (array $participante) => $this->participantKey($participante))
             ->values()
             ->all();
+    }
+
+    /**
+     * @param array<string, mixed> $participante
+     */
+    private function participantKey(array $participante): string
+    {
+        if (! empty($participante['funcionario_id'])) {
+            return 'usuario:' . $participante['funcionario_id'];
+        }
+
+        return 'colaborador:' . ($participante['colaborador_operacional_id'] ?? '');
     }
 
     /**

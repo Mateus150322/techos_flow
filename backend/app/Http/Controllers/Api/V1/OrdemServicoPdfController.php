@@ -19,27 +19,16 @@ class OrdemServicoPdfController extends Controller
         $user = $request->user();
         $ordemServico = OrdemServico::query()->findOrFail($id);
 
-        if (! in_array($user->role, ['atendente', 'tecnico', 'administrador'], true)) {
+        if ($user->role !== 'administrador') {
             return response()->json([
                 'message' => 'Acesso negado ao relatório solicitado.',
             ], 403);
         }
 
-        if ($user->role === 'tecnico') {
-            $osDisponivel = $ordemServico->status === 'aberta' && ! $ordemServico->tecnico_responsavel_id;
-            $tecnicoResponsavel = $ordemServico->tecnico_responsavel_id === $user->id;
-
-            if (! $osDisponivel && ! $tecnicoResponsavel) {
-                return response()->json([
-                    'message' => 'Acesso negado ao relatório solicitado.',
-                ], 403);
-            }
-        }
-
         return $pdfService->buildPdf(
             $ordemServico,
             $user?->name ?? 'Sistema',
-            $user?->role === 'administrador'
+            true
         );
     }
 }

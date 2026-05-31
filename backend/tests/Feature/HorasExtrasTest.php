@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ColaboradorOperacional;
 use App\Models\Endereco;
 use App\Models\Execucao;
 use App\Models\ExecucaoFuncionario;
@@ -116,12 +117,67 @@ class HorasExtrasTest extends TestCase
         ]);
     }
 
-    public function test_endpoint_funcionarios_lista_apenas_tecnicos_e_administradores_ativos(): void
+    public function test_finalizacao_aceita_periodo_individual_atravessando_meia_noite_em_dia_util(): void
+    {
+        $tecnico = $this->criarUsuario('tecnico', 'Tecnico Noturno', 25);
+        $adminParticipante = $this->criarUsuario('administrador', 'Admin Apoio', 40);
+        $os = $this->criarOs($tecnico->id, ['numero' => '2026-000099']);
+
+        Sanctum::actingAs($tecnico);
+
+        $iniciar = $this->postJson("/api/v1/ordens-servico/{$os->id}/iniciar", [
+            'data_inicio' => '2026-04-28 22:00:00',
+        ]);
+
+        $iniciar->assertCreated();
+        $execucaoId = (string) $iniciar->json('execucao.id');
+
+        $finalizar = $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
+            'execucao_id' => $execucaoId,
+            'data_fim' => '2026-04-29 02:00:00',
+            'funcionarios' => [
+                [
+                    'funcionario_id' => $adminParticipante->id,
+                    'data_inicio' => '2026-04-28 22:00:00',
+                    'data_fim' => '2026-04-29 02:00:00',
+                ],
+            ],
+        ]);
+
+        $finalizar
+            ->assertOk()
+            ->assertJsonPath('os.status', 'finalizada')
+            ->assertJsonPath('participantes_registrados', 2);
+
+        $this->assertDatabaseHas('execucao_funcionarios', [
+            'execucao_id' => $execucaoId,
+            'funcionario_id' => $adminParticipante->id,
+            'minutos_trabalhados' => 240,
+            'minutos_normais' => 0,
+            'minutos_extras_50' => 240,
+            'minutos_extras_100' => 0,
+        ]);
+
+        Sanctum::actingAs($adminParticipante);
+
+        $response = $this->getJson("/api/v1/relatorios/horas-extras?mes=4&ano=2026&funcionario_id={$adminParticipante->id}");
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('rows.0.funcionario_nome', 'Admin Apoio')
+            ->assertJsonPath('rows.0.horas_extras_50_minutos', 240)
+            ->assertJsonPath('rows.0.horas_extras_100_minutos', 0)
+            ->assertJsonPath('rows.0.valor_estimado_financeiro', 240);
+    }
+
+    public function test_endpoint_funcionarios_lista_usuarios_e_colaboradores_operacionais_ativos(): void
     {
         $tecnico = $this->criarUsuario('tecnico', 'Técnico Ativo');
         $admin = $this->criarUsuario('administrador', 'Administrador Ativo');
+        $auxiliar = $this->criarColaborador('Auxiliar Operacional');
         $this->criarUsuario('atendente', 'Atendente');
         $this->criarUsuario('tecnico', 'Técnico Inativo', 0, false);
+        $this->criarColaborador('Auxiliar Inativo', 18, false);
 
         Sanctum::actingAs($tecnico);
 
@@ -132,7 +188,61 @@ class HorasExtrasTest extends TestCase
 
         $this->assertContains($tecnico->id, $ids);
         $this->assertContains($admin->id, $ids);
-        $this->assertCount(2, $ids);
+        $this->assertContains($auxiliar->id, $ids);
+        $this->assertCount(3, $ids);
+    }
+
+    public function test_finalizacao_aceita_colaborador_operacional_e_relatorio_consolida_horas_extras(): void
+    {
+        $admin = $this->criarUsuario('administrador', 'Admin Relatorios');
+        $tecnico = $this->criarUsuario('tecnico', 'Técnico Campo', 25);
+        $auxiliar = $this->criarColaborador('Auxiliar de Campo', 15);
+        $os = $this->criarOs($tecnico->id);
+
+        Sanctum::actingAs($tecnico);
+
+        $iniciar = $this->postJson("/api/v1/ordens-servico/{$os->id}/iniciar", [
+            'data_inicio' => '2026-04-24 18:00:00',
+        ]);
+
+        $iniciar->assertCreated();
+        $execucaoId = (string) $iniciar->json('execucao.id');
+
+        $finalizar = $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
+            'execucao_id' => $execucaoId,
+            'data_fim' => '2026-04-24 20:00:00',
+            'funcionarios' => [
+                [
+                    'colaborador_operacional_id' => $auxiliar->id,
+                    'data_inicio' => '2026-04-24 18:30:00',
+                    'data_fim' => '2026-04-24 20:00:00',
+                ],
+            ],
+        ]);
+
+        $finalizar
+            ->assertOk()
+            ->assertJsonPath('participantes_registrados', 2);
+
+        $this->assertDatabaseHas('execucao_funcionarios', [
+            'execucao_id' => $execucaoId,
+            'colaborador_operacional_id' => $auxiliar->id,
+            'funcionario_id' => null,
+            'minutos_trabalhados' => 90,
+            'minutos_extras_50' => 90,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson("/api/v1/relatorios/horas-extras?funcionario_id={$auxiliar->id}");
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('rows.0.funcionario_nome', 'Auxiliar de Campo')
+            ->assertJsonPath('rows.0.role', 'auxiliar_tecnico')
+            ->assertJsonPath('rows.0.tipo_vinculo', 'colaborador_operacional')
+            ->assertJsonPath('rows.0.horas_extras_50_minutos', 90)
+            ->assertJsonPath('rows.0.valor_estimado_financeiro', 33.75);
     }
 
     public function test_relatorio_de_horas_extras_aplica_limite_mensal_e_banco_de_folgas(): void
@@ -247,6 +357,19 @@ class HorasExtrasTest extends TestCase
             'role' => $role,
             'is_active' => $ativo,
             'valor_hora' => $valorHora > 0 ? $valorHora : null,
+        ]);
+    }
+
+    private function criarColaborador(
+        string $name,
+        float $valorHora = 0,
+        bool $ativo = true
+    ): ColaboradorOperacional {
+        return ColaboradorOperacional::query()->create([
+            'name' => $name,
+            'funcao' => 'Auxiliar técnico',
+            'valor_hora' => $valorHora > 0 ? $valorHora : null,
+            'is_active' => $ativo,
         ]);
     }
 
