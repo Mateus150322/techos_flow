@@ -2,11 +2,11 @@
 
 ## Objetivo
 
-Padronizar a instalação e execução local do projeto com containers, reduzindo diferenças de ambiente entre máquinas.
+Padronizar a instalacao e execucao local do projeto com containers, reduzindo diferencas de ambiente entre maquinas.
 
 ## Estrutura usada
 
-Arquivos principais:
+Arquivos principais de desenvolvimento:
 
 - [compose.yaml](../../compose.yaml)
 - [backend/Dockerfile](../../backend/Dockerfile)
@@ -14,7 +14,16 @@ Arquivos principais:
 - [frontend/Dockerfile](../../frontend/Dockerfile)
 - [frontend/docker/start.sh](../../frontend/docker/start.sh)
 
-## Serviços
+Arquivos principais de producao:
+
+- [compose.prod.yaml](../../compose.prod.yaml)
+- [backend/Dockerfile.prod](../../backend/Dockerfile.prod)
+- [frontend/Dockerfile.prod](../../frontend/Dockerfile.prod)
+- [deploy/oracle/Caddyfile](../../deploy/oracle/Caddyfile)
+- [deploy/oracle/.env.production.example](../../deploy/oracle/.env.production.example)
+- [oracle-cloud.md](oracle-cloud.md)
+
+## Servicos do ambiente local
 
 ### `postgres`
 
@@ -25,8 +34,8 @@ Arquivos principais:
 ### `backend`
 
 - PHP 8.2
-- instala dependências com Composer quando necessário
-- gera `APP_KEY` se necessário
+- instala dependencias com Composer quando necessario
+- gera `APP_KEY` se necessario
 - aguarda o PostgreSQL
 - executa migrations ao iniciar
 - sobe em `http://localhost:8000`
@@ -34,23 +43,23 @@ Arquivos principais:
 ### `frontend`
 
 - Node 20
-- instala dependências com `npm install` quando necessário
+- instala dependencias com `npm install` quando necessario
 - sobe o Vite em `http://localhost:5173`
 - usa proxy interno para o backend Docker
 
-## Subida do ambiente
+## Subida do ambiente local
 
 ```bash
 docker compose up --build
 ```
 
-## Parada do ambiente
+## Parada do ambiente local
 
 ```bash
 docker compose down
 ```
 
-## Comandos úteis
+## Comandos uteis no ambiente local
 
 ```bash
 docker compose exec backend php artisan test
@@ -61,17 +70,31 @@ docker compose exec frontend npx tsc -b
 docker compose exec frontend npm run test:a11y
 ```
 
-## Verificação do estado atual
+## Verificacao do estado atual
 
-O `compose.yaml` do projeto continua coerente com esta documentação e hoje define:
+O `compose.yaml` continua coerente com a documentacao e hoje define:
 
 - `postgres` com volume persistente local;
 - `backend` em modo `local`, com `APP_DEBUG=true` e disco `local`;
 - `frontend` com Vite em modo de desenvolvimento e proxy interno para o backend.
 
-## Observações importantes
+## Producao
 
-- o ambiente Docker atual foi preparado para desenvolvimento e validação local;
-- o fluxo atual com Herd continua possível, sem conflito com esta estrutura;
-- o frontend sobe via Vite dev server, não como build estático;
-- para produção, recomenda-se uma adaptação específica de build, domínio, HTTPS, storage persistente e segredos.
+Para deploy em nuvem, use a stack especifica de producao:
+
+- [guia de deploy na Oracle Cloud](oracle-cloud.md)
+
+Ela adiciona:
+
+- frontend estatico;
+- backend Laravel em modo de producao;
+- HTTPS com Caddy;
+- persistencia parametrizada por caminhos do host;
+- `compose.prod.yaml` separado do ambiente local.
+
+## Observacoes importantes
+
+- o ambiente Docker atual foi preparado para desenvolvimento e validacao local;
+- o fluxo atual com Herd continua possivel, sem conflito com esta estrutura;
+- o frontend local sobe via Vite dev server, nao como build estatico;
+- para producao, use a stack especifica de `compose.prod.yaml`.

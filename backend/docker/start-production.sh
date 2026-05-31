@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+set -eu
+
+if [ -z "${APP_KEY:-}" ]; then
+  echo "APP_KEY nao configurada. Gere uma chave antes de subir o ambiente de producao."
+  exit 1
+fi
+
+mkdir -p storage/app storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache
+chmod -R ug+rwx storage bootstrap/cache
+
+echo "Aguardando PostgreSQL..."
+until pg_isready -h "${DB_HOST:-postgres}" -p "${DB_PORT:-5432}" -U "${DB_USERNAME:-postgres}" -d "${DB_DATABASE:-postgres}" >/dev/null 2>&1; do
+  sleep 2
+done
+
+php artisan package:discover --ansi
+
+if [ "${RUN_MIGRATIONS_ON_START:-false}" = "true" ]; then
+  php artisan migrate --force
+fi
+
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+exec apache2-foreground

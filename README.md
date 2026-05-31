@@ -184,6 +184,10 @@ Pontos de entrada mais úteis:
 - [guia de Docker](docs/implantacao/docker.md)
 - [validação em ambiente real](docs/implantacao/validacao-ambiente-real.md)
 
+Guia novo de deploy em nuvem:
+
+- [deploy na Oracle Cloud](docs/implantacao/oracle-cloud.md)
+
 ## O que ainda precisa ser decidido
 
 O sistema já está funcionalmente maduro. O que ainda precisa ser fechado para produção é principalmente infraestrutura:

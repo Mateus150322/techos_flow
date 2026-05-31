@@ -8,3 +8,6 @@ out/
 docs/TCC*
 docs/tcc_media/
 docs/_tmp_*
+deploy/oracle/.env.production
+deploy/oracle/.env.production.localtest
+.docker-prod/
