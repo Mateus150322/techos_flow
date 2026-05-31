@@ -1,53 +1,62 @@
-# Documentação do Projeto TechOS Flow
+# Documentação do Projeto
 
-## Objetivo
+Esta pasta concentra a documentação funcional, técnica e acadêmica do `TechOS Flow`.
 
-Este diretório centraliza a documentação técnica, acadêmica e organizacional do projeto **TechOS Flow**, sistema web para gestão de ordens de serviço.
+## Estado atual
 
-## Estrutura
+- documentação central revisada para refletir o comportamento real do sistema;
+- textos normalizados em UTF-8;
+- novos artefatos de modelagem disponíveis em `docs/diagramas`;
+- exports acadêmicos (`.docx`, `.html`, `.pdf`) mantidos como artefatos derivados, não como fonte principal.
 
-- `visao/`: documento de visão do projeto.
-- `requisitos/`: requisitos funcionais, não funcionais, segurança, usabilidade, desempenho e LGPD.
-- `regras-negocio/`: regras operacionais e restrições do domínio.
-- `casos-de-uso/`: casos de uso principais por ator e objetivo.
-- `processos/`: modelagem textual dos fluxos preparada para futura conversão em BPMN.
-- `arquitetura/`: arquitetura, módulos, decisões técnicas e estrutura do código.
-- `api/`: documentação da API REST e especificação OpenAPI.
-- `banco-de-dados/`: entidades, dicionário de dados e relacionamentos.
-- `seguranca-lgpd/`: segurança, privacidade, minimização de dados e retenção.
-- `testes/`: plano de testes e catálogo de casos de teste.
+## Estrutura principal
+
+- `visao/`: visão geral, objetivos e escopo do projeto.
+- `requisitos/`: requisitos funcionais, não funcionais, de segurança e usabilidade.
+- `regras-negocio/`: regras operacionais e administrativas do sistema.
+- `casos-de-uso/`: casos de uso principais por ator e fluxo.
+- `processos/`: modelagem textual dos processos que servem de base para BPMN.
+- `arquitetura/`: arquitetura lógica, técnica e recomendações de diagramas.
+- `banco-de-dados/`: modelagem relacional, entidades e relacionamentos.
+- `api/`: documentação da API e especificação OpenAPI.
 - `manuais/`: manuais por perfil e manual técnico do projeto.
-- `implantacao/`: guia de implantação, Docker e opções de hospedagem.
-- `changelog/`: histórico de versões e mudanças relevantes.
-- `acessibilidade/`: checklist, verificações e referência para acessibilidade do frontend.
+- `testes/`: plano de testes e casos de teste.
+- `implantacao/`: instruções de deploy, Docker e validação em ambiente real.
+- `seguranca-lgpd/`: segurança, privacidade, retenção e alinhamento com LGPD.
+- `diagramas/`: fontes Mermaid e PlantUML para geração de artefatos visuais.
+- `issues/`: backlog e histórico de issues do projeto.
+- `changelog/`: histórico consolidado de evolução.
+- `tcc_media/`: artefatos acadêmicos auxiliares e imagens exportadas.
 
-## Convenções adotadas
+## Documentos de referência rápida
 
-- linguagem: português técnico e objetivo;
-- campos dependentes de definição institucional ou operacional permanecem marcados como `A preencher`;
-- os documentos refletem o estado atual do código e da configuração local do projeto;
-- nomes de perfis, módulos, rotas e entidades seguem a implementação existente.
+- [Visão do projeto](c:/Users/VAIO/Documents/projetos/techos-flow/docs/visao/documento-visao-projeto.md)
+- [Documento de requisitos](c:/Users/VAIO/Documents/projetos/techos-flow/docs/requisitos/documento-requisitos.md)
+- [Regras de negócio](c:/Users/VAIO/Documents/projetos/techos-flow/docs/regras-negocio/documento-regras-negocio.md)
+- [Casos de uso principais](c:/Users/VAIO/Documents/projetos/techos-flow/docs/casos-de-uso/casos-de-uso-principais.md)
+- [Modelagem de processos](c:/Users/VAIO/Documents/projetos/techos-flow/docs/processos/modelagem-processos.md)
+- [Documentação da arquitetura](c:/Users/VAIO/Documents/projetos/techos-flow/docs/arquitetura/documentacao-arquitetura.md)
+- [Documentação do banco de dados](c:/Users/VAIO/Documents/projetos/techos-flow/docs/banco-de-dados/documentacao-banco-dados.md)
+- [Documentação da API](c:/Users/VAIO/Documents/projetos/techos-flow/docs/api/documentacao-api.md)
+- [Manual técnico do projeto](c:/Users/VAIO/Documents/projetos/techos-flow/docs/manuais/manual-tecnico-projeto.md)
+- [Validação em ambiente real](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/validacao-ambiente-real.md)
+- [Guia de estrutura do TCC](c:/Users/VAIO/Documents/projetos/techos-flow/docs/tcc_media/guia-estrutura-tcc.md)
+- [TCC consolidado com apêndices e figuras](c:/Users/VAIO/Documents/projetos/techos-flow/docs/tcc_media/TCC_consolidado_2026-05-28.md)
+- [TCC pronto para colar no Word](c:/Users/VAIO/Documents/projetos/techos-flow/docs/tcc_media/TCC_pronto_para_word.txt)
+- [TCC final formatado em HTML](c:/Users/VAIO/Documents/projetos/techos-flow/docs/tcc_media/TCC_final_formatado.html)
+- [TCC final formatado em RTF](c:/Users/VAIO/Documents/projetos/techos-flow/docs/tcc_media/TCC_final_formatado.rtf)
+- [TCC final em DOCX no padrão UNINORTE/ABNT](c:/Users/VAIO/Documents/projetos/techos-flow/docs/tcc_media/TCC_final_UNINORTE_ABNT.docx)
+- [Revisão do TCC para banca](c:/Users/VAIO/Documents/projetos/techos-flow/docs/tcc_media/revisao_banca_tcc_2026-05-28.md)
 
-## Atualizações recentes já refletidas
+## Diagramas e modelagens
 
-- recuperação de senha por e-mail com Zoho Mail;
-- endurecimento do login com rate limit e política de senha forte;
-- módulo de horas extras e banco de folgas;
-- PDF detalhado de OS;
-- tema claro/escuro, acessibilidade e melhorias mobile;
-- domínios locais de desenvolvimento com `techosflow.test`;
-- documentação de deploy para Railway, Oracle Cloud e ambientes Linux tradicionais.
+Os arquivos-fonte para diagramas e imagens dos artefatos estão em:
 
-## Documentos adicionais sugeridos
+- [Índice de diagramas](c:/Users/VAIO/Documents/projetos/techos-flow/docs/diagramas/README.md)
+- [Prompt mestre para artefatos visuais](c:/Users/VAIO/Documents/projetos/techos-flow/docs/diagramas/prompt-artefatos-visuais.md)
 
-Os artefatos abaixo não são obrigatórios para o projeto funcionar, mas agregam valor para evolução e auditoria:
+## Observações importantes
 
-- `matriz-rastreabilidade-requisitos.md`
-- `runbook-incidentes.md`
-- `politica-backup-e-recuperacao.md`
-- diretório `adrs/` para decisões arquiteturais
-- coleção de API em Postman ou Insomnia
-
-## Observação sobre os artefatos acadêmicos
-
-O diretório `docs/` também contém arquivos de apoio ao TCC e materiais de apresentação. Eles não substituem a documentação técnica do produto, mas registram a evolução acadêmica do projeto.
+- os documentos em `docs/` são a fonte oficial de texto do projeto;
+- arquivos de TCC exportados em `.docx`, `.html` e `.pdf` devem ser regenerados quando a documentação-base for alterada;
+- a validação final do sistema ainda depende de ambiente com domínio, `HTTPS`, SMTP funcional e storage persistente para anexos.

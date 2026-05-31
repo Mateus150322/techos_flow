@@ -2,26 +2,27 @@
 
 ## 1. Visão geral
 
-O TechOS Flow expõe uma API REST versionada em `/api/v1`, usada pelo frontend React e estruturada para autenticação, recuperação de senha, operação de ordens de serviço, relatórios, horas extras e administração.
+O `TechOS Flow` expõe uma API REST versionada em `/api/v1`. Ela é consumida pelo frontend React e concentra autenticação, regras operacionais, anexos, relatórios, horas extras e administração.
 
 ## 2. Base URL
 
 ### Desenvolvimento
 
-- acesso direto ao backend: `http://backend-flow.test/api/v1`
-- acesso pelo frontend local com proxy do Vite: `http://techosflow.test:5173/api/v1`
+- backend direto: `http://backend-flow.test/api/v1`
+- frontend local com proxy do Vite: `http://techosflow.test:5173/api/v1`
 
 ### Produção
 
-- `https://api.techosflow.com.br/api/v1` ou domínio equivalente definido no ambiente
+- `https://api.techosflow.com.br/api/v1`
 
 ## 3. Autenticação
 
-- mecanismo: Laravel Sanctum com token Bearer;
-- obtenção do token: `POST /login`;
-- envio: cabeçalho `Authorization: Bearer <token>`;
-- recuperação de senha: `POST /esqueci-senha` e `POST /redefinir-senha`;
-- o login público possui limitação de tentativas por throttle.
+- mecanismo: `Laravel Sanctum` com token Bearer;
+- login público: `POST /login`;
+- recuperação de senha:
+  - `POST /esqueci-senha`
+  - `POST /redefinir-senha`
+- rotas protegidas exigem `Authorization: Bearer <token>`.
 
 ## 4. Headers principais
 
@@ -29,28 +30,18 @@ O TechOS Flow expõe uma API REST versionada em `/api/v1`, usada pelo frontend R
 | --- | --- |
 | `Accept: application/json` | padronização de resposta |
 | `Content-Type: application/json` | payload JSON |
-| `Content-Type: multipart/form-data` | upload de anexos |
+| `Content-Type: multipart/form-data` | upload de anexo |
 | `Authorization: Bearer <token>` | autenticação das rotas protegidas |
 
-## 5. Convenções de resposta
-
-- respostas de sucesso retornam `200`, `201` ou `204` quando aplicável;
-- erros de validação retornam `422`;
-- falta de autenticação retorna `401`;
-- falta de autorização retorna `403`;
-- recurso inexistente retorna `404`;
-- conflitos de negócio podem retornar `409`;
-- excesso de tentativas em rotas limitadas pode retornar `429`.
-
-## 6. Regras de acesso por perfil
+## 5. Regras de acesso por perfil
 
 | Recurso | Atendente | Técnico | Administrador |
 | --- | --- | --- | --- |
 | Login, logout, me | Sim | Sim | Sim |
 | Esqueci senha / redefinir senha | Sim | Sim | Sim |
 | Alterar senha | Sim | Sim | Sim |
-| Criar OS geral | Sim | Não | Sim |
-| Criar OS ETA/ETE | Não | Sim | Sim |
+| Criar OS geral | Sim | Não | Não |
+| Criar OS ETA/ETE | Não | Sim | Não no fluxo operacional padrão |
 | Listar e consultar OS | Sim | Sim, com restrição de escopo | Sim |
 | Aceitar OS | Não | Sim | Não |
 | Iniciar execução | Não | Sim | Não |
@@ -58,25 +49,20 @@ O TechOS Flow expõe uma API REST versionada em `/api/v1`, usada pelo frontend R
 | Marcar não executada | Não | Sim | Não |
 | Enviar evidência | Não | Sim | Não |
 | Dashboard do perfil | Sim | Sim | Sim |
-| Funcionários para equipe | Não | Sim | Sim |
+| Funcionários elegíveis para equipe | Não | Sim | Sim |
 | Relatórios administrativos | Não | Não | Sim |
 | Relatório de horas extras | Não | Não | Sim |
 | Gestão de usuários | Não | Não | Sim |
+| Gestão de colaboradores operacionais | Não | Não | Sim |
+| PDF detalhado da OS | Não | Não | Sim |
 
-### Observação sobre o perfil técnico
+## 6. Endpoints principais
 
-O técnico pode consultar:
-
-- OS `abertas` e sem responsável;
-- OS já atribuídas a ele.
-
-## 7. Endpoints principais
-
-### 7.1 Saúde
+### 6.1 Saúde
 
 - `GET /health`
 
-### 7.2 Autenticação
+### 6.2 Autenticação e senha
 
 - `POST /login`
 - `POST /logout`
@@ -85,13 +71,13 @@ O técnico pode consultar:
 - `POST /esqueci-senha`
 - `POST /redefinir-senha`
 
-### 7.3 Dashboards
+### 6.3 Dashboards
 
 - `GET /dashboard/admin`
 - `GET /dashboard/atendente`
 - `GET /dashboard/tecnico`
 
-### 7.4 Ordens de serviço
+### 6.4 Ordens de serviço
 
 - `GET /ordens-servico`
 - `GET /ordens-servico/resumo`
@@ -102,31 +88,39 @@ O técnico pode consultar:
 - `POST /ordens-servico/{id}/iniciar`
 - `POST /ordens-servico/{id}/execucoes/finalizar`
 - `POST /ordens-servico/{id}/nao-executada`
-- `POST /ordens-servico/{id}/anexos`
 - `GET /ordens-servico/{id}/relatorio/pdf`
 
-### 7.5 Anexos
+### 6.5 Anexos
 
+- `POST /ordens-servico/{id}/anexos`
 - `GET /anexos/{id}/arquivo`
 
-### 7.6 Relatórios administrativos
+### 6.6 Relatórios administrativos
 
 - `GET /relatorios/ordens-servico`
 - `GET /relatorios/ordens-servico/exportar/{format}`
 - `GET /relatorios/horas-extras`
 - `GET /relatorios/horas-extras/exportar/{format}`
 
-### 7.7 Usuários e equipe
+Observações operacionais:
+
+- o relatório de OS em PDF por período pode organizar as ordens em blocos individuais com suas evidências fotográficas;
+- o formato `csv` foi ajustado para usar `;` como separador, visando melhor abertura no Excel em ambiente pt-BR.
+
+### 6.7 Administração de pessoas
 
 - `GET /usuarios`
 - `GET /usuarios/{id}`
 - `POST /usuarios`
 - `PUT /usuarios/{id}`
+- `GET /colaboradores-operacionais`
+- `POST /colaboradores-operacionais`
+- `PUT /colaboradores-operacionais/{id}`
 - `GET /funcionarios`
 
-## 8. Exemplos resumidos
+## 7. Endpoints mais importantes por fluxo
 
-### 8.1 Login
+### 7.1 Login
 
 ```http
 POST /api/v1/login
@@ -138,7 +132,7 @@ Content-Type: application/json
 }
 ```
 
-### 8.2 Solicitar recuperação de senha
+### 7.2 Solicitar recuperação de senha
 
 ```http
 POST /api/v1/esqueci-senha
@@ -149,7 +143,21 @@ Content-Type: application/json
 }
 ```
 
-### 8.3 Criar OS geral
+### 7.3 Redefinir senha
+
+```http
+POST /api/v1/redefinir-senha
+Content-Type: application/json
+
+{
+  "email": "admin@techosflow.com.br",
+  "token": "token-recebido-no-email",
+  "password": "NovaSenha@123",
+  "password_confirmation": "NovaSenha@123"
+}
+```
+
+### 7.4 Criar OS geral
 
 ```http
 POST /api/v1/ordens-servico
@@ -174,7 +182,7 @@ Content-Type: application/json
 }
 ```
 
-### 8.4 Finalizar execução
+### 7.5 Finalizar execução
 
 ```http
 POST /api/v1/ordens-servico/{id}/execucoes/finalizar
@@ -190,12 +198,17 @@ Content-Type: application/json
       "funcionario_id": "uuid-do-tecnico",
       "data_inicio": "2026-05-16T14:30:00-05:00",
       "data_fim": "2026-05-16T18:15:00-05:00"
+    },
+    {
+      "colaborador_operacional_id": "uuid-do-auxiliar",
+      "data_inicio": "2026-05-16T14:30:00-05:00",
+      "data_fim": "2026-05-16T18:15:00-05:00"
     }
   ]
 }
 ```
 
-### 8.5 Enviar evidência
+### 7.6 Enviar evidência com geolocalização
 
 ```http
 POST /api/v1/ordens-servico/{id}/anexos
@@ -208,19 +221,51 @@ latitude=-9.97499
 longitude=-67.82430
 precisao_metros=12.5
 geolocalizacao_capturada_em=2026-05-16T13:40:00Z
+rua_capturada=Rua X
+bairro_capturado=Bairro Y
+cidade_capturada=Rio Branco
+estado_capturado=Acre
 endereco_capturado=Rua X, Bairro Y, Rio Branco - AC
 ```
 
-## 9. Especificação OpenAPI
+### 7.7 Cadastrar colaborador operacional
 
-O arquivo principal de especificação compatível com Swagger está disponível em:
+```http
+POST /api/v1/colaboradores-operacionais
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "Auxiliar 01",
+  "funcao": "Auxiliar técnico",
+  "valor_hora": 11.82
+}
+```
+
+## 8. Regras importantes da API
+
+- o técnico só visualiza OS abertas sem responsável ou OS atribuídas a ele;
+- o técnico só opera início, finalização, não execução e anexos na própria OS;
+- o endpoint `/funcionarios` mistura usuários elegíveis e colaboradores operacionais ativos;
+- o PDF detalhado da OS retorna `403` para não administradores;
+- a resposta de recuperação de senha é neutra para reduzir vazamento de informação sobre contas.
+
+## 9. Códigos de resposta esperados
+
+| Código | Significado |
+| --- | --- |
+| `200` | operação concluída com sucesso |
+| `201` | recurso criado |
+| `204` | operação sem corpo de resposta |
+| `401` | não autenticado |
+| `403` | não autorizado |
+| `404` | recurso inexistente |
+| `409` | conflito de negócio |
+| `422` | falha de validação |
+| `429` | throttle/excesso de tentativas |
+
+## 10. Especificação OpenAPI
+
+O arquivo OpenAPI do projeto está disponível em:
 
 - [openapi-techos-flow.yaml](c:/Users/VAIO/Documents/projetos/techos-flow/docs/api/openapi-techos-flow.yaml)
-
-## 10. Observações importantes
-
-- a recuperação de senha por e-mail faz parte da versão atual;
-- exportações em PDF e XLSX possuem restrição por perfil e volume;
-- o acesso ao conteúdo de anexos privados depende de autenticação e autorização;
-- o relatório detalhado em PDF de uma OS é disponível por rota autenticada;
-- o endpoint `/funcionarios` não expõe e-mail, apenas os dados mínimos necessários para seleção de equipe.

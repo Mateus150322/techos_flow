@@ -1,17 +1,18 @@
 openapi: 3.0.3
 info:
   title: TechOS Flow API
-  version: 1.1.0
+  version: 1.2.0
   description: >
-    Especificação principal da API REST do TechOS Flow. Esta definição resume
-    os recursos públicos e protegidos atualmente implementados no projeto.
+    Especificação resumida da API REST do TechOS Flow. Esta definição reflete os
+    fluxos atuais de autenticação, ordens de serviço, evidências, relatórios,
+    horas extras e administração.
 servers:
   - url: http://backend-flow.test/api/v1
     description: Backend local direto
   - url: http://techosflow.test:5173/api/v1
     description: Frontend local com proxy do Vite
   - url: https://api.techosflow.com.br/api/v1
-    description: Produção (exemplo)
+    description: Produção
 security:
   - bearerAuth: []
 tags:
@@ -22,8 +23,9 @@ tags:
   - name: Anexos
   - name: Relatórios
   - name: Horas Extras
-  - name: Funcionários
   - name: Usuários
+  - name: Colaboradores Operacionais
+  - name: Funcionários
 paths:
   /health:
     get:
@@ -57,7 +59,7 @@ paths:
         "403":
           description: Usuário inativo
         "429":
-          description: Muitas tentativas de login
+          description: Muitas tentativas
 
   /esqueci-senha:
     post:
@@ -81,7 +83,7 @@ paths:
   /redefinir-senha:
     post:
       tags: [Autenticação]
-      summary: Redefinir senha a partir do token
+      summary: Redefinir senha a partir de token
       security: []
       requestBody:
         required: true
@@ -129,33 +131,39 @@ paths:
               $ref: "#/components/schemas/ChangePasswordRequest"
       responses:
         "200":
-          description: Senha atualizada
+          description: Senha alterada
         "422":
-          description: Falha de validação ou senha atual incorreta
+          description: Falha de validação
 
   /dashboard/admin:
     get:
       tags: [Dashboards]
-      summary: Obter dashboard administrativo
+      summary: Consultar dashboard do administrador
       responses:
         "200":
-          description: Dados do dashboard
+          description: Indicadores administrativos
+        "403":
+          description: Perfil não autorizado
 
   /dashboard/atendente:
     get:
       tags: [Dashboards]
-      summary: Obter dashboard do atendente
+      summary: Consultar dashboard do atendente
       responses:
         "200":
-          description: Dados do dashboard do atendente
+          description: Indicadores do atendente
+        "403":
+          description: Perfil não autorizado
 
   /dashboard/tecnico:
     get:
       tags: [Dashboards]
-      summary: Obter dashboard do técnico
+      summary: Consultar dashboard do técnico
       responses:
         "200":
-          description: Dados do dashboard do técnico
+          description: Indicadores do técnico
+        "403":
+          description: Perfil não autorizado
 
   /ordens-servico:
     get:
@@ -186,27 +194,27 @@ paths:
               $ref: "#/components/schemas/CreateOrderRequest"
       responses:
         "201":
-          description: Ordem criada com sucesso
-        "403":
-          description: Perfil sem permissão para o tipo informado
+          description: OS criada
         "422":
           description: Falha de validação
-
-  /ordens-servico/resumo:
-    get:
-      tags: [Ordens de Serviço]
-      summary: Obter resumo agregado das ordens
-      responses:
-        "200":
-          description: Resumo agregado
+        "403":
+          description: Perfil não autorizado
 
   /ordens-servico/opcoes-filtro:
     get:
       tags: [Ordens de Serviço]
-      summary: Listar opções disponíveis para filtros
+      summary: Consultar opções de filtro
       responses:
         "200":
-          description: Tipos de serviço cadastrados
+          description: Opções disponíveis
+
+  /ordens-servico/resumo:
+    get:
+      tags: [Ordens de Serviço]
+      summary: Consultar resumo de ordens
+      responses:
+        "200":
+          description: Resumo consolidado
 
   /ordens-servico/{id}:
     get:
@@ -216,9 +224,9 @@ paths:
         - $ref: "#/components/parameters/OrderIdParam"
       responses:
         "200":
-          description: Detalhe da ordem
+          description: Detalhe da OS
         "404":
-          description: Ordem não encontrada
+          description: OS não encontrada
 
   /ordens-servico/{id}/aceitar:
     post:
@@ -230,30 +238,28 @@ paths:
         "200":
           description: OS aceita
         "403":
-          description: Somente técnico pode aceitar
-        "409":
-          description: OS já atribuída
+          description: Perfil não autorizado
         "422":
-          description: OS em estado inválido
+          description: Estado inválido
 
   /ordens-servico/{id}/iniciar:
     post:
       tags: [Ordens de Serviço]
-      summary: Iniciar execução de OS
+      summary: Iniciar execução da OS
       parameters:
         - $ref: "#/components/parameters/OrderIdParam"
       responses:
         "201":
-          description: Execução iniciada
+          description: Execução criada
         "403":
-          description: Técnico não autorizado
+          description: Perfil não autorizado
         "422":
-          description: OS em estado inválido ou execução já aberta
+          description: Estado inválido
 
   /ordens-servico/{id}/execucoes/finalizar:
     post:
       tags: [Ordens de Serviço]
-      summary: Finalizar execução aberta
+      summary: Finalizar execução da OS
       parameters:
         - $ref: "#/components/parameters/OrderIdParam"
       requestBody:
@@ -264,16 +270,16 @@ paths:
               $ref: "#/components/schemas/FinishExecutionRequest"
       responses:
         "200":
-          description: Execução finalizada
+          description: Execução finalizada e horas extras calculadas
         "403":
-          description: Técnico não autorizado
+          description: Perfil não autorizado
         "422":
-          description: Execução ou OS em estado inválido
+          description: Falha de validação ou estado inválido
 
   /ordens-servico/{id}/nao-executada:
     post:
       tags: [Ordens de Serviço]
-      summary: Encerrar OS como não executada
+      summary: Marcar OS como não executada
       parameters:
         - $ref: "#/components/parameters/OrderIdParam"
       requestBody:
@@ -284,11 +290,11 @@ paths:
               $ref: "#/components/schemas/NotExecutedRequest"
       responses:
         "200":
-          description: OS marcada como não executada
+          description: OS encerrada como não executada
         "403":
-          description: Técnico não autorizado
+          description: Perfil não autorizado
         "422":
-          description: Motivo ausente ou estado inválido
+          description: Falha de validação
 
   /ordens-servico/{id}/anexos:
     post:
@@ -314,15 +320,14 @@ paths:
     get:
       tags: [Relatórios]
       summary: Gerar PDF detalhado da ordem de serviço
+      description: Disponível apenas para o perfil administrador.
       parameters:
         - $ref: "#/components/parameters/OrderIdParam"
       responses:
         "200":
-          description: PDF da ordem gerado
+          description: PDF gerado
         "403":
-          description: Acesso negado
-        "404":
-          description: Ordem não encontrada
+          description: Perfil não autorizado
 
   /anexos/{id}/arquivo:
     get:
@@ -337,19 +342,21 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Conteúdo do arquivo
+          description: Conteúdo do anexo
         "403":
-          description: Acesso negado
+          description: Perfil não autorizado
         "404":
           description: Anexo não encontrado
 
   /relatorios/ordens-servico:
     get:
       tags: [Relatórios]
-      summary: Consultar relatório gerencial de ordens
+      summary: Consultar relatório administrativo de ordens
       responses:
         "200":
-          description: Relatório paginado
+          description: Relatório de ordens
+        "403":
+          description: Perfil não autorizado
 
   /relatorios/ordens-servico/exportar/{format}:
     get:
@@ -366,15 +373,17 @@ paths:
         "200":
           description: Arquivo exportado
         "422":
-          description: Formato inválido ou limite excedido
+          description: Formato inválido
 
   /relatorios/horas-extras:
     get:
       tags: [Horas Extras]
-      summary: Consultar relatório de horas extras
+      summary: Consultar relatório administrativo de horas extras
       responses:
         "200":
           description: Relatório de horas extras
+        "403":
+          description: Perfil não autorizado
 
   /relatorios/horas-extras/exportar/{format}:
     get:
@@ -393,14 +402,6 @@ paths:
         "422":
           description: Formato inválido
 
-  /funcionarios:
-    get:
-      tags: [Funcionários]
-      summary: Listar funcionários elegíveis para equipe de execução
-      responses:
-        "200":
-          description: Lista de funcionários
-
   /usuarios:
     get:
       tags: [Usuários]
@@ -408,6 +409,8 @@ paths:
       responses:
         "200":
           description: Lista paginada de usuários
+        "403":
+          description: Perfil não autorizado
     post:
       tags: [Usuários]
       summary: Criar usuário
@@ -458,6 +461,63 @@ paths:
           description: Usuário atualizado
         "422":
           description: Falha de validação ou regra de negócio
+
+  /colaboradores-operacionais:
+    get:
+      tags: [Colaboradores Operacionais]
+      summary: Listar colaboradores operacionais
+      responses:
+        "200":
+          description: Lista paginada de colaboradores operacionais
+        "403":
+          description: Perfil não autorizado
+    post:
+      tags: [Colaboradores Operacionais]
+      summary: Criar colaborador operacional
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateColaboradorRequest"
+      responses:
+        "201":
+          description: Colaborador criado
+        "422":
+          description: Falha de validação
+
+  /colaboradores-operacionais/{id}:
+    put:
+      tags: [Colaboradores Operacionais]
+      summary: Atualizar colaborador operacional
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateColaboradorRequest"
+      responses:
+        "200":
+          description: Colaborador atualizado
+        "422":
+          description: Falha de validação
+
+  /funcionarios:
+    get:
+      tags: [Funcionários]
+      summary: Listar usuários e colaboradores elegíveis para equipe
+      responses:
+        "200":
+          description: Lista consolidada para composição de equipe
+        "403":
+          description: Perfil não autorizado
 
 components:
   securitySchemes:
@@ -527,13 +587,13 @@ components:
           format: email
     ResetPasswordRequest:
       type: object
-      required: [token, email, password, password_confirmation]
+      required: [email, token, password, password_confirmation]
       properties:
-        token:
-          type: string
         email:
           type: string
           format: email
+        token:
+          type: string
         password:
           type: string
         password_confirmation:
@@ -685,6 +745,9 @@ components:
               funcionario_id:
                 type: string
                 format: uuid
+              colaborador_operacional_id:
+                type: string
+                format: uuid
               data_inicio:
                 type: string
                 format: date-time
@@ -715,6 +778,14 @@ components:
         geolocalizacao_capturada_em:
           type: string
           format: date-time
+        rua_capturada:
+          type: string
+        bairro_capturado:
+          type: string
+        cidade_capturada:
+          type: string
+        estado_capturado:
+          type: string
         endereco_capturado:
           type: string
     CreateUserRequest:
@@ -752,3 +823,24 @@ components:
         valor_hora:
           type: number
           nullable: true
+    CreateColaboradorRequest:
+      type: object
+      required: [name, funcao, valor_hora]
+      properties:
+        name:
+          type: string
+        funcao:
+          type: string
+        valor_hora:
+          type: number
+    UpdateColaboradorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        funcao:
+          type: string
+        valor_hora:
+          type: number
+        is_active:
+          type: boolean

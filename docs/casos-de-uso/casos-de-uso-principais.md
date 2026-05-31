@@ -2,245 +2,162 @@
 
 ## UC-01 — Autenticar usuário
 
-- **Objetivo:** permitir acesso ao sistema por meio de credenciais válidas.
+- **Objetivo:** permitir acesso ao sistema com credenciais válidas.
 - **Ator principal:** usuário autenticável.
 - **Pré-condições:** usuário cadastrado e ativo.
-- **Fluxo principal:**
-  1. O usuário informa e-mail e senha.
-  2. O sistema valida as credenciais.
-  3. O sistema cria um token de acesso.
-  4. O sistema retorna os dados do usuário autenticado.
-- **Fluxos alternativos:**
-  - credenciais inválidas: erro 401;
-  - usuário inativo: erro 403;
-  - excesso de tentativas: erro 429.
-- **Pós-condições:** sessão autenticada disponível para uso.
+- **Fluxo principal:** informa e-mail e senha, o sistema valida, gera token e devolve os dados do usuário.
+- **Fluxos alternativos:** credenciais inválidas, usuário inativo, excesso de tentativas.
+- **Pós-condição:** sessão autenticada disponível.
 
 ## UC-02 — Realizar primeiro acesso
 
-- **Objetivo:** obrigar a troca da senha inicial por uma senha forte.
-- **Ator principal:** usuário recém-criado ou com troca pendente.
-- **Pré-condições:** usuário autenticado com `must_change_password = true`.
-- **Fluxo principal:**
-  1. O usuário acessa o sistema.
-  2. O sistema redireciona para a tela de primeiro acesso.
-  3. O usuário informa senha atual, nova senha e confirmação.
-  4. O sistema valida força, diferença da senha atual e confirmação.
-  5. O sistema atualiza a senha e libera o acesso normal.
-- **Fluxos alternativos:**
-  - senha atual incorreta;
-  - nova senha não atende à política;
-  - confirmação inválida.
-- **Pós-condições:** `must_change_password = false`.
+- **Objetivo:** obrigar troca da senha inicial por uma senha forte.
+- **Ator principal:** usuário com troca pendente.
+- **Pré-condições:** `must_change_password = true`.
+- **Fluxo principal:** usuário informa senha atual, nova senha e confirmação; o sistema valida e libera o acesso normal.
+- **Fluxos alternativos:** senha atual incorreta, nova senha fraca ou confirmação inválida.
+- **Pós-condição:** troca obrigatória removida.
 
 ## UC-03 — Recuperar senha por e-mail
 
-- **Objetivo:** permitir que o usuário redefina a própria senha sem intervenção manual do administrador.
+- **Objetivo:** permitir redefinição segura da senha.
 - **Ator principal:** usuário autenticável.
-- **Pré-condições:** conta existente com e-mail válido.
-- **Fluxo principal:**
-  1. O usuário acessa `Esqueci minha senha`.
-  2. Informa o e-mail cadastrado.
-  3. O sistema gera token temporário.
-  4. O sistema envia link de redefinição por e-mail.
-  5. O usuário abre o link.
-  6. Informa nova senha e confirmação.
-  7. O sistema redefine a credencial.
-- **Fluxos alternativos:**
-  - e-mail inválido;
-  - token expirado ou inválido;
-  - nova senha fora da política.
-- **Pós-condições:** senha redefinida e acesso liberado.
+- **Pré-condições:** conta existente e ativa.
+- **Fluxo principal:** usuário solicita o link, recebe e-mail, abre o token e redefine a senha.
+- **Fluxos alternativos:** token inválido/expirado, nova senha fora da política.
+- **Pós-condição:** credencial redefinida.
 
 ## UC-04 — Criar OS geral
 
-- **Objetivo:** registrar uma nova ordem de serviço geral.
+- **Objetivo:** registrar ordem de serviço geral.
 - **Ator principal:** atendente.
-- **Pré-condições:** usuário autenticado com perfil `atendente`.
-- **Fluxo principal:**
-  1. O atendente acessa a área de criação.
-  2. Preenche tipo, cliente, prioridade, data e hora de abertura, descrição e endereço.
-  3. Solicita o envio do formulário.
-  4. O sistema valida os campos.
-  5. O sistema gera número da OS e registra os vínculos.
-- **Fluxos alternativos:**
-  - campos obrigatórios ausentes;
-  - dados de endereço inválidos.
-- **Pós-condições:** OS criada com status `aberta`.
+- **Pré-condições:** usuário autenticado com papel `atendente`.
+- **Fluxo principal:** preenche cliente, prioridade, descrição e endereço; o sistema valida e cria a OS.
+- **Fluxos alternativos:** dados obrigatórios ausentes ou endereço inválido.
+- **Pós-condição:** OS criada com status `aberta`.
 
 ## UC-05 — Criar OS técnica ETA/ETE
 
-- **Objetivo:** registrar uma ordem técnica de manutenção operacional.
+- **Objetivo:** registrar ordem técnica de manutenção operacional.
 - **Ator principal:** técnico.
-- **Pré-condições:** usuário autenticado com perfil `tecnico`.
-- **Fluxo principal:**
-  1. O técnico acessa a área de criação.
-  2. Preenche os campos do formulário ETA/ETE.
-  3. O sistema monta a descrição técnica consolidada.
-  4. O sistema cria a OS do tipo `Manutenção ETA/ETE`.
-- **Fluxos alternativos:**
-  - campos técnicos obrigatórios ausentes;
-  - tentativa de criação de OS fora do tipo permitido.
-- **Pós-condições:** OS criada e vinculada ao técnico criador.
+- **Pré-condições:** usuário autenticado com papel `tecnico`.
+- **Fluxo principal:** preenche unidade, local operacional, prioridade e dados técnicos; o sistema monta a descrição e cria a OS.
+- **Fluxos alternativos:** campos técnicos obrigatórios ausentes.
+- **Pós-condição:** OS técnica criada.
 
 ## UC-06 — Consultar ordens de serviço
 
-- **Objetivo:** localizar ordens por busca, status, tipo, prioridade ou responsável.
+- **Objetivo:** localizar ordens por filtros e busca.
 - **Ator principal:** atendente, técnico ou administrador.
-- **Pré-condições:** usuário autenticado e autorizado.
-- **Fluxo principal:**
-  1. O usuário acessa a listagem.
-  2. Informa filtros ou termo de busca.
-  3. O sistema consulta a API com paginação.
-  4. O sistema retorna o recorte correspondente.
-- **Fluxos alternativos:**
-  - filtro inválido;
-  - nenhum registro encontrado.
-- **Pós-condições:** ordens exibidas conforme os filtros aplicados.
+- **Pré-condições:** usuário autenticado.
+- **Fluxo principal:** acessa a listagem, informa filtros, consulta o resultado paginado.
+- **Fluxos alternativos:** nenhum registro encontrado ou filtros inválidos.
+- **Pós-condição:** conjunto de ordens exibido.
 
-## UC-07 — Visualizar detalhes de uma OS
+## UC-07 — Visualizar detalhes da OS
 
-- **Objetivo:** consultar o conteúdo completo da ordem de serviço.
+- **Objetivo:** consultar o conteúdo completo da ordem.
 - **Ator principal:** atendente, técnico ou administrador.
-- **Pré-condições:** OS existente e usuário autenticado.
-- **Fluxo principal:**
-  1. O usuário seleciona uma OS.
-  2. O sistema busca os detalhes com relacionamentos necessários.
-  3. O sistema apresenta descrição, endereço, criador, responsável, execuções e anexos.
-- **Fluxos alternativos:**
-  - OS inexistente;
-  - falha de comunicação com a API.
-- **Pós-condições:** usuário acessa a visão detalhada da OS.
+- **Pré-condições:** OS existente e acesso autorizado.
+- **Fluxo principal:** seleciona a OS e o sistema apresenta descrição, endereço, responsável, execuções e anexos.
+- **Fluxos alternativos:** OS inexistente ou acesso negado.
+- **Pós-condição:** usuário acessa o detalhe completo.
 
 ## UC-08 — Aceitar OS
 
-- **Objetivo:** assumir responsabilidade sobre uma OS aberta.
+- **Objetivo:** assumir responsabilidade por uma OS aberta.
 - **Ator principal:** técnico.
-- **Pré-condições:** OS em status `aberta` e sem responsável técnico.
-- **Fluxo principal:**
-  1. O técnico visualiza a OS disponível.
-  2. Aciona a operação de aceite.
-  3. O sistema valida status e ausência de responsável.
-  4. O sistema grava `tecnico_responsavel_id`.
-- **Fluxos alternativos:**
-  - OS já atribuída a outro técnico;
-  - OS não está aberta.
-- **Pós-condições:** OS permanece aberta, porém vinculada ao técnico.
+- **Pré-condições:** OS aberta e sem responsável técnico.
+- **Fluxo principal:** técnico aciona o aceite, o sistema valida e registra o responsável.
+- **Fluxos alternativos:** OS já atribuída ou fora do estado permitido.
+- **Pós-condição:** OS vinculada ao técnico.
 
 ## UC-09 — Iniciar execução
 
-- **Objetivo:** registrar o início da execução de uma OS.
+- **Objetivo:** abrir a execução operacional da OS.
 - **Ator principal:** técnico responsável.
-- **Pré-condições:** OS aceita pelo próprio técnico e ainda não encerrada.
-- **Fluxo principal:**
-  1. O técnico acessa a OS.
-  2. Informa observação inicial, se desejar.
-  3. Solicita o início da execução.
-  4. O sistema cria uma execução aberta.
-  5. O status da OS muda para `em_execucao`.
-- **Fluxos alternativos:**
-  - OS sem responsável;
-  - OS de outro técnico;
-  - já existe execução aberta para a OS.
-- **Pós-condições:** execução em andamento registrada.
+- **Pré-condições:** OS aceita pelo próprio técnico.
+- **Fluxo principal:** técnico aciona o início; o sistema cria a execução e muda a OS para `em_execucao`.
+- **Fluxos alternativos:** OS de outro técnico, OS encerrada, execução aberta existente.
+- **Pós-condição:** execução registrada.
 
 ## UC-10 — Finalizar execução
 
-- **Objetivo:** encerrar uma execução em andamento.
+- **Objetivo:** encerrar a execução da OS.
 - **Ator principal:** técnico responsável.
-- **Pré-condições:** OS em `em_execucao` e execução aberta vinculada ao técnico.
-- **Fluxo principal:**
-  1. O técnico acessa a OS.
-  2. Informa observação final, se desejar.
-  3. Informa equipe participante e horários individuais quando necessário.
-  4. Solicita finalização.
-  5. O sistema encerra a execução.
-  6. O sistema calcula os dados de horas extras por funcionário.
-  7. O sistema muda a OS para `finalizada`.
-- **Fluxos alternativos:**
-  - execução já encerrada;
-  - OS fora do estado `em_execucao`;
-  - equipe inválida.
-- **Pós-condições:** execução finalizada, OS encerrada e horas extras apuradas.
+- **Pré-condições:** OS em `em_execucao`.
+- **Fluxo principal:** técnico informa observação final, equipe participante e horários individuais; o sistema encerra a execução e a OS.
+- **Fluxos alternativos:** equipe inválida, execução já encerrada, estado incompatível.
+- **Pós-condição:** OS finalizada e horas extras apuradas.
 
 ## UC-11 — Marcar OS como não executada
 
-- **Objetivo:** registrar encerramento sem execução concluída.
+- **Objetivo:** registrar encerramento sem conclusão operacional.
 - **Ator principal:** técnico responsável.
-- **Pré-condições:** OS sob responsabilidade do técnico e ainda não encerrada.
-- **Fluxo principal:**
-  1. O técnico acessa a opção de não execução.
-  2. Informa o motivo.
-  3. Solicita a operação.
-  4. O sistema registra o motivo e encerra a OS como `nao_executada`.
-- **Fluxos alternativos:**
-  - motivo não informado;
-  - OS já encerrada.
-- **Pós-condições:** OS encerrada com motivo registrado.
+- **Pré-condições:** OS sob responsabilidade do técnico.
+- **Fluxo principal:** técnico informa motivo e o sistema encerra a OS como `nao_executada`.
+- **Fluxos alternativos:** motivo ausente ou OS já encerrada.
+- **Pós-condição:** OS encerrada com motivo registrado.
 
 ## UC-12 — Anexar evidência
 
 - **Objetivo:** adicionar arquivo comprobatório à OS.
 - **Ator principal:** técnico responsável.
-- **Pré-condições:** técnico responsável pela OS e arquivo válido.
-- **Fluxo principal:**
-  1. O técnico seleciona o tipo do anexo.
-  2. Escolhe o arquivo.
-  3. Opcionalmente captura geolocalização.
-  4. Solicita envio.
-  5. O sistema valida arquivo e grava metadados.
-  6. O sistema registra o anexo em armazenamento privado.
-- **Fluxos alternativos:**
-  - arquivo inválido ou acima do limite;
-  - geolocalização indisponível;
-  - técnico sem autorização na OS.
-- **Pós-condições:** anexo persistido e associado à OS.
+- **Pré-condições:** técnico responsável e arquivo válido.
+- **Fluxo principal:** seleciona arquivo, opcionalmente captura geolocalização e envia a evidência.
+- **Fluxos alternativos:** falha de permissão, arquivo inválido, geolocalização indisponível.
+- **Pós-condição:** anexo persistido em storage privado.
 
 ## UC-13 — Consultar relatórios gerenciais
 
-- **Objetivo:** fornecer visão gerencial da operação.
+- **Objetivo:** analisar contexto operacional e indicadores.
 - **Ator principal:** administrador.
-- **Pré-condições:** usuário autenticado com perfil `administrador`.
-- **Fluxo principal:**
-  1. O administrador acessa a área de relatórios.
-  2. Define tipo de relatório e filtros.
-  3. O sistema gera resumo, dados analíticos e tabela paginada.
-  4. O administrador pode exportar em formato suportado.
-- **Fluxos alternativos:**
-  - filtros inválidos;
-  - nenhum dado encontrado;
-  - exportação excede limite seguro para PDF ou XLSX.
-- **Pós-condições:** relatório visualizado ou exportado.
+- **Pré-condições:** usuário autenticado com papel `administrador`.
+- **Fluxo principal:** aplica filtros, consulta o relatório e visualiza resumo, gargalos e tabela.
+- **Fluxos alternativos:** filtros sem resultado ou exportação bloqueada por regra.
+- **Pós-condição:** relatório exibido.
 
-## UC-14 — Consultar horas extras
+## UC-14 — Exportar relatórios
 
-- **Objetivo:** fornecer visão administrativa da jornada excedente por funcionário.
+- **Objetivo:** gerar saídas formais ou analíticas dos relatórios.
 - **Ator principal:** administrador.
-- **Pré-condições:** usuário autenticado com perfil `administrador`.
-- **Fluxo principal:**
-  1. O administrador acessa a área de horas extras.
-  2. Define filtros por funcionário, mês, ano ou período.
-  3. O sistema gera indicadores, tabela e resumo individual.
-  4. O administrador pode exportar em formato suportado.
-- **Fluxos alternativos:**
-  - período inválido;
-  - nenhum dado encontrado.
-- **Pós-condições:** relatório visualizado ou exportado.
+- **Pré-condições:** relatório disponível para exportação.
+- **Fluxo principal:** administrador escolhe `PDF`, `Excel` ou `CSV`; o sistema gera e devolve o arquivo.
+- **Fluxos alternativos:** formato inválido, volume incompatível ou falha de geração.
+- **Pós-condição:** arquivo exportado.
 
-## UC-15 — Gerenciar usuários
+## UC-15 — Consultar horas extras
 
-- **Objetivo:** administrar acessos do sistema.
+- **Objetivo:** acompanhar extras, banco de folgas e estimativa financeira.
 - **Ator principal:** administrador.
-- **Pré-condições:** usuário autenticado com perfil `administrador`.
-- **Fluxo principal:**
-  1. O administrador acessa a tela de usuários.
-  2. Pesquisa, filtra, cria ou edita usuários.
-  3. O sistema valida os dados.
-  4. O sistema persiste a alteração.
-  5. Opcionalmente o administrador inativa ou reativa um usuário.
-- **Fluxos alternativos:**
-  - e-mail já cadastrado;
-  - senha fora do padrão;
-  - tentativa de inativar o próprio usuário;
-  - tentativa de remover o último administrador ativo.
-- **Pós-condições:** base de usuários atualizada.
+- **Pré-condições:** execuções finalizadas com equipe registrada.
+- **Fluxo principal:** administrador aplica filtros, consulta indicadores e lista analítica.
+- **Fluxos alternativos:** filtros sem resultado.
+- **Pós-condição:** relatório de horas extras exibido.
+
+## UC-16 — Gerenciar usuários
+
+- **Objetivo:** manter a base de usuários autenticáveis.
+- **Ator principal:** administrador.
+- **Pré-condições:** usuário autenticado com papel `administrador`.
+- **Fluxo principal:** listar, criar, editar, inativar e reativar usuários.
+- **Fluxos alternativos:** e-mail duplicado, senha inválida, tentativa de remover o último administrador ativo.
+- **Pós-condição:** base de usuários atualizada.
+
+## UC-17 — Gerenciar colaboradores operacionais
+
+- **Objetivo:** manter a base de participantes sem login.
+- **Ator principal:** administrador.
+- **Pré-condições:** usuário autenticado com papel `administrador`.
+- **Fluxo principal:** listar, cadastrar, editar e inativar colaboradores operacionais.
+- **Fluxos alternativos:** dados obrigatórios ausentes ou valor-hora inválido.
+- **Pós-condição:** base operacional atualizada.
+
+## UC-18 — Emitir PDF detalhado da OS
+
+- **Objetivo:** gerar documento formal detalhado da ordem.
+- **Ator principal:** administrador.
+- **Pré-condições:** OS existente e acesso administrativo.
+- **Fluxo principal:** administrador acessa a OS e solicita o PDF detalhado.
+- **Fluxos alternativos:** perfil não autorizado recebe `403`.
+- **Pós-condição:** PDF detalhado gerado.

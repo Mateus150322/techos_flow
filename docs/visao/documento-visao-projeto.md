@@ -8,143 +8,140 @@
 | Tipo de solução | Sistema web para gestão de ordens de serviço |
 | Domínio | Operação e atendimento com ordens de serviço |
 | Organização de referência | Não aplicável |
-| Versão deste documento | 1.1 |
-| Data de referência | 2026-05-16 |
-| Responsável | A preencher |
+| Versão deste documento | 1.2 |
+| Data de referência | 2026-05-28 |
+| Responsável | A definir |
 
 ## 2. Descrição geral
 
-O TechOS Flow é um sistema web desenvolvido para substituir controles manuais e processos em papel na gestão de ordens de serviço. A solução organiza o fluxo de abertura, aceite, execução, acompanhamento, evidências, relatórios, horas extras e gestão administrativa das ordens de serviço, com autenticação e autorização por perfil.
+O `TechOS Flow` é um sistema web criado para substituir controles manuais e registros dispersos na gestão de ordens de serviço. A solução cobre abertura, aceite, execução, encerramento, evidências, relatórios, horas extras, banco de folgas e administração de acessos, com separação por perfil e rastreabilidade operacional.
 
-O sistema foi estruturado com backend em Laravel, frontend em React com TypeScript e banco de dados PostgreSQL, operando por meio de API REST versionada.
+O projeto utiliza:
+
+- frontend em `React + TypeScript + Vite`;
+- backend em `Laravel`;
+- banco de dados `PostgreSQL`;
+- API REST versionada em `/api/v1`;
+- envio de e-mail para recuperação de senha;
+- armazenamento privado para anexos e evidências.
 
 ## 3. Problema que o projeto resolve
 
-Antes da informatização, a gestão de ordens de serviço tende a apresentar:
+O sistema foi desenhado para reduzir problemas frequentes em operações de ordens de serviço, como:
 
-- baixa rastreabilidade sobre quem abriu, aceitou, executou e encerrou uma OS;
-- dependência de formulários manuais e registros em papel;
-- dificuldade de consultar histórico de atendimento;
-- demora no acompanhamento gerencial;
+- baixa rastreabilidade sobre quem abriu, aceitou, executou ou encerrou uma OS;
+- dependência de planilhas e registros em papel;
+- dificuldade de acompanhar andamento e produtividade;
 - fragilidade no controle de acesso por perfil;
-- ausência de evidências digitais e georreferenciadas das execuções;
-- pouca visibilidade sobre carga de trabalho, horas extras e banco de folgas.
-
-O TechOS Flow resolve esses problemas ao centralizar o fluxo operacional em uma plataforma única, com histórico auditável, separação por perfil, suporte a anexos e evidências e apuração administrativa mais estruturada.
+- ausência de evidências digitais e georreferenciadas;
+- pouco controle gerencial sobre horas extras e banco de folgas.
 
 ## 4. Objetivo geral
 
-Desenvolver um sistema web para gerenciar ordens de serviço de forma estruturada, rastreável e segura, melhorando a operação técnica, o atendimento e a visão gerencial da organização usuária.
+Centralizar o fluxo operacional e administrativo das ordens de serviço em uma plataforma web segura, rastreável e preparada para uso em desktop e smartphone.
 
 ## 5. Objetivos específicos
 
 - digitalizar a abertura e o acompanhamento das ordens de serviço;
-- permitir controle de acesso por perfil de usuário;
-- registrar aceite, execução, finalização e não execução das ordens;
-- possibilitar envio de evidências e anexos com suporte à geolocalização;
-- oferecer dashboards, relatórios, exportações e PDF detalhado de OS;
-- apoiar o cálculo de horas extras e banco de folgas;
-- garantir maior rastreabilidade, segurança e minimização de dados;
-- disponibilizar recuperação de senha por e-mail;
-- reduzir improvisos operacionais e inconsistências entre equipes.
+- controlar acesso por perfil de usuário;
+- permitir aceite, execução, finalização e não execução de OS;
+- registrar evidências com foto, anexos e geolocalização;
+- apoiar a gestão administrativa por meio de dashboards, relatórios e exportações;
+- apurar horas extras e banco de folgas por participante da execução;
+- oferecer recuperação de senha por e-mail;
+- melhorar a consistência da operação em campo e a visibilidade gerencial.
 
 ## 6. Público-alvo
 
 ### 6.1 Público direto
 
-- atendentes responsáveis pela abertura e consulta de ordens;
-- técnicos responsáveis pela execução operacional;
-- administradores responsáveis por acompanhamento, relatórios, horas extras e gestão de usuários.
+- atendentes responsáveis pela abertura e consulta de OS;
+- técnicos responsáveis pela operação em campo;
+- administradores responsáveis por relatórios, horas extras, gestão de usuários e configuração operacional.
 
 ### 6.2 Público indireto
 
 - gestores da organização usuária;
-- áreas de controle interno e apoio administrativo;
-- cidadãos atendidos pelo serviço público, de forma indireta, pela melhoria operacional.
+- áreas administrativas de apoio;
+- equipes operacionais sem login direto, como colaboradores operacionais/auxiliares;
+- público atendido indiretamente pela melhoria do processo.
 
 ## 7. Proposta de valor
 
 O projeto entrega:
 
-- centralização do processo de OS em ambiente digital;
-- rastreabilidade por usuário, perfil e status;
-- ganho de controle operacional para técnico, atendimento e administração;
-- melhor visibilidade gerencial por meio de relatórios, indicadores e horas extras;
-- maior segurança na manipulação de evidências e dados operacionais;
-- base estruturada para evolução futura do sistema.
+- centralização digital do ciclo da OS;
+- rastreabilidade por usuário, perfil, status e execução;
+- evidências com localização capturada no campo;
+- relatórios administrativos com exportação em `PDF`, `Excel` e `CSV`;
+- apuração estruturada de horas extras por participante;
+- base técnica organizada para crescimento futuro.
 
-## 8. Escopo do projeto
+## 8. Escopo atual implementado
 
 O escopo atual contempla:
 
-- autenticação com Laravel Sanctum;
-- perfis de acesso `administrador`, `atendente` e `tecnico`;
-- criação de OS geral pelo atendente e pelo administrador;
-- criação de OS de `Manutenção ETA/ETE` pelo técnico e pelo administrador;
-- consulta, filtros e detalhamento de ordens de serviço;
-- aceite de OS pelo técnico;
-- início e finalização de execução;
-- marcação de OS como não executada;
-- upload de evidências e anexos;
-- suporte a geolocalização em evidências;
-- dashboards por perfil;
-- relatórios administrativos com exportação em CSV, XLSX e PDF;
-- PDF detalhado por OS;
-- módulo administrativo de horas extras e banco de folgas;
-- gestão administrativa de usuários;
+- autenticação por e-mail e senha com Sanctum;
 - primeiro acesso com troca obrigatória de senha forte;
 - recuperação de senha por e-mail;
-- inativação de usuários;
-- armazenamento privado de anexos;
+- perfis `administrador`, `atendente` e `tecnico`;
+- criação de OS geral por atendente;
+- criação de OS `Manutenção ETA/ETE` por técnico;
+- aceite de OS aberta sem responsável;
+- início, finalização e não execução da OS;
+- composição de equipe de execução com usuários e colaboradores operacionais sem login;
+- cálculo de horas extras e banco de folgas;
+- envio de evidências com foto e geolocalização;
+- dashboards por perfil;
+- relatórios administrativos e PDF detalhado por OS;
+- gestão administrativa de usuários e colaboradores operacionais;
 - melhorias de acessibilidade, responsividade e uso em smartphone.
 
-## 9. Fora de escopo
+## 9. Fora de escopo atual
 
-Os itens abaixo não fazem parte do escopo atual implementado:
+Não fazem parte do escopo implementado:
 
 - aplicativo mobile nativo;
 - notificações push;
-- workflow formal de aprovação entre múltiplos setores;
-- assinatura eletrônica avançada;
-- integração com ERP ou outros sistemas legados;
-- exclusão física de usuários;
-- automação completa de descarte de dados por retenção;
-- object storage externo como padrão de anexos;
-- observabilidade corporativa completa com métricas e alertas externos.
+- integração com ERP ou sistemas legados;
+- workflow formal de aprovação multiárea;
+- observabilidade corporativa completa;
+- descarte automático institucional de dados por prazo;
+- storage em nuvem como padrão obrigatório;
+- assinatura eletrônica avançada.
 
 ## 10. Benefícios esperados
 
-- redução do uso de papel e controles paralelos;
-- maior agilidade na abertura e no acompanhamento de OS;
-- rastreabilidade mais forte sobre ações operacionais;
-- visão gerencial mais clara sobre status, produtividade, horas extras e volume de serviços;
-- maior segurança de acesso e privacidade dos dados tratados;
-- base documental e técnica mais adequada para expansão futura.
+- redução de controles paralelos e retrabalho;
+- ganho de rastreabilidade operacional;
+- maior velocidade de consulta e acompanhamento da OS;
+- melhor visibilidade gerencial sobre fila, produtividade e horas extras;
+- base mais segura para tratamento de anexos e evidências;
+- documentação mais adequada para TCC, apresentação e evolução do produto.
 
-## 11. Indicadores de sucesso sugeridos
+## 11. Indicadores sugeridos
 
-- percentual de OS abertas e encerradas dentro do período esperado;
+- quantidade de OS abertas, em execução, finalizadas e não executadas;
 - tempo médio entre abertura e encerramento;
 - percentual de OS com evidência anexada;
-- percentual de OS não executadas;
+- distribuição por prioridade e tipo;
 - produtividade por técnico;
-- volume de ordens por tipo de serviço;
-- total de horas extras por período;
-- número de acessos inativados ou revisados por período.
+- total de horas extras 50% e 100% por período;
+- total de colaboradores com banco de folgas gerado.
 
 ## 12. Restrições e premissas
 
 ### 12.1 Restrições
 
-- dependência de infraestrutura web com backend e frontend separados;
-- necessidade de conexão com banco PostgreSQL;
-- armazenamento de anexos local no estado atual do projeto;
-- uso de navegador moderno no frontend;
-- envio de e-mails depende de SMTP válido em cada ambiente.
+- dependência de backend, frontend e banco integrados;
+- necessidade de `SMTP` válido para recuperação de senha;
+- necessidade de `HTTPS` para funcionamento confiável da geolocalização em smartphone;
+- anexos exigem storage persistente em produção;
+- uso por navegador moderno.
 
 ### 12.2 Premissas
 
-- a organização usuária já possui equipe segregada por perfil;
-- o fluxo operacional continuará baseado em ordens de serviço;
-- a autenticação permanecerá centralizada na API;
-- o sistema será operado em ambiente autenticado e controlado.
+- a organização usuária já opera por ordens de serviço;
+- a API continuará sendo a fonte oficial de regras de negócio;
+- os perfis principais continuarão sendo `administrador`, `atendente` e `tecnico`;
+- colaboradores operacionais poderão participar da execução sem possuir login.

@@ -86,7 +86,7 @@ Executar:
 npm run dev
 ```
 
-## 5.2 Domínios locais de desenvolvimento
+### 5.2 Domínios locais de desenvolvimento
 
 O ambiente local atual usa:
 
@@ -95,7 +95,7 @@ O ambiente local atual usa:
 
 Isso depende de entradas locais no arquivo `hosts` da máquina.
 
-## 5.3 Execução com Docker
+### 5.3 Execução com Docker
 
 Na raiz do projeto:
 
@@ -138,6 +138,7 @@ Observações:
 - `DB_*`
 - `SESSION_DRIVER`
 - `FILESYSTEM_DISK`
+- `ANEXOS_DISK`
 - `SANCTUM_STATEFUL_DOMAINS`
 - `MAIL_*`
 
@@ -200,19 +201,26 @@ O projeto possui uma suíte inicial de acessibilidade para validar partes críti
 - gestão de usuários;
 - modal técnico de detalhe da OS.
 
+Além da suíte automatizada, a interface passou por uma rodada específica de responsividade mobile com foco em:
+
+- remoção de rolagem horizontal indesejada;
+- tabelas administrativas convertidas para cards no celular;
+- formulários e ações da OS mais confortáveis em toque;
+- melhor adaptação de dashboards, relatórios e painéis operacionais em telas pequenas.
+
+Também fazem parte do comportamento atual do frontend:
+
+- envio de múltiplas fotos no mesmo fluxo de evidência;
+- miniaturas de imagens nos detalhes da OS para técnico e administrador;
+- captura de geolocalização com uso da melhor posição disponível quando a precisão ideal não é alcançada;
+- correção do mapeamento de prioridade para manter `Alta = 1`, `Média = 2` e `Baixa = 3`.
+
 Execução local:
 
 ```bash
 cd frontend
 npm run test:a11y
 ```
-
-Pipeline GitLab:
-
-- o arquivo [.gitlab-ci.yml](c:/Users/VAIO/Documents/projetos/techos-flow/.gitlab-ci.yml) executa:
-  - `npm run lint`
-  - `npx tsc -b`
-  - `npm run test:a11y`
 
 ## 10. Padrões adotados
 
@@ -230,26 +238,4 @@ Pipeline GitLab:
 - sempre executar migrations antes de validar fluxo novo no backend;
 - revisar impacto em perfis ao alterar rotas protegidas;
 - manter coerência entre nomes e contratos do backend e do frontend;
-- atualizar documentação ao alterar regras de negócio;
-- preservar proteção dos anexos privados;
-- validar `lint`, `tsc` e `php artisan test` antes de consolidar mudanças.
-
-## 12. Checklist de validação local
-
-1. Subir banco PostgreSQL.
-2. Configurar `.env` do backend.
-3. Rodar migrations e seeders.
-4. Instalar dependências do frontend.
-5. Configurar ambiente do Vite.
-6. Subir backend e frontend.
-7. Testar login, recuperação de senha e fluxos básicos.
-
-## 13. Itens a preencher conforme ambiente institucional
-
-- domínio oficial do backend;
-- domínio oficial do frontend;
-- política de backup;
-- SMTP de produção;
-- observabilidade e monitoramento;
-- credenciais e segredos por ambiente;
-- estratégia final de storage para anexos em produção.
+- revisar os relatórios em PDF e CSV sempre que houver mudança estrutural em OS, anexos ou geolocalização.

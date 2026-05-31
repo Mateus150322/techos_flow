@@ -2,219 +2,158 @@
 
 ## 1. Visão geral
 
-O TechOS Flow adota arquitetura web em camadas, com separação entre:
+O `TechOS Flow` adota arquitetura web em camadas, com separação entre:
 
-- **frontend**: aplicação React + TypeScript responsável pela interface do usuário;
-- **backend**: API REST em Laravel responsável por autenticação, regras de negócio e persistência;
-- **banco de dados**: PostgreSQL responsável pelo armazenamento estruturado;
-- **armazenamento de arquivos**: disco local privado para anexos no estado atual.
+- frontend para experiência do usuário;
+- backend para autenticação, autorização e regras de negócio;
+- banco de dados relacional para persistência;
+- armazenamento privado de anexos;
+- serviço de e-mail para recuperação de senha.
 
-## 2. Arquitetura geral do sistema
+## 2. Camadas principais
 
-### 2.1 Camadas principais
+### 2.1 Apresentação
 
-1. **Apresentação**
-   - páginas, componentes e hooks React;
-   - dashboards por perfil;
-   - formulários de criação, consulta e execução;
-   - tema claro/escuro e componentes mobile.
-2. **Aplicação**
-   - controllers Laravel;
-   - middlewares;
-   - services de dashboard, relatórios, exportação e horas extras.
-3. **Domínio e persistência**
-   - models Eloquent;
-   - migrations;
-   - banco PostgreSQL.
-4. **Infraestrutura**
-   - Laravel Sanctum;
-   - SMTP para recuperação de senha;
-   - armazenamento privado de anexos;
-   - logs de eventos sensíveis.
+Responsável por:
 
-## 3. Organização entre frontend, backend e banco
+- páginas e componentes React;
+- navegação por perfil;
+- formulários de criação, consulta e execução;
+- experiência mobile;
+- acessibilidade inicial;
+- exportação acionada pela interface administrativa.
 
-### 3.1 Frontend
+### 2.2 Aplicação
 
-- responsável pela experiência de uso;
-- consome a API REST versionada;
-- mantém estado local de telas, filtros, formulários e sessão de usuário;
-- aplica separação por módulos (`auth`, `dashboard`, `ordensServico`, `admin`, `shared`);
-- inclui suíte inicial de testes de acessibilidade.
+Responsável por:
 
-### 3.2 Backend
+- controllers Laravel;
+- middlewares de autenticação, usuário ativo, troca obrigatória de senha e papel;
+- services de dashboards, relatórios, exportação, horas extras e anexos;
+- notifications de recuperação de senha.
 
-- centraliza autenticação e autorização;
-- aplica validação de entrada;
-- executa regras de negócio;
-- retorna dados estruturados por perfil;
-- controla acesso a arquivos privados;
-- calcula horas extras e banco de folgas ao finalizar execuções;
-- envia e-mails de recuperação de senha.
+### 2.3 Domínio e persistência
 
-### 3.3 Banco de dados
+Responsável por:
 
-- armazena usuários, endereços, ordens de serviço, execuções, equipe de execução, anexos, feriados, sessões, tokens e reset de senha;
-- utiliza UUID como identificador principal nas entidades de domínio;
-- mantém chaves estrangeiras e índices para suportar filtros, consultas e relatórios.
+- models Eloquent;
+- migrations;
+- regras de relacionamento entre ordens, execuções, equipe, anexos e colaboradores;
+- persistência em PostgreSQL.
 
-## 4. Módulos do sistema
+### 2.4 Infraestrutura
 
-### 4.1 Módulo de autenticação
+Responsável por:
+
+- Laravel Sanctum;
+- SMTP;
+- storage privado/local ou storage em nuvem configurável;
+- geração de PDF;
+- geração de planilhas com `PhpSpreadsheet`.
+
+## 3. Módulos funcionais
+
+### 3.1 Autenticação e acesso
 
 - login;
 - logout;
-- consulta do usuário autenticado;
-- primeiro acesso com troca obrigatória de senha;
-- bloqueio de usuários inativos;
+- usuário autenticado;
+- primeiro acesso;
 - recuperação de senha por e-mail.
 
-### 4.2 Módulo de ordens de serviço
+### 3.2 Ordens de serviço
 
 - criação de OS geral;
 - criação de OS técnica ETA/ETE;
-- listagem, filtros e detalhe;
+- consulta, filtros e detalhe;
 - aceite;
-- execução;
+- início de execução;
 - finalização;
-- não execução;
-- PDF detalhado por OS.
+- não execução.
 
-### 4.3 Módulo de evidências
+### 3.3 Evidências e anexos
 
-- envio de anexos;
+- upload de arquivos;
 - geolocalização opcional;
 - armazenamento privado;
-- consulta autenticada do arquivo.
+- leitura autenticada;
+- campos estruturados do endereço capturado.
 
-### 4.4 Módulo de dashboards
+### 3.4 Dashboards
 
-- painel do atendente;
-- painel do técnico;
-- painel administrativo.
+- dashboard do administrador;
+- dashboard do atendente;
+- dashboard do técnico.
 
-### 4.5 Módulo administrativo
+### 3.5 Administração
 
-- relatórios gerenciais;
-- exportações;
+- relatórios operacionais e gerenciais;
+- relatório de horas extras;
+- exportação em PDF, Excel e CSV;
 - gestão de usuários;
-- relatório de horas extras e banco de folgas.
+- gestão de colaboradores operacionais.
 
-## 5. Fluxo de autenticação
+## 4. Integrações externas
 
-1. Usuário informa e-mail e senha no frontend.
-2. Frontend chama `POST /api/v1/login`.
-3. Backend valida credenciais e aplica throttle no endpoint público.
-4. Em caso de sucesso, revoga tokens antigos do usuário e gera novo token do Sanctum.
-5. Frontend armazena token e dados do usuário.
-6. Requisições subsequentes usam cabeçalho `Authorization: Bearer <token>`.
+- `SMTP`: recuperação de senha;
+- navegador + geolocalização: captura de coordenadas e contexto de evidência;
+- storage persistente: necessário para produção;
+- domínio com `HTTPS`: necessário para validação real do fluxo de geolocalização em smartphone.
 
-## 6. Fluxo de autorização
+## 5. Decisões arquiteturais relevantes
 
-O backend aplica autorização em camadas:
+### DA-01 — A API é a fonte oficial da regra de negócio
 
-- autenticação obrigatória nas rotas protegidas;
-- middleware de usuário ativo;
-- middleware de troca obrigatória de senha;
-- middleware por perfil;
-- validações específicas por regra de negócio, como técnico responsável da OS;
-- restrição de leitura para o técnico visualizar apenas OS abertas sem responsável ou OS atribuídas a ele.
+As regras críticas não ficam apenas no frontend. O backend valida perfil, status, vínculo do técnico, composição da equipe, geração de relatório e acesso ao anexo.
 
-## 7. Versionamento da API
+### DA-02 — Separação entre usuário autenticável e colaborador operacional
 
-A API utiliza versionamento por prefixo:
+Colaboradores operacionais participam da execução e das horas extras sem receber login. Isso reduz complexidade de permissões e reflete melhor o processo real.
 
-- `/api/v1`
+### DA-03 — Evidência com geolocalização separada do endereço da OS
 
-Isso permite evolução futura sem quebrar o contrato atual de integração.
+O endereço cadastral da OS representa o contexto do atendimento, enquanto a geolocalização da evidência representa o local capturado no campo.
 
-## 8. Estrutura de pastas do projeto
+### DA-04 — Anexos privados por padrão
 
-### 8.1 Backend
+Arquivos não são servidos por URL pública. O acesso é mediado por backend autenticado.
 
-```text
-backend/
-  app/
-    Http/
-      Controllers/Api/V1/
-      Middleware/
-    Models/
-    Notifications/
-    Services/
-      Dashboard/
-      HorasExtras/
-      Relatorios/
-    Support/
-  database/
-    migrations/
-    seeders/
-  routes/
-    api.php
-    console.php
-  tests/
-    Feature/
-```
+### DA-05 — Relatórios e exportações concentrados no backend
 
-### 8.2 Frontend
+Consultas agregadas, exportações e PDFs são calculados no backend para manter consistência e reduzir lógica duplicada no frontend.
 
-```text
-frontend/
-  src/
-    app/
-    modules/
-      admin/
-      auth/
-      dashboard/
-      ordensServico/
-    shared/
-      api/
-      auth/
-      components/
-      hooks/
-      utils/
-    test/
-```
+### DA-06 — Planilhas geradas com biblioteca dedicada
 
-## 9. Principais decisões arquiteturais
+O projeto migrou a geração de Excel para `PhpSpreadsheet`, melhorando manutenibilidade e acabamento visual.
 
-### DA-01 — API como fonte central de regra de negócio
+## 6. Visão de implantação recomendada
 
-As regras críticas não ficam apenas no frontend. O backend valida perfil, status, campos, execução, horas extras e acesso a anexos.
+Para ambiente real, a arquitetura esperada inclui:
 
-### DA-02 — Separação por perfil também no frontend
+- frontend publicado em domínio com `HTTPS`;
+- backend publicado em domínio ou subdomínio próprio;
+- banco PostgreSQL persistente;
+- storage persistente ou compatível com S3 para anexos;
+- SMTP funcional para recuperação de senha.
 
-Embora o backend seja a fonte de autorização, o frontend organiza experiência, painéis e fluxos por papel de usuário.
+## 7. Diagramas recomendados
 
-### DA-03 — Uso de UUID
+Os seguintes diagramas devem ser mantidos junto desta arquitetura:
 
-UUID foi adotado nas entidades centrais para reduzir acoplamento com sequências numéricas e melhorar consistência entre integrações futuras.
+- diagrama de contexto do sistema;
+- diagrama de arquitetura em camadas;
+- diagrama de implantação;
+- diagrama entidade-relacionamento;
+- diagramas de sequência para login, recuperação de senha e evidência;
+- diagramas de processo/BPMN para os fluxos principais.
 
-### DA-04 — Armazenamento privado de evidências
+Os arquivos-fonte sugeridos estão em:
 
-Anexos deixaram de ser expostos por URL pública e passaram a ser servidos por rota autenticada.
+- [docs/diagramas](c:/Users/VAIO/Documents/projetos/techos-flow/docs/diagramas/README.md)
 
-### DA-05 — Relatórios e dashboards orientados ao backend
+## 8. Restrições conhecidas
 
-Consultas agregadas e painéis deixaram de depender de carregamento completo no frontend, melhorando desempenho e previsibilidade.
-
-### DA-06 — Recuperação de senha via backend
-
-O reset de senha é iniciado por endpoint público, com notificação enviada pelo backend e aplicação da mesma política de senha forte usada no restante do sistema.
-
-## 10. Compatibilidade e evolução
-
-A arquitetura atual favorece:
-
-- manutenção evolutiva por módulo;
-- expansão da API sem alterar toda a interface;
-- futura criação de PWA ou app mobile consumindo a mesma API;
-- expansão de relatórios e integrações;
-- futura migração de anexos locais para object storage sem refatoração completa do domínio.
-
-## 11. Limitações arquiteturais atuais
-
-- armazenamento de anexos ainda local no estado atual;
-- ausência de fila estruturada para tarefas pesadas;
-- ausência de observabilidade completa com métricas externas;
-- políticas formais de produção e continuidade ainda dependem de definição institucional;
-- deploy de produção ainda precisa de adaptação específica, pois o `compose.yaml` atual é voltado para desenvolvimento.
+- a geolocalização em smartphone depende de `HTTPS`;
+- anexos exigem storage persistente em produção;
+- o projeto ainda precisa de validação final em ambiente publicado;
+- observabilidade e monitoramento ainda estão em nível básico de projeto acadêmico/produto inicial.

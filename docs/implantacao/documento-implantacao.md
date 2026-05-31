@@ -10,9 +10,11 @@ O projeto já está pronto para:
 
 - homologação online;
 - deploy controlado em pequena escala;
-- separação entre frontend, backend e banco.
+- separação entre frontend, backend e banco;
+- uso de SMTP real para recuperação de senha;
+- uso de domínio próprio com HTTPS.
 
-Pontos que ainda exigem decisão de infraestrutura:
+Pontos que ainda exigem definição de infraestrutura:
 
 - storage persistente para anexos;
 - política de backup;
@@ -48,7 +50,7 @@ Definir no `.env`:
 - `APP_URL=A_preencher`
 - `FRONTEND_URL=A_preencher`
 - `DB_*`
-- `FILESYSTEM_DISK=local` ou estratégia institucional definida
+- `ANEXOS_DISK=local` ou storage institucional definido
 - `SESSION_DRIVER=database` ou outro conforme estratégia
 - `SANCTUM_STATEFUL_DOMAINS`
 - `MAIL_*`
@@ -99,9 +101,9 @@ Publicar o conteúdo gerado em `frontend/dist`.
 Produção deve operar com HTTPS para:
 
 - proteger credenciais;
-- proteger tokens de autenticação;
+- proteger sessão e autenticação;
 - proteger links de recuperação de senha;
-- reduzir risco de interceptação;
+- permitir geolocalização no navegador do celular com muito mais confiabilidade;
 - cumprir boas práticas mínimas de segurança.
 
 ## 9. Backups
@@ -194,3 +196,9 @@ Ponto de atenção:
 - [ ] monitoramento definido
 - [ ] política de logs definida
 - [ ] estratégia de storage persistente validada
+- [ ] recuperação de senha testada no ambiente final
+- [ ] evidência com geolocalização testada em smartphone com HTTPS
+
+## 15. Próximo passo recomendado
+
+Depois da implantação técnica, executar o guia de [validação em ambiente real](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/validacao-ambiente-real.md).

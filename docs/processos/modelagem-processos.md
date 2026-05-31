@@ -2,17 +2,16 @@
 
 ## 1. Objetivo
 
-Este documento descreve, em formato textual estruturado, os principais processos do
-TechOS Flow. O objetivo é facilitar entendimento operacional e futura conversão para BPMN.
+Descrever os processos principais do `TechOS Flow` em formato textual estruturado, servindo como base para BPMN, fluxogramas e artefatos do TCC.
 
-## 2. Convenção textual sugerida para BPMN
+## 2. Convenção textual
 
-Cada processo abaixo está organizado com os elementos:
+Cada processo é descrito com:
 
 - participantes;
 - evento inicial;
 - atividades principais;
-- pontos de decisão;
+- decisões;
 - evento final.
 
 ## 3. Processo de abertura de OS
@@ -29,25 +28,25 @@ Necessidade de registrar uma ordem de serviço.
 
 ### Atividades principais
 
-1. Usuário autenticado acessa a área de criação.
-2. Sistema identifica o perfil do usuário.
-3. Atendente preenche formulário de OS geral ou técnico preenche formulário ETA/ETE.
-4. Sistema valida os campos obrigatórios.
-5. Sistema cria o endereço.
-6. Sistema gera número único da OS.
-7. Sistema persiste a OS com status `aberta`.
+1. O usuário autenticado acessa a área de criação.
+2. O sistema identifica o perfil.
+3. O atendente preenche OS geral ou o técnico preenche OS ETA/ETE.
+4. O sistema valida os campos obrigatórios.
+5. O sistema gera número único da OS.
+6. O sistema persiste endereço, descrição e vínculos.
+7. A OS é gravada com status `aberta`.
 
-### Pontos de decisão
+### Decisões
 
-- Se o usuário for `tecnico`, o tipo deve ser `Manutenção ETA/ETE`.
-- Se houver erro de validação, o processo retorna à edição do formulário.
-- Se houver conflito de numeração, o backend repete a geração de número.
+- se o usuário for `tecnico`, o fluxo permitido é o de OS técnica;
+- se houver falha de validação, o processo retorna ao formulário;
+- se houver conflito na sequência da numeração, o backend repete a geração.
 
 ### Evento final
 
-OS criada com sucesso e disponível para consulta.
+OS criada e disponível para consulta.
 
-## 4. Processo de atribuição ou encaminhamento
+## 4. Processo de aceite e início de execução
 
 ### Participantes
 
@@ -60,58 +59,31 @@ Existência de OS aberta e sem responsável.
 
 ### Atividades principais
 
-1. Técnico consulta painel de ordens disponíveis.
-2. Técnico seleciona uma OS.
-3. Técnico aciona o aceite.
-4. Sistema verifica status da OS.
-5. Sistema verifica ausência de responsável técnico.
-6. Sistema grava o técnico responsável.
+1. O técnico consulta ordens disponíveis.
+2. Seleciona a OS.
+3. Aciona o aceite.
+4. O sistema verifica status e ausência de responsável técnico.
+5. O sistema vincula o técnico responsável.
+6. O técnico aciona `Iniciar execução`.
+7. O sistema cria uma execução aberta.
+8. O status da OS muda para `em_execucao`.
 
-### Pontos de decisão
+### Decisões
 
-- Se a OS já estiver atribuída, o aceite é negado.
-- Se a OS não estiver `aberta`, o aceite é negado.
+- se a OS já estiver atribuída, o aceite é negado;
+- se a OS não estiver `aberta`, o aceite é negado;
+- se já existir execução aberta, o início é bloqueado.
 
 ### Evento final
 
-OS vinculada ao técnico responsável.
+Execução aberta e OS em andamento.
 
-## 5. Processo de execução da OS
+## 5. Processo de finalização com equipe e horas extras
 
 ### Participantes
 
 - técnico responsável;
-- sistema.
-
-### Evento inicial
-
-OS aceita pelo técnico.
-
-### Atividades principais
-
-1. Técnico abre a OS.
-2. Técnico informa observação inicial, se necessário.
-3. Técnico aciona `Iniciar execução`.
-4. Sistema verifica autorização do técnico.
-5. Sistema verifica se já existe execução aberta.
-6. Sistema cria execução com `data_inicio`.
-7. Sistema atualiza status da OS para `em_execucao`.
-
-### Pontos de decisão
-
-- Se a OS estiver encerrada, a execução não inicia.
-- Se existir execução aberta, a operação é rejeitada.
-- Se o técnico não for o responsável, a operação é negada.
-
-### Evento final
-
-Execução aberta registrada e OS em andamento.
-
-## 6. Processo de finalização
-
-### Participantes
-
-- técnico responsável;
+- colaboradores/usuários da equipe;
 - sistema.
 
 ### Evento inicial
@@ -120,24 +92,26 @@ OS em `em_execucao`.
 
 ### Atividades principais
 
-1. Técnico acessa a OS em execução.
-2. Técnico informa observação final, se necessário.
-3. Técnico aciona `Finalizar`.
-4. Sistema valida execução e vínculo do técnico.
-5. Sistema registra `data_fim`.
-6. Sistema atualiza a OS para `finalizada`.
-7. Sistema define `data_encerramento`.
+1. O técnico acessa a OS.
+2. Informa observação final, se necessário.
+3. Informa participantes da equipe.
+4. Registra intervalos individuais de início e fim.
+5. Aciona a finalização.
+6. O sistema encerra a execução.
+7. O sistema muda a OS para `finalizada`.
+8. O sistema calcula horas normais, extras 50%, extras 100% e banco de folgas por participante.
 
-### Pontos de decisão
+### Decisões
 
-- Se a OS não estiver em execução, o encerramento é bloqueado.
-- Se a execução já estiver finalizada, a operação é rejeitada.
+- se a OS não estiver em execução, o encerramento é bloqueado;
+- se a equipe estiver inconsistente, a finalização é rejeitada;
+- se o período individual atravessar a meia-noite, o cálculo é segmentado por dia.
 
 ### Evento final
 
-OS finalizada.
+OS finalizada e horas extras apuradas.
 
-## 7. Processo de não execução
+## 6. Processo de não execução
 
 ### Participantes
 
@@ -146,117 +120,117 @@ OS finalizada.
 
 ### Evento inicial
 
-Impossibilidade de concluir a execução da OS.
+Impossibilidade de concluir a OS.
 
 ### Atividades principais
 
-1. Técnico acessa a opção `Não executada`.
+1. O técnico aciona `Não executada`.
 2. Informa o motivo.
-3. Sistema valida autorização e integridade do estado.
-4. Sistema grava o motivo de não execução.
-5. Sistema atualiza a OS para `nao_executada`.
-6. Sistema registra `data_encerramento`.
+3. O sistema valida o estado e o vínculo do técnico.
+4. O sistema registra o motivo.
+5. O status da OS muda para `nao_executada`.
+6. O sistema registra `data_encerramento`.
 
-### Pontos de decisão
+### Decisões
 
-- Se o motivo não for informado, o sistema não conclui a ação.
-- Se a OS já estiver encerrada, a operação é negada.
+- se o motivo não for informado, o encerramento é bloqueado;
+- se a OS já estiver encerrada, a ação é negada.
 
 ### Evento final
 
 OS encerrada como não executada.
 
-## 8. Processo de consulta e acompanhamento
-
-### Participantes
-
-- atendente;
-- técnico;
-- administrador;
-- sistema.
-
-### Evento inicial
-
-Necessidade de localizar ou acompanhar uma OS.
-
-### Atividades principais
-
-1. Usuário acessa a listagem ou dashboard do seu perfil.
-2. Usuário informa busca e filtros, quando necessário.
-3. Sistema executa consulta paginada.
-4. Usuário abre o detalhe da OS.
-5. Sistema retorna relacionamento de endereço, criador, responsável, execuções e anexos.
-
-### Pontos de decisão
-
-- O conteúdo exibido depende do perfil do usuário e do contexto da OS.
-- O acesso a anexos privados depende de autenticação e autorização.
-
-### Evento final
-
-Usuário acompanha o estado atual e o histórico da ordem.
-
-## 9. Processo de gestão administrativa
-
-### Participantes
-
-- administrador;
-- sistema.
-
-### Evento inicial
-
-Necessidade de acompanhar operação ou administrar acessos.
-
-### Atividades principais
-
-1. Administrador acessa dashboard gerencial.
-2. Analisa indicadores de total, pendências, produtividade e tipos de serviço.
-3. Acessa relatórios.
-4. Aplica filtros por período, status, tipo, prioridade ou técnico.
-5. Visualiza relatório paginado.
-6. Opcionalmente exporta relatório.
-7. Acessa gestão de usuários.
-8. Cria, edita, inativa ou reativa usuários.
-
-### Pontos de decisão
-
-- Exportações pesadas podem ser limitadas por volume em formatos específicos.
-- O sistema não permite inativar o próprio usuário.
-- O sistema não permite remover o último administrador ativo.
-
-### Evento final
-
-Administrador obtém visão gerencial da operação e mantém o controle de acessos.
-
-## 10. Processo de evidência com geolocalização
+## 7. Processo de envio de evidência com geolocalização
 
 ### Participantes
 
 - técnico responsável;
-- navegador ou dispositivo;
+- navegador/smartphone;
+- sistema;
+- serviço de geolocalização reversa.
+
+### Evento inicial
+
+Necessidade de anexar foto ou evidência à OS.
+
+### Atividades principais
+
+1. O técnico seleciona o arquivo.
+2. Opcionalmente aciona a captura de localização.
+3. O navegador solicita permissão de geolocalização.
+4. O sistema obtém coordenadas e precisão.
+5. O sistema tenta identificar rua, bairro, cidade e estado.
+6. O técnico confirma o envio.
+7. O backend valida arquivo e metadados.
+8. O anexo é gravado em storage privado.
+
+### Decisões
+
+- se a localização falhar, a evidência pode seguir sem geolocalização, conforme o fluxo permitido;
+- em smartphone, a captura confiável depende de `HTTPS`;
+- o endereço capturado da evidência não substitui o endereço cadastral da OS.
+
+### Evento final
+
+Anexo persistido com ou sem geolocalização.
+
+## 8. Processo de recuperação de senha
+
+### Participantes
+
+- usuário;
+- sistema;
+- serviço de e-mail.
+
+### Evento inicial
+
+Usuário esqueceu a senha.
+
+### Atividades principais
+
+1. O usuário acessa `Esqueci minha senha`.
+2. Informa o e-mail cadastrado.
+3. O sistema gera token temporário.
+4. O sistema envia link de redefinição por e-mail.
+5. O usuário acessa o link.
+6. Informa nova senha e confirmação.
+7. O sistema valida a política de senha.
+8. O sistema redefine a credencial.
+
+### Decisões
+
+- se o e-mail não existir ou estiver inativo, a resposta pública continua neutra;
+- se o token estiver inválido ou expirado, a redefinição é rejeitada.
+
+### Evento final
+
+Senha redefinida com sucesso.
+
+## 9. Processo administrativo de relatórios
+
+### Participantes
+
+- administrador;
 - sistema.
 
 ### Evento inicial
 
-Necessidade de anexar evidência à OS.
+Necessidade de acompanhar contexto operacional, produtividade ou horas extras.
 
 ### Atividades principais
 
-1. Técnico seleciona o arquivo.
-2. Técnico define o tipo do anexo.
-3. Técnico escolhe se deseja incluir geolocalização.
-4. Navegador solicita permissão de localização.
-5. Se permitido, a localização é capturada.
-6. Técnico envia a evidência.
-7. Sistema grava o arquivo e os metadados.
+1. O administrador acessa a área de relatórios.
+2. Define filtros.
+3. O sistema consulta dados agregados.
+4. O administrador visualiza resumo, gargalos e resultados.
+5. Opcionalmente exporta em PDF, Excel ou CSV.
 
-### Pontos de decisão
+### Decisões
 
-- Geolocalização é opcional.
-- Se a captura falhar, o anexo ainda pode ser enviado sem coordenadas.
-- O endereço operacional da OS continua sendo referência principal da ordem.
+- o PDF detalhado da OS é restrito ao administrador;
+- Excel e CSV são acessados por menu de exportação em planilha;
+- relatórios podem restringir exportações em caso de volume excessivo, conforme regras do backend.
 
 ### Evento final
 
-Evidência registrada e disponível no detalhe da OS.
-
+Relatório consultado ou exportado.

@@ -2,19 +2,19 @@
 
 ## 1. Objetivo do perfil
 
-O administrador possui visão gerencial do sistema, com acesso a indicadores, relatórios, horas extras, PDF detalhado de OS e gestão de usuários.
+O administrador possui visão gerencial e administrativa do sistema. Ele acompanha indicadores, relatórios, horas extras, PDF detalhado da OS, gestão de usuários e gestão de colaboradores operacionais.
 
 ## 2. Acesso ao sistema
 
 1. Informe e-mail e senha na tela de login.
-2. Se o usuário estiver ativo e sem troca pendente, o acesso será direcionado para o dashboard principal.
-3. Se necessário, use `Esqueci minha senha` para receber um link de redefinição por e-mail.
+2. Se o usuário estiver ativo e sem troca pendente, o sistema direciona para o dashboard administrativo.
+3. Se necessário, use `Esqueci minha senha` para recuperar o acesso.
 
 ## 3. Navegação principal
 
 O administrador utiliza principalmente:
 
-- painel inicial com indicadores;
+- dashboard principal;
 - `Consultar OS`;
 - `Relatórios`;
 - `Horas Extras`;
@@ -24,7 +24,7 @@ O administrador utiliza principalmente:
 
 ### 4.1 Dashboard administrativo
 
-Exibe:
+Exibe indicadores como:
 
 - total de ordens;
 - abertas;
@@ -32,68 +32,115 @@ Exibe:
 - encerradas;
 - distribuição por status;
 - tipos de serviço;
-- produtividade de técnicos;
+- produtividade;
 - atividade recente.
 
 ### 4.2 Relatórios
 
 O administrador pode:
 
-- escolher o tipo de relatório;
 - aplicar filtros por status, tipo, prioridade, técnico e período;
-- consultar a tabela paginada;
-- exportar em CSV, XLSX e PDF;
-- gerar PDF detalhado da OS a partir do detalhe da ordem.
+- consultar contexto operacional;
+- visualizar gargalos, fila e resultados;
+- exportar em `PDF`, `Excel` e `CSV`;
+- abrir o PDF detalhado da OS.
 
-### 4.3 Relatório de horas extras
+Observações importantes:
+
+- `Excel` e `CSV` ficam agrupados em menu de exportação de planilha;
+- `PDF` permanece como ação separada;
+- em telas pequenas, os resultados passam a aparecer em cards responsivos para manter a leitura sem rolagem horizontal;
+- no relatório de OS em PDF por período, o sistema mantém o resumo geral no topo e organiza as ordens de serviço em blocos individuais abaixo;
+- cada bloco da OS pode mostrar as evidências fotográficas vinculadas àquela ordem, com dados de geolocalização da própria evidência;
+- o CSV agora usa `;` como separador para abrir melhor no Excel em ambiente pt-BR.
+
+### 4.3 Relatório mensal de OS em PDF
+
+Quando o administrador exporta o relatório de OS em PDF, o documento pode apresentar:
+
+- resumo geral do período no topo;
+- blocos organizados por OS;
+- informações da OS, como número, tipo, status, prioridade, cliente/local e responsável;
+- fotos da evidência ligadas àquela OS;
+- geolocalização da evidência, quando disponível.
+
+Importante:
+
+- a geolocalização exibida na evidência é diferente do endereço cadastral da OS;
+- o PDF detalhado da OS continua sendo um documento diferente do relatório geral por período.
+
+### 4.4 Relatório de horas extras
 
 Permite:
 
-- filtrar por funcionário, mês, ano e período;
-- visualizar horas extras 50% e 100%;
-- visualizar horas pagas e saldo de banco;
-- consultar dias de folga gerados;
-- exportar o relatório em CSV, XLSX e PDF.
+- filtrar por participante, mês, ano e período;
+- visualizar horas 50% e 100%;
+- visualizar horas pagas e banco;
+- identificar usuários e colaboradores operacionais;
+- exportar os dados.
 
-### 4.4 Gestão de usuários
+No smartphone, o consolidado por participante também é exibido em cards, preservando os dados principais sem depender da tabela larga do desktop.
+
+### 4.5 Gestão de usuários
 
 Permite:
 
 - listar usuários;
-- filtrar por perfil e status;
-- criar usuário;
-- editar usuário;
-- definir ou ajustar `valor_hora`;
+- filtrar por papel e status;
+- criar e editar usuários;
+- ajustar `valor_hora`;
 - inativar e reativar acessos.
+
+Em telas pequenas, a listagem administrativa de usuários troca a tabela por cards com ações diretas de edição e status.
+
+### 4.6 Gestão de colaboradores operacionais
+
+Permite:
+
+- listar auxiliares e demais colaboradores sem login;
+- cadastrar nome, função e valor-hora;
+- editar dados;
+- ativar e inativar colaboradores.
+
+Assim como em usuários, a área de colaboradores operacionais apresenta cartões no mobile para evitar quebra de layout.
+
+### 4.7 Visualização de anexos e miniaturas
+
+Nos detalhes da OS, o administrador pode:
+
+- visualizar miniaturas de imagens anexadas;
+- abrir o arquivo completo;
+- verificar geolocalização capturada na evidência, quando houver.
 
 ## 5. Ações permitidas
 
-- consultar indicadores e relatórios;
+- consultar indicadores, ordens e relatórios;
+- exportar relatórios;
+- emitir PDF detalhado da OS;
 - consultar horas extras;
 - gerenciar usuários;
-- consultar ordens e seus detalhes;
-- gerar PDF detalhado da OS.
+- gerenciar colaboradores operacionais.
 
 ## 6. Ações não recomendadas
 
-- usar relatórios amplos sem avaliar necessidade real de dados;
 - compartilhar exportações fora do contexto administrativo;
-- manter usuários inativos como ativos sem necessidade;
-- expor relatórios de horas extras fora do contexto de gestão.
+- manter usuários ou colaboradores inativos como ativos sem necessidade;
+- expor relatórios operacionais sem necessidade funcional ou gerencial.
 
 ## 7. Erros comuns
 
 | Situação | Causa provável | Como resolver |
 | --- | --- | --- |
 | Não foi possível gerar relatório | filtro inválido ou resposta temporariamente indisponível | revisar filtros e tentar novamente |
-| Não foi possível exportar relatório | formato inválido ou volume excessivo | revisar formato e reduzir filtros |
+| Não foi possível exportar planilha | formato inválido ou volume excessivo | revisar formato e reduzir o recorte |
 | Não é possível remover o último administrador ativo | regra de proteção do sistema | manter ao menos um administrador ativo |
-| Não é possível inativar o próprio usuário | proteção de segurança | solicitar apoio de outro administrador |
-| Erro ao criar usuário | senha fraca ou e-mail duplicado | revisar dados informados |
+| Não é possível inativar o próprio acesso em contexto crítico | regra de segurança | solicitar apoio de outro administrador |
+| Erro ao criar usuário | senha fraca ou e-mail duplicado | revisar os dados informados |
 
-## 8. Boas práticas de uso
+## 8. Boas práticas
 
 - revisar periodicamente usuários ativos e inativos;
+- revisar colaboradores operacionais sem login;
 - exportar relatórios apenas quando necessário;
-- evitar compartilhamento indevido de dados operacionais;
-- acompanhar anexos e evidências somente quando houver necessidade funcional ou gerencial.
+- acompanhar anexos e evidências somente quando houver finalidade legítima;
+- validar o ambiente publicado com `HTTPS`, storage persistente e SMTP real antes de homologar.

@@ -1,16 +1,16 @@
 # TechOS Flow
 
-Sistema web para gestão de ordens de serviço, com foco em rastreabilidade operacional, controle por perfil, evidências, relatórios, horas extras e banco de folgas.
+Sistema web para gestão de ordens de serviço, com foco em rastreabilidade operacional, controle por perfil, evidências, relatórios, horas extras, banco de folgas e recuperação de senha por e-mail.
 
 ## Visão geral
 
-O TechOS Flow foi projetado para substituir fluxos manuais e em papel em operações como:
+O TechOS Flow foi estruturado para substituir fluxos manuais e em papel em operações como:
 
 - atendimento e abertura de ordens de serviço;
 - execução técnica em campo;
 - gestão de ordens de manutenção ETA/ETE;
-- controle de anexos e evidências;
-- relatórios administrativos;
+- controle de anexos e evidências com geolocalização;
+- relatórios administrativos e PDF detalhado por OS;
 - horas extras e banco de folgas;
 - recuperação de senha por e-mail.
 
@@ -63,6 +63,7 @@ docker compose exec frontend npm run test:a11y
 ```
 
 Observação:
+
 - a estrutura Docker atual foi preparada para desenvolvimento e validação local;
 - para produção, recomenda-se configuração específica de build, domínio, HTTPS e storage persistente.
 
@@ -130,6 +131,30 @@ npm run build
 npm run test:a11y
 ```
 
+## Validação em ambiente real
+
+Antes do deploy final, vale validar o sistema em um domínio com `HTTPS` e storage persistente.
+
+Checklist prático:
+
+1. Publicar frontend, backend e banco em ambiente de homologação.
+2. Configurar domínio, HTTPS, SMTP e volume persistente para anexos.
+3. Executar smoke test completo:
+   - login;
+   - recuperação de senha;
+   - abertura de OS;
+   - aceite e finalização de OS;
+   - evidência com foto e geolocalização no celular;
+   - relatório PDF da OS;
+   - relatório administrativo;
+   - horas extras.
+4. Testar restauração básica de banco e anexos.
+5. Confirmar logs, monitoramento e alertas mínimos.
+
+Guia detalhado:
+
+- [validação em ambiente real](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/validacao-ambiente-real.md)
+
 ## Pipeline
 
 O projeto já possui pipeline base para qualidade do frontend em:
@@ -153,16 +178,20 @@ Pontos de entrada mais úteis:
 - [docs/README.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/README.md)
 - [docs/manuais/manual-tecnico-projeto.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/manuais/manual-tecnico-projeto.md)
 - [docs/testes/plano-de-testes.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/testes/plano-de-testes.md)
-- [docs/acessibilidade/checklist-acessibilidade.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/acessibilidade/checklist-acessibilidade.md)
 - [docs/implantacao/documento-implantacao.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/documento-implantacao.md)
-- [docs/implantacao/docker.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/docker.md)
+- [docs/implantacao/validacao-ambiente-real.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/validacao-ambiente-real.md)
+- [docs/acessibilidade/checklist-acessibilidade.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/acessibilidade/checklist-acessibilidade.md)
 
-## Observações
+## O que ainda precisa ser decidido
 
-- o modo claro é o padrão do sistema, com suporte opcional a modo escuro;
-- os PDFs permanecem com fundo claro, independentemente do tema da interface;
-- a proteção de acesso depende de autenticação, perfil e validações no backend;
-- o armazenamento de anexos ainda usa disco local privado, então deploy real exige volume persistente ou futura migração para object storage.
+O sistema já está funcionalmente maduro. O que ainda precisa ser fechado para produção é principalmente infraestrutura:
+
+- provedor de hospedagem;
+- domínio final do frontend e da API;
+- HTTPS;
+- storage persistente para anexos;
+- rotina de backup e restauração;
+- monitoramento e logs.
 
 ## Status atual
 
