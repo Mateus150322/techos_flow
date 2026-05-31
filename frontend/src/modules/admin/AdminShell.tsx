@@ -9,9 +9,9 @@ import {
 } from "lucide-react";
 
 import { logout as logoutSession } from "@/modules/auth/auth.service";
+import { type CurrentUser } from "@/shared/auth/session";
 import { BrandMark } from "@/shared/components/BrandMark";
 import { ThemeToggle } from "@/shared/components/ThemeToggle";
-import { type CurrentUser } from "@/shared/auth/session";
 import { useTheme } from "@/shared/hooks/useTheme";
 
 type AdminShellProps = {
@@ -54,7 +54,7 @@ export function AdminShell({ currentUser, activeTab, children }: AdminShellProps
     },
     {
       key: "relatorios",
-      label: "Relatorios",
+      label: "Relatórios",
       icon: FileText,
       to: "/admin/relatorios",
     },
@@ -66,7 +66,7 @@ export function AdminShell({ currentUser, activeTab, children }: AdminShellProps
     },
     {
       key: "usuarios",
-      label: "Usuarios",
+      label: "Usuários",
       icon: Users,
       to: "/admin/usuarios",
     },
@@ -111,7 +111,10 @@ export function AdminShell({ currentUser, activeTab, children }: AdminShellProps
           </div>
         </header>
 
-        <nav className="app-touch-scroll mb-5 overflow-x-auto pb-1" aria-label="Navegação administrativa">
+        <nav
+          className="app-touch-scroll mb-5 overflow-x-auto pb-1"
+          aria-label="Navegação administrativa"
+        >
           <div className={`${softBg} flex min-w-max flex-nowrap gap-1`}>
             {tabs.map((tab) => {
               const Icon = tab.icon;

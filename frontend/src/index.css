@@ -59,6 +59,12 @@ body,
   min-height: 100%;
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 html {
   color-scheme: light;
 }
@@ -69,6 +75,7 @@ html.dark {
 
 body {
   margin: 0;
+  width: 100%;
   background: var(--bg-main);
   color: var(--text-main);
   transition:
@@ -79,6 +86,15 @@ body {
 
 * {
   box-sizing: border-box;
+  min-width: 0;
+}
+
+img,
+picture,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
 }
 
 a:focus-visible,
@@ -325,6 +341,12 @@ select:focus-visible,
   border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
   background: color-mix(in srgb, var(--primary) 10%, var(--bg-card) 90%);
   color: var(--primary-dark);
+}
+
+.app-alert-success {
+  border: 1px solid color-mix(in srgb, var(--success) 28%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, var(--bg-card) 90%);
+  color: var(--success);
 }
 
 .pdf-report {

@@ -5,6 +5,7 @@ import {
 } from "@/modules/ordensServico/ordensServico.service";
 
 export type TipoRelatorio =
+  | "operacional"
   | "geral"
   | "status"
   | "produtividade"
@@ -48,6 +49,61 @@ export type ResumoRelatorios = {
   canceladas: number;
 };
 
+export type ResumoOperacional = {
+  filaAtiva: number;
+  semResponsavel: number;
+  criticasAtivas: number;
+  abertas48h: number;
+  execucao24h: number;
+  fotosAnexadas: number;
+  horasExtrasFormatadas: string;
+};
+
+export type GargaloOperacional = {
+  id: string;
+  label: string;
+  quantidade: number;
+  descricao: string;
+  nivel: "critico" | "atencao" | "ok";
+};
+
+export type FilaOperacionalItem = {
+  id: string;
+  numero: string;
+  tipo: string;
+  clienteLocal: string;
+  status: OrdemStatus;
+  prioridade: string;
+  responsavel: string;
+  idadeHoras: number;
+  idadeDescricao: string;
+  contexto: string;
+};
+
+export type CargaTecnicoOperacional = {
+  tecnico: string;
+  abertas: number;
+  emExecucao: number;
+  criticas: number;
+  totalAtivas: number;
+};
+
+export type MetricaOperacional = {
+  fotosAnexadas: number;
+  horasExtrasMinutos: number;
+  horasExtrasFormatadas: string;
+};
+
+export type ResumoTipoStatus = {
+  tipo: string;
+  abertas: number;
+  emExecucao: number;
+  finalizadas: number;
+  naoExecutadas: number;
+  canceladas: number;
+  total: number;
+};
+
 export type ProdutividadeTecnico = {
   tecnico: string;
   aceitas: number;
@@ -69,7 +125,7 @@ export type StatusResumoItem = {
 };
 
 export const INITIAL_FILTERS: FiltrosRelatorio = {
-  tipoRelatorio: "geral",
+  tipoRelatorio: "operacional",
   status: "todos",
   tipo: "todos",
   prioridade: "todas",

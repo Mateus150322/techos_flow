@@ -39,10 +39,14 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
 
   const resumo = dashboard?.resumo;
   const distribuicaoStatus = dashboard?.distribuicao_status ?? [];
-  const tiposBreakdown = dashboard?.tipos_breakdown ?? [];
+  const tiposBreakdown = useMemo(() => dashboard?.tipos_breakdown ?? [], [dashboard?.tipos_breakdown]);
   const produtividadeTecnicos = dashboard?.produtividade_tecnicos ?? [];
   const resumoMesAtual = dashboard?.resumo_mes_atual;
   const recentOrders = dashboard?.atividade_recente ?? [];
+  const maiorTotalPorTipo = useMemo(
+    () => Math.max(...tiposBreakdown.map((item) => item.total), 1),
+    [tiposBreakdown]
+  );
 
   const tempoMedioHoras = useMemo(() => {
     if (typeof resumo?.tempo_medio_horas !== "number") {
@@ -185,29 +189,26 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
           <h2 className={`text-2xl font-semibold ${titleText}`}>OS por tipo de serviço</h2>
           <p className={`mt-1 text-sm ${mutedText}`}>Quantidade de ordens por categoria.</p>
 
-          <div className="mt-8 overflow-x-auto pb-2">
-            <div className="flex min-h-[320px] min-w-[420px] items-end gap-4">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {tiposBreakdown.map((item) => (
-                <div key={item.tipo} className="flex flex-1 flex-col items-center gap-3">
-                  <div className={`flex h-72 w-full items-end rounded-2xl ${barTrack}`}>
+                <div key={item.tipo} className={`rounded-2xl border p-4 ${softBg}`}>
+                  <div className={`flex h-48 items-end rounded-2xl ${barTrack}`}>
                     <div
                       className="w-full rounded-2xl bg-blue-500"
                       style={{
                         height: `${Math.max(
-                          (item.total / Math.max(...tiposBreakdown.map((tipo) => tipo.total), 1)) *
-                            100,
+                          (item.total / maiorTotalPorTipo) * 100,
                           item.total ? 16 : 0
                         )}%`,
                       }}
                     />
                   </div>
-                  <div className="text-center">
+                  <div className="mt-3 text-center">
                     <p className={`text-sm font-medium ${titleText}`}>{item.tipo}</p>
                     <p className={`text-xs ${mutedText}`}>{item.total}</p>
                   </div>
                 </div>
               ))}
-            </div>
           </div>
         </div>
       </section>

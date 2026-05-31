@@ -50,6 +50,7 @@ const responseMock: HorasExtrasResponse = {
       {
         funcionario_id: "tec-1",
         funcionario_nome: "Carlos Andrade",
+        funcao: "Técnico",
         total_extras_minutos: 180,
         total_extras: "3h00",
       },
@@ -60,12 +61,17 @@ const responseMock: HorasExtrasResponse = {
       id: "tec-1",
       name: "Carlos Andrade",
       role: "tecnico",
+      funcao: "Técnico",
+      tipo_vinculo: "usuario",
     },
   ],
   rows: [
     {
       funcionario_id: "tec-1",
       funcionario_nome: "Carlos Andrade",
+      role: "tecnico",
+      funcao: "Técnico",
+      tipo_vinculo: "usuario",
       horas_extras_50_minutos: 120,
       horas_extras_50: "2h00",
       horas_extras_100_minutos: 60,

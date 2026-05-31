@@ -1,9 +1,10 @@
-import { useEffect, useId, useMemo, useState } from "react";
+﻿import { useEffect, useId, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { CalendarRange, Download, FileDown, FileSpreadsheet, TimerReset, Users } from "lucide-react";
+import { CalendarRange, FileDown, TimerReset, Users } from "lucide-react";
 
 import { AdminShell } from "./AdminShell";
 import { AdminMetricCard } from "./components/AdminMetricCard";
+import { SpreadsheetExportMenu } from "./components/SpreadsheetExportMenu";
 import {
   buscarRelatorioHorasExtras,
   exportarRelatorioHorasExtras,
@@ -226,7 +227,7 @@ export default function HorasExtrasPage() {
               <option value="todos">Todos os funcionários</option>
               {(dados?.funcionarios ?? []).map((funcionario) => (
                 <option key={funcionario.id} value={funcionario.id}>
-                  {funcionario.name}
+                  {funcionario.name} ({funcionario.funcao})
                 </option>
               ))}
             </select>
@@ -317,25 +318,12 @@ export default function HorasExtrasPage() {
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <button
-            type="button"
+          <SpreadsheetExportMenu
             disabled={!dados || exportandoFormato !== null}
-            onClick={() => void handleExportar("csv")}
-            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
-          >
-            <Download className="h-4 w-4" />
-            {exportandoFormato === "csv" ? "Exportando CSV..." : "Exportar CSV"}
-          </button>
-
-          <button
-            type="button"
-            disabled={!dados || exportandoFormato !== null}
-            onClick={() => void handleExportar("xlsx")}
-            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${secondaryButton}`}
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            {exportandoFormato === "xlsx" ? "Exportando Excel..." : "Exportar Excel"}
-          </button>
+            exportandoFormato={exportandoFormato}
+            isDark={isDark}
+            onSelect={(format) => void handleExportar(format)}
+          />
 
           <button
             type="button"
@@ -368,7 +356,7 @@ export default function HorasExtrasPage() {
           <div>
             <h3 className={`text-2xl font-semibold ${titleText}`}>Consolidado por funcionário</h3>
             <p className={`mt-1 text-sm ${mutedText}`}>
-              Período: {dados?.periodo_descricao ?? "-"} | Emissão: {dados?.data_emissao ?? "-"}
+              Período: {dados?.periodo_descricao || "-"} | Emissão: {dados?.data_emissao || "-"}
             </p>
           </div>
 
@@ -383,7 +371,19 @@ export default function HorasExtrasPage() {
               <ul className="mt-2 space-y-1">
                 {(dados?.indicadores.top_funcionarios ?? []).map((item) => (
                   <li key={item.funcionario_id} className={`flex items-center justify-between gap-4 ${mutedText}`}>
-                    <span>{item.funcionario_nome}</span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span>{item.funcionario_nome}</span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${papelBadge(
+                          inferirRolePorFuncao(item.funcao)
+                        )}`}
+                      >
+                        {papelLabel(inferirRolePorFuncao(item.funcao))}
+                      </span>
+                      {item.funcao !== papelLabel(inferirRolePorFuncao(item.funcao)) ? (
+                        <span className="text-xs opacity-80">{item.funcao}</span>
+                      ) : null}
+                    </span>
                     <span className={titleText}>{item.total_extras}</span>
                   </li>
                 ))}
@@ -392,7 +392,29 @@ export default function HorasExtrasPage() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800">
+        <div className="space-y-4 md:hidden">
+          {loading ? (
+            <div className={`rounded-3xl border p-6 text-center text-sm ${softCard} ${mutedText}`}>
+              Carregando relatório...
+            </div>
+          ) : (dados?.rows ?? []).length === 0 ? (
+            <div className={`rounded-3xl border p-6 text-center text-sm ${softCard} ${mutedText}`}>
+              Nenhum lançamento encontrado para os filtros aplicados.
+            </div>
+          ) : (
+            (dados?.rows ?? []).map((row) => (
+              <HoraExtraMobileCard
+                key={row.funcionario_id}
+                row={row}
+                isDark={isDark}
+                titleText={titleText}
+                mutedText={mutedText}
+              />
+            ))
+          )}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 md:block">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1100px] text-sm">
               <caption id={tabelaCaptionId} className="sr-only">
@@ -430,7 +452,36 @@ export default function HorasExtrasPage() {
                       key={row.funcionario_id}
                       className={`border-t border-slate-200 transition dark:border-slate-800 ${rowHover}`}
                     >
-                      <th scope="row" className="p-4 text-left font-medium">{row.funcionario_nome}</th>
+                      <th scope="row" className="p-4 text-left font-medium">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span>{row.funcionario_nome}</span>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${papelBadge(
+                                row.role
+                              )}`}
+                            >
+                              {papelLabel(row.role)}
+                            </span>
+                            {row.tipo_vinculo === "colaborador_operacional" ? (
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                  isDark
+                                    ? "bg-slate-800 text-slate-200"
+                                    : "bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                Sem login
+                              </span>
+                            ) : null}
+                          </div>
+                          {row.funcao !== papelLabel(row.role) ? (
+                            <span className={`text-xs font-normal ${mutedText}`}>
+                              {row.funcao}
+                            </span>
+                          ) : null}
+                        </div>
+                      </th>
                       <td className="p-4">{row.horas_extras_50}</td>
                       <td className="p-4">{row.horas_extras_100}</td>
                       <td className="p-4">{row.total_extras}</td>
@@ -447,19 +498,19 @@ export default function HorasExtrasPage() {
           </div>
         </div>
 
-        {(dados?.pagination.last_page ?? 1) > 1 ? (
+        {(dados?.pagination?.last_page ?? 1) > 1 ? (
           <div
             className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             aria-label="Paginação do relatório de horas extras"
           >
             <p className={`text-sm ${mutedText}`}>
-              Página {dados?.pagination.page ?? 1} de {dados?.pagination.last_page ?? 1}
+              Página {dados?.pagination?.page ?? 1} de {dados?.pagination?.last_page ?? 1}
             </p>
 
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={loading || (dados?.pagination.page ?? 1) <= 1}
+                disabled={loading || (dados?.pagination?.page ?? 1) <= 1}
                 onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
                 className={`rounded-2xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${secondaryButton}`}
               >
@@ -467,9 +518,9 @@ export default function HorasExtrasPage() {
               </button>
               <button
                 type="button"
-                disabled={loading || (dados?.pagination.page ?? 1) >= (dados?.pagination.last_page ?? 1)}
+                disabled={loading || (dados?.pagination?.page ?? 1) >= (dados?.pagination?.last_page ?? 1)}
                 onClick={() =>
-                  setPaginaAtual((prev) => Math.min(prev + 1, dados?.pagination.last_page ?? prev))
+                  setPaginaAtual((prev) => Math.min(prev + 1, dados?.pagination?.last_page ?? prev))
                 }
                 className={`rounded-2xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${secondaryButton}`}
               >
@@ -524,3 +575,124 @@ function InfoBox({
     </div>
   );
 }
+
+function papelBadge(role: "administrador" | "tecnico" | "auxiliar_tecnico") {
+  if (role === "administrador") {
+    return "bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-200";
+  }
+
+  if (role === "auxiliar_tecnico") {
+    return "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-200";
+  }
+
+  return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200";
+}
+
+function papelLabel(role: "administrador" | "tecnico" | "auxiliar_tecnico") {
+  if (role === "administrador") {
+    return "Administrador";
+  }
+
+  if (role === "auxiliar_tecnico") {
+    return "Auxiliar técnico";
+  }
+
+  return "Técnico";
+}
+
+function inferirRolePorFuncao(
+  funcao: string
+): "administrador" | "tecnico" | "auxiliar_tecnico" {
+  const texto = funcao.trim().toLowerCase();
+
+  if (texto.includes("auxiliar")) {
+    return "auxiliar_tecnico";
+  }
+
+  if (texto.includes("admin")) {
+    return "administrador";
+  }
+
+  return "tecnico";
+}
+
+function HoraExtraMobileCard({
+  row,
+  isDark,
+  titleText,
+  mutedText,
+}: {
+  row: HorasExtrasResponse["rows"][number];
+  isDark: boolean;
+  titleText: string;
+  mutedText: string;
+}) {
+  return (
+    <article
+      className={`rounded-3xl border p-4 shadow-sm ${
+        isDark ? "border-slate-800 bg-slate-950/70" : "border-slate-200 bg-white"
+      }`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className={`text-base font-semibold ${titleText}`}>{row.funcionario_nome}</h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${papelBadge(row.role)}`}>
+              {papelLabel(row.role)}
+            </span>
+            {row.tipo_vinculo === "colaborador_operacional" ? (
+              <span
+                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                  isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                Sem login
+              </span>
+            ) : null}
+          </div>
+          {row.funcao !== papelLabel(row.role) ? (
+            <p className={`mt-2 text-sm ${mutedText}`}>{row.funcao}</p>
+          ) : null}
+        </div>
+        <p className={`text-lg font-semibold ${titleText}`}>{row.total_extras}</p>
+      </div>
+
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+        <MobileValue label="Horas 50%" value={row.horas_extras_50} titleText={titleText} mutedText={mutedText} />
+        <MobileValue label="Horas 100%" value={row.horas_extras_100} titleText={titleText} mutedText={mutedText} />
+        <MobileValue label="Horas pagas" value={row.horas_pagas} titleText={titleText} mutedText={mutedText} />
+        <MobileValue label="Folga" value={row.horas_convertidas_folga} titleText={titleText} mutedText={mutedText} />
+        <MobileValue label="Dias de folga" value={String(row.dias_folga_gerados)} titleText={titleText} mutedText={mutedText} />
+        <MobileValue label="Saldo banco" value={row.saldo_banco} titleText={titleText} mutedText={mutedText} />
+        <MobileValue
+          label="Estimativa"
+          value={`R$ ${row.valor_estimado_financeiro.toFixed(2).replace(".", ",")}`}
+          titleText={titleText}
+          mutedText={mutedText}
+        />
+      </dl>
+    </article>
+  );
+}
+
+function MobileValue({
+  label,
+  value,
+  titleText,
+  mutedText,
+}: {
+  label: string;
+  value: string;
+  titleText: string;
+  mutedText: string;
+}) {
+  return (
+    <div>
+      <dt className={`text-xs font-semibold uppercase tracking-[0.14em] ${mutedText}`}>{label}</dt>
+      <dd className={`mt-1 text-sm ${titleText}`}>{value}</dd>
+    </div>
+  );
+}
+
+
+

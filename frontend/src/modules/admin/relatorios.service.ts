@@ -1,8 +1,17 @@
 import { api } from "@/shared/api/client";
 import type { OrdemServico, OrdemStatus } from "@/modules/ordensServico/ordensServico.service";
 import type {
+  CargaTecnicoOperacional,
+  FilaOperacionalItem,
+  GargaloOperacional,
+  MetricaOperacional,
+  ResumoOperacional,
   ReportDefinition,
   ResumoRelatorios,
+  ResumoTipoStatus,
+  StatusResumoItem,
+  ProdutividadeTecnico,
+  TipoMaisFrequente,
   TecnicoFiltro,
   TipoRelatorio,
 } from "./relatorios.utils";
@@ -30,12 +39,33 @@ export type RelatoriosResponse = {
   tipos: string[];
   tecnicos: TecnicoFiltro[];
   resumo: ResumoRelatorios;
+  resumoOperacional: ResumoOperacional;
+  gargalosOperacionais: GargaloOperacional[];
+  filaOperacional: FilaOperacionalItem[];
+  cargaTecnicos: CargaTecnicoOperacional[];
+  metricasOperacionais: MetricaOperacional;
+  statusResumo: StatusResumoItem[];
+  produtividadeTecnicos: ProdutividadeTecnico[];
+  tiposMaisFrequentes: TipoMaisFrequente[];
+  resumoTiposStatus: ResumoTipoStatus[];
+  resumoTecnicosOperacional: Array<{
+    tecnico: string;
+    osFinalizadas: number;
+    horasTrabalhadas: string;
+    horasExtras: string;
+  }>;
   reportDefinition: ReportDefinition;
   reportPagination: ReportPagination;
-  atividadeRecente: Pick<
-    OrdemServico,
-    "id" | "numero" | "nome_cliente" | "tipo" | "status" | "data_abertura"
-  >[];
+  atividadeRecente: Array<
+    Pick<
+      OrdemServico,
+      "id" | "numero" | "nome_cliente" | "tipo" | "status" | "data_abertura"
+    > & {
+      prioridade: number;
+      atualizado_em: string | null;
+      responsavel: string;
+    }
+  >;
   filtrosDescricao: string;
   periodoDescricao: string;
   dataEmissao: string;

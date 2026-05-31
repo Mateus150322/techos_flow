@@ -5,12 +5,17 @@ export type HoraExtraExportFormat = "csv" | "xlsx" | "pdf";
 export type HoraExtraFuncionarioFiltro = {
   id: string;
   name: string;
-  role: "administrador" | "tecnico";
+  role: "administrador" | "tecnico" | "auxiliar_tecnico";
+  funcao: string;
+  tipo_vinculo: "usuario" | "colaborador_operacional";
 };
 
 export type HoraExtraRow = {
   funcionario_id: string;
   funcionario_nome: string;
+  role: "administrador" | "tecnico" | "auxiliar_tecnico";
+  funcao: string;
+  tipo_vinculo: "usuario" | "colaborador_operacional";
   horas_extras_50_minutos: number;
   horas_extras_50: string;
   horas_extras_100_minutos: number;
@@ -49,6 +54,7 @@ export type HorasExtrasResponse = {
     top_funcionarios: Array<{
       funcionario_id: string;
       funcionario_nome: string;
+      funcao: string;
       total_extras_minutos: number;
       total_extras: string;
     }>;
