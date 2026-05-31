@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+﻿import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -12,8 +12,10 @@ import {
 
 import {
   formatarDataHora,
-  listarLinhasEnderecoOperacional,
   formatarStatus,
+  obterResumoUnidadeOperacional,
+  obterUltimaGeolocalizacaoEvidencia,
+  formatarCoordenada,
 } from "../ordemServicoDetalhe.utils";
 import { exportarRelatorioDetalhadoOrdem } from "../ordensServico.service";
 import { AnexoItemCard } from "./AnexoItemCard";
@@ -22,7 +24,6 @@ import { OrdemServicoAcoesPanel } from "./OrdemServicoAcoesPanel";
 import { PrioridadeBadge } from "./PrioridadeBadge";
 import { StatusBadge } from "./StatusBadge";
 import { useOrdemServicoDetalhe } from "../useOrdemServicoDetalhe";
-import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { getApiErrorMessage } from "@/shared/utils/apiError";
 
 type Props = {
@@ -71,7 +72,10 @@ export default function TecnicoOSDetailsModal({
     incluirGeolocalizacao,
     alternarIncluirGeolocalizacao,
     processandoGeolocalizacao,
+    processandoEnderecoCapturado,
     geolocalizacaoCapturada,
+    feedbackGeolocalizacao,
+    diagnosticoGeolocalizacao,
     atualizarEnderecoCapturado,
     aceitar,
     iniciar,
@@ -85,11 +89,12 @@ export default function TecnicoOSDetailsModal({
     fallbackRole: "tecnico",
   });
 
-  const linhasEndereco = useMemo(
-    () => listarLinhasEnderecoOperacional(os?.endereco),
-    [os?.endereco]
+  const resumoUnidade = useMemo(() => obterResumoUnidadeOperacional(os), [os]);
+  const podeBaixarRelatorio = currentUser.role === "administrador";
+  const ultimaGeolocalizacao = useMemo(
+    () => obterUltimaGeolocalizacaoEvidencia(os?.anexos),
+    [os?.anexos]
   );
-  const enderecoReferencia = useMemo(() => linhasEndereco.join("\n"), [linhasEndereco]);
 
   async function executarAcao(fn: () => Promise<boolean>) {
     const ok = await fn();
@@ -228,7 +233,7 @@ export default function TecnicoOSDetailsModal({
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--primary-dark)] dark:text-[var(--primary-light)]">
-                      Ordem de Servico
+                      Ordem de Serviço
                     </span>
                     <StatusBadge status={os.status} />
                     <PrioridadeBadge prioridade={os.prioridade} />
@@ -242,6 +247,7 @@ export default function TecnicoOSDetailsModal({
 
                 <div className="w-full space-y-3 xl:w-auto">
                   <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+                    {podeBaixarRelatorio ? (
                     <button
                       type="button"
                       onClick={handleBaixarRelatorio}
@@ -251,7 +257,7 @@ export default function TecnicoOSDetailsModal({
                       <FileDown className="h-4 w-4" />
                       {baixandoRelatorio ? "Gerando PDF..." : "Baixar relatório PDF"}
                     </button>
-                    <ThemeToggle />
+                    ) : null}
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3">
@@ -261,13 +267,13 @@ export default function TecnicoOSDetailsModal({
                       icon={<ClipboardList className="h-4 w-4" />}
                     />
                     <TopoCard
-                      label="Responsavel"
+                      label="Responsável"
                       value={tecnicoResponsavel?.name || "Não atribuído"}
                       icon={<UserIcon className="h-4 w-4" />}
                     />
                     <TopoCard
-                      label="Execucao"
-                      value={execucaoAberta ? "Em andamento" : "Sem execucao aberta"}
+                      label="Execução"
+                      value={execucaoAberta ? "Em andamento" : "Sem execução aberta"}
                       icon={<Wrench className="h-4 w-4" />}
                     />
                   </div>
@@ -294,10 +300,10 @@ export default function TecnicoOSDetailsModal({
                     <Info label="Aberto por" value={criadaPor?.name} />
                     <Info label="Email de abertura" value={criadaPor?.email} />
                   </div>
-                  <Info label="Descricao" value={os.descricao} full />
+                  <Info label="Descrição" value={os.descricao} full />
                 </CardSection>
 
-                <CardSection titulo="Resolucao e acoes" icone={<CheckCircle2 className="h-5 w-5" />}>
+                <CardSection titulo="Resolução e ações" icone={<CheckCircle2 className="h-5 w-5" />}>
                   <OrdemServicoAcoesPanel
                     variant="modal"
                     status={os.status}
@@ -335,7 +341,7 @@ export default function TecnicoOSDetailsModal({
                   />
                 </CardSection>
 
-                <CardSection titulo="Execucoes registradas" icone={<Wrench className="h-5 w-5" />}>
+                <CardSection titulo="Execuções registradas" icone={<Wrench className="h-5 w-5" />}>
                   {os.execucoes?.length ? (
                     <div className="space-y-3">
                       {os.execucoes.map((execucao) => (
@@ -344,12 +350,12 @@ export default function TecnicoOSDetailsModal({
                           className="app-card-soft rounded-2xl px-4 py-4"
                         >
                           <div className="grid gap-4 sm:grid-cols-2">
-                            <Info label="Tecnico" value={execucao.tecnico?.name} />
-                            <Info label="Inicio" value={formatarDataHora(execucao.data_inicio)} />
+                            <Info label="Técnico" value={execucao.tecnico?.name} />
+                            <Info label="Início" value={formatarDataHora(execucao.data_inicio)} />
                             <Info label="Fim" value={formatarDataHora(execucao.data_fim)} />
                             <Info
-                              label="Observacao"
-                              value={execucao.observacao || "Sem observacoes registradas."}
+                              label="Observação"
+                              value={execucao.observacao || "Sem observações registradas."}
                               full
                             />
                           </div>
@@ -357,26 +363,59 @@ export default function TecnicoOSDetailsModal({
                       ))}
                     </div>
                   ) : (
-                    <p className="app-muted text-sm">Nenhuma execucao registrada ate o momento.</p>
+                    <p className="app-muted text-sm">Nenhuma execução registrada até o momento.</p>
                   )}
                 </CardSection>
               </section>
 
               <section className="space-y-6">
-                <CardSection titulo="Endereco e evidencias" icone={<MapPin className="h-5 w-5" />}>
+                <CardSection titulo="Unidade e evidências" icone={<MapPin className="h-5 w-5" />}>
                   <div className="app-card-soft rounded-2xl px-4 py-4">
                     <p className="app-muted text-xs font-medium uppercase tracking-[0.16em]">
-                      Endereco da OS
+                      Dados da unidade operacional
                     </p>
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-[var(--text-main)]">
-                      {linhasEndereco.join("\n") || "-"}
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {resumoUnidade.map((item) => (
+                        <Info key={item.label} label={item.label} value={item.value} />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="app-card-soft rounded-2xl px-4 py-4">
+                    <p className="app-muted text-xs font-medium uppercase tracking-[0.16em]">
+                      Geolocalização da evidência
                     </p>
+                    {ultimaGeolocalizacao ? (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <Info
+                          label="Latitude"
+                          value={formatarCoordenada(ultimaGeolocalizacao.latitude)}
+                        />
+                        <Info
+                          label="Longitude"
+                          value={formatarCoordenada(ultimaGeolocalizacao.longitude)}
+                        />
+                        <Info label="Rua" value={ultimaGeolocalizacao.rua_capturada} />
+                        <Info label="Bairro" value={ultimaGeolocalizacao.bairro_capturado} />
+                        <Info label="Cidade" value={ultimaGeolocalizacao.cidade_capturada} />
+                        <Info label="Estado" value={ultimaGeolocalizacao.estado_capturado} />
+                        <Info
+                          label="Endereço capturado"
+                          value={ultimaGeolocalizacao.endereco_capturado}
+                          full
+                        />
+                      </div>
+                    ) : (
+                      <p className="app-muted mt-3 text-sm">
+                        A localização aparecerá aqui quando o técnico enviar uma evidência com geolocalização.
+                      </p>
+                    )}
                   </div>
 
                   {podeEnviarAnexo && (
                     <div className="app-card-soft rounded-2xl px-4 py-4">
                       <p className="app-muted mb-3 text-xs font-medium uppercase tracking-[0.16em]">
-                        Nova evidencia
+                        Nova evidência
                       </p>
                       <EvidenciaUploadPanel
                         variant="modal"
@@ -388,7 +427,10 @@ export default function TecnicoOSDetailsModal({
                         incluirGeolocalizacao={incluirGeolocalizacao}
                         alternarIncluirGeolocalizacao={alternarIncluirGeolocalizacao}
                         processandoGeolocalizacao={processandoGeolocalizacao}
+                        processandoEnderecoCapturado={processandoEnderecoCapturado}
                         geolocalizacaoCapturada={geolocalizacaoCapturada}
+                        feedbackGeolocalizacao={feedbackGeolocalizacao}
+                        diagnosticoGeolocalizacao={diagnosticoGeolocalizacao}
                         atualizarEnderecoCapturado={atualizarEnderecoCapturado}
                         onCapturarGeolocalizacao={handleCapturarGeolocalizacao}
                         onEnviar={handleEnviarAnexo}
@@ -399,19 +441,18 @@ export default function TecnicoOSDetailsModal({
                   {os.anexos?.length ? (
                     <div className="space-y-3">
                       <p className="app-muted text-xs font-medium uppercase tracking-[0.16em]">
-                        Evidencias enviadas
+                        Evidências enviadas
                       </p>
                       {os.anexos.map((anexo) => (
                         <AnexoItemCard
                           key={anexo.id}
                           anexo={anexo}
                           variant="modal"
-                          enderecoReferencia={enderecoReferencia}
                         />
                       ))}
                     </div>
                   ) : (
-                    <p className="app-muted text-sm">Sem anexos enviados ate o momento.</p>
+                    <p className="app-muted text-sm">Sem anexos enviados até o momento.</p>
                   )}
                 </CardSection>
               </section>
@@ -475,7 +516,12 @@ function Info({
   return (
     <div className={full ? "sm:col-span-2" : undefined}>
       <p className="app-muted text-xs font-medium uppercase tracking-[0.16em]">{label}</p>
-      <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-main)]">{value || "-"}</p>
+      <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[var(--text-main)]">{value || "-"}</p>
     </div>
   );
 }
+
+
+
+
+

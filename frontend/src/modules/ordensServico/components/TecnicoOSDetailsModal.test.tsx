@@ -82,7 +82,7 @@ describe("TecnicoOSDetailsModal", () => {
       podeMarcarNaoExecutada: false,
       podeEnviarAnexo: false,
       processandoAcao: false,
-      arquivoSelecionado: null,
+      arquivoSelecionado: [],
       setArquivoSelecionado: vi.fn(),
       tipoAnexo: "foto",
       selecionarTipoAnexo: vi.fn(),

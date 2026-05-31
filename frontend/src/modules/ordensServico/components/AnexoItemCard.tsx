@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, MapPin } from "lucide-react";
 
 import { obterArquivoAnexo, type Anexo } from "../ordensServico.service";
@@ -11,7 +11,6 @@ type Props = {
   variant: "page" | "modal";
   isDark?: boolean;
   wrapper?: "div" | "li";
-  enderecoReferencia?: string;
 };
 
 function getClasses(variant: "page" | "modal") {
@@ -20,6 +19,13 @@ function getClasses(variant: "page" | "modal") {
       outer: "app-card-soft rounded-2xl px-4 py-3 text-sm text-[var(--text-main)]",
       link: "mt-1 block break-all text-[var(--primary)] hover:underline",
       fallback: "app-muted mt-1 break-all",
+      previewButton:
+        "mt-3 block overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] transition hover:border-[var(--primary)]",
+      previewFrame:
+        "flex min-h-[180px] items-center justify-center bg-[var(--bg-soft)] p-3",
+      previewImage: "max-h-[220px] w-auto max-w-full rounded-xl object-contain",
+      previewPlaceholder:
+        "app-muted flex min-h-[180px] items-center justify-center text-sm",
       geoCard: "app-card mt-3 rounded-xl px-3 py-3 text-[var(--text-main)]",
       mapLink: "inline-block text-[var(--primary)] hover:underline",
       innerTag: "app-card-soft rounded-xl px-3 py-3",
@@ -30,6 +36,13 @@ function getClasses(variant: "page" | "modal") {
     outer: "app-card-soft rounded-lg px-3 py-3 text-sm text-[var(--text-main)]",
     link: "text-[var(--primary)] hover:underline",
     fallback: "app-muted",
+    previewButton:
+      "mt-3 block overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] transition hover:border-[var(--primary)]",
+    previewFrame:
+      "flex min-h-[140px] items-center justify-center bg-[var(--bg-soft)] p-3",
+    previewImage: "max-h-[180px] w-auto max-w-full rounded-lg object-contain",
+    previewPlaceholder:
+      "app-muted flex min-h-[140px] items-center justify-center text-sm",
     geoCard: "app-card mt-3 rounded-xl px-3 py-3 text-sm text-[var(--text-main)]",
     mapLink: "inline-block text-[var(--primary)] hover:underline",
     innerTag: "app-card-soft rounded-xl px-3 py-3",
@@ -52,18 +65,80 @@ export function AnexoItemCard({
   variant,
   isDark = false,
   wrapper = "div",
-  enderecoReferencia,
 }: Props) {
   const [baixandoArquivo, setBaixandoArquivo] = useState(false);
+  const [carregandoPreview, setCarregandoPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [erroArquivo, setErroArquivo] = useState("");
+
   void isDark;
+
   const classes = getClasses(variant);
   const Wrapper = wrapper;
   const fileLabel = anexo.nome_arquivo || anexo.id;
+  const ehFoto = anexo.tipo === "foto";
+
+  useEffect(() => {
+    if (!ehFoto || !anexo.id) {
+      setPreviewUrl("");
+      setCarregandoPreview(false);
+      return;
+    }
+
+    let ativo = true;
+    let objectUrl = "";
+
+    async function carregarPreview() {
+      try {
+        setCarregandoPreview(true);
+        const { blob } = await obterArquivoAnexo(anexo.id);
+
+        if (!ativo) {
+          return;
+        }
+
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      } catch {
+        if (ativo) {
+          setPreviewUrl("");
+        }
+      } finally {
+        if (ativo) {
+          setCarregandoPreview(false);
+        }
+      }
+    }
+
+    void carregarPreview();
+
+    return () => {
+      ativo = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [anexo.id, ehFoto]);
 
   async function handleAbrirArquivo() {
-    const ehVisualizavel = anexo.tipo === "foto" || anexo.tipo === "pdf";
-    const previewWindow = ehVisualizavel ? window.open("", "_blank", "noopener,noreferrer") : null;
+    const ehVisualizavel = ehFoto || anexo.tipo === "pdf";
+    const previewWindow = ehVisualizavel
+      ? window.open("", "_blank", "noopener,noreferrer")
+      : null;
+
+    if (ehFoto && previewUrl) {
+      try {
+        setErroArquivo("");
+        if (previewWindow) {
+          previewWindow.location.href = previewUrl;
+        }
+        return;
+      } catch {
+        if (previewWindow) {
+          previewWindow.close();
+        }
+      }
+    }
 
     try {
       setBaixandoArquivo(true);
@@ -106,6 +181,30 @@ export function AnexoItemCard({
     <Wrapper className={classes.outer}>
       <p className="font-medium text-[var(--text-main)]">{anexo.tipo || "Arquivo"}</p>
 
+      {ehFoto ? (
+        <button
+          type="button"
+          onClick={() => void handleAbrirArquivo()}
+          disabled={baixandoArquivo}
+          className={classes.previewButton}
+        >
+          <div className={classes.previewFrame}>
+            {previewUrl ? (
+              <img src={previewUrl} alt={fileLabel} className={classes.previewImage} />
+            ) : carregandoPreview ? (
+              <span className={classes.previewPlaceholder}>
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando miniatura...
+                </span>
+              </span>
+            ) : (
+              <span className={classes.previewPlaceholder}>Miniatura indisponível</span>
+            )}
+          </div>
+        </button>
+      ) : null}
+
       {anexo.id ? (
         <button
           type="button"
@@ -134,13 +233,13 @@ export function AnexoItemCard({
             <MapPin className="mt-0.5 h-4 w-4 text-[var(--primary)]" />
             <div className="space-y-3">
               <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">
-                Geolocalizacao da evidencia
+                Geolocalização da evidência
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <GeoInfoItem label="Latitude" value={formatarCoordenada(anexo.latitude)} />
                 <GeoInfoItem label="Longitude" value={formatarCoordenada(anexo.longitude)} />
                 <GeoInfoItem
-                  label="Precisao"
+                  label="Precisão"
                   value={
                     typeof anexo.precisao_metros === "number"
                       ? `${Math.round(anexo.precisao_metros)} m`
@@ -156,26 +255,27 @@ export function AnexoItemCard({
                   }
                 />
               </div>
+              <div className={classes.innerTag}>
+                <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">
+                  Endereço capturado pela geolocalização
+                </p>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <GeoInfoItem label="Rua" value={anexo.rua_capturada || "-"} />
+                  <GeoInfoItem label="Bairro" value={anexo.bairro_capturado || "-"} />
+                  <GeoInfoItem label="Cidade" value={anexo.cidade_capturada || "-"} />
+                  <GeoInfoItem label="Estado" value={anexo.estado_capturado || "-"} />
+                </div>
+              </div>
               {anexo.endereco_capturado && (
                 <div className={classes.innerTag}>
                   <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">
-                    Referencia
+                    Endereço completo informado
                   </p>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-main)]">
                     {anexo.endereco_capturado}
                   </p>
                 </div>
               )}
-              {enderecoReferencia ? (
-                <div className={classes.innerTag}>
-                  <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">
-                    Endereco da OS
-                  </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-main)]">
-                    {enderecoReferencia}
-                  </p>
-                </div>
-              ) : null}
               <a
                 href={getGoogleMapsUrl(anexo.latitude, anexo.longitude)}
                 target="_blank"

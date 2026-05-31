@@ -98,7 +98,9 @@ export default function FormularioOSGeral({
       return "";
     }
 
-    return `${form.dataAbertura}T${form.horaAbertura}`;
+    const local = new Date(`${form.dataAbertura}T${form.horaAbertura}`);
+
+    return Number.isNaN(local.getTime()) ? "" : local.toISOString();
   }
 
   function validarFormulario() {

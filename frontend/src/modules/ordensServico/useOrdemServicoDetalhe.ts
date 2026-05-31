@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   aceitarOrdem,
@@ -20,6 +20,9 @@ import { type UserRole, useCurrentUser } from "@/shared/auth/session";
 import { getApiErrorMessage } from "@/shared/utils/apiError";
 import {
   capturarGeolocalizacaoAtual,
+  diagnosticarGeolocalizacao,
+  preencherEnderecoCapturado,
+  type DiagnosticoGeolocalizacao,
   type GeolocalizacaoCapturada,
 } from "@/shared/utils/geolocalizacao";
 
@@ -27,6 +30,11 @@ type UseOrdemServicoDetalheOptions = {
   ordemId?: string | null;
   enabled?: boolean;
   fallbackRole?: UserRole;
+};
+
+type FeedbackGeolocalizacao = {
+  tipo: "sucesso" | "erro";
+  mensagem: string;
 };
 
 export function useOrdemServicoDetalhe({
@@ -40,12 +48,18 @@ export function useOrdemServicoDetalhe({
   const [error, setError] = useState("");
   const [os, setOs] = useState<OrdemServicoDetalhe | null>(null);
   const [processandoAcao, setProcessandoAcao] = useState(false);
-  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
+  const [arquivoSelecionado, setArquivoSelecionado] = useState<File[]>([]);
   const [tipoAnexo, setTipoAnexo] = useState("foto");
   const [incluirGeolocalizacao, setIncluirGeolocalizacao] = useState(true);
   const [processandoGeolocalizacao, setProcessandoGeolocalizacao] = useState(false);
+  const [processandoEnderecoCapturado, setProcessandoEnderecoCapturado] = useState(false);
   const [geolocalizacaoCapturada, setGeolocalizacaoCapturada] =
     useState<GeolocalizacaoCapturada | null>(null);
+  const [feedbackGeolocalizacao, setFeedbackGeolocalizacao] =
+    useState<FeedbackGeolocalizacao | null>(null);
+  const [diagnosticoGeolocalizacao] = useState<DiagnosticoGeolocalizacao>(() =>
+    diagnosticarGeolocalizacao()
+  );
 
   const carregarOrdem = useCallback(async () => {
     if (!ordemId) {
@@ -92,26 +106,32 @@ export function useOrdemServicoDetalhe({
       return null;
     }
 
-    return [...os.execucoes]
-      .sort((atual, proxima) => {
-        const atualTs = new Date(atual.data_fim ?? atual.data_inicio).getTime();
-        const proximaTs = new Date(proxima.data_fim ?? proxima.data_inicio).getTime();
+    return (
+      [...os.execucoes]
+        .sort((atual, proxima) => {
+          const atualTs = new Date(atual.data_fim ?? atual.data_inicio).getTime();
+          const proximaTs = new Date(proxima.data_fim ?? proxima.data_inicio).getTime();
 
-        return proximaTs - atualTs;
-      })
-      .at(0) ?? null;
+          return proximaTs - atualTs;
+        })
+        .at(0) ?? null
+    );
   }, [os, ultimaExecucaoAberta]);
 
   const execucaoParaFinalizacao = ultimaExecucaoAberta ?? execucaoRecuperavel;
 
-  const tecnicoResponsavelId = os?.tecnico_responsavel_id ?? tecnicoResponsavel?.id ?? null;
+  const tecnicoResponsavelId =
+    os?.tecnico_responsavel_id ?? tecnicoResponsavel?.id ?? null;
   const osSemResponsavel = !tecnicoResponsavelId;
   const osEhMinha = !!tecnicoResponsavelId && tecnicoResponsavelId === currentUser.id;
   const osEhDeOutroTecnico =
     !!tecnicoResponsavelId && !!currentUser.id && tecnicoResponsavelId !== currentUser.id;
   const podeAceitar = currentUser.role === "tecnico" && os?.status === "aberta" && osSemResponsavel;
   const podeIniciarExecucao =
-    currentUser.role === "tecnico" && os?.status === "aberta" && osEhMinha && !ultimaExecucaoAberta;
+    currentUser.role === "tecnico" &&
+    os?.status === "aberta" &&
+    osEhMinha &&
+    !ultimaExecucaoAberta;
   const podeFinalizarExecucao =
     currentUser.role === "tecnico" &&
     os?.status === "em_execucao" &&
@@ -186,37 +206,109 @@ export function useOrdemServicoDetalhe({
     try {
       setProcessandoGeolocalizacao(true);
       setError("");
+      setFeedbackGeolocalizacao(null);
+
+      if (!diagnosticoGeolocalizacao.disponivel) {
+        throw new Error(
+          diagnosticoGeolocalizacao.mensagem ||
+            "Não foi possível capturar a geolocalização neste dispositivo."
+        );
+      }
 
       const geolocalizacao = await capturarGeolocalizacaoAtual();
       setGeolocalizacaoCapturada(geolocalizacao);
+      setFeedbackGeolocalizacao({
+        tipo: "sucesso",
+        mensagem:
+          typeof geolocalizacao.precisaoMetros === "number"
+            ? geolocalizacao.precisaoMetros <= 100
+              ? `Localização capturada com precisão de ${Math.round(geolocalizacao.precisaoMetros)} m. Buscando endereço...`
+              : `Localização aproximada capturada com precisão de ${Math.round(geolocalizacao.precisaoMetros)} m. Usando a melhor posição encontrada e buscando endereço...`
+            : "Localização capturada com sucesso. Buscando endereço...",
+      });
+
+      void enriquecerEnderecoDaGeolocalizacao(geolocalizacao);
       return geolocalizacao;
     } catch (captureError) {
-      setError(
-        getApiErrorMessage(
-          captureError,
-          "Não foi possível capturar a geolocalização para esta evidência."
-        )
+      const mensagem = getApiErrorMessage(
+        captureError,
+        "Não foi possível capturar a geolocalização para esta evidência."
       );
+
+      setError(mensagem);
+      setFeedbackGeolocalizacao({
+        tipo: "erro",
+        mensagem,
+      });
       return null;
     } finally {
       setProcessandoGeolocalizacao(false);
     }
   }
 
+  async function enriquecerEnderecoDaGeolocalizacao(geolocalizacao: GeolocalizacaoCapturada) {
+    try {
+      setProcessandoEnderecoCapturado(true);
+
+      const geolocalizacaoComEndereco = await preencherEnderecoCapturado(geolocalizacao);
+
+      setGeolocalizacaoCapturada((atual) => {
+        if (!atual) {
+          return geolocalizacaoComEndereco;
+        }
+
+        const mesmaCaptura =
+          atual.capturadaEm === geolocalizacao.capturadaEm &&
+          atual.latitude === geolocalizacao.latitude &&
+          atual.longitude === geolocalizacao.longitude;
+
+        return mesmaCaptura ? geolocalizacaoComEndereco : atual;
+      });
+
+      if (geolocalizacaoComEndereco.endereco || geolocalizacaoComEndereco.cidade) {
+        setFeedbackGeolocalizacao({
+          tipo: "sucesso",
+          mensagem:
+            typeof geolocalizacaoComEndereco.precisaoMetros === "number"
+              ? geolocalizacaoComEndereco.precisaoMetros <= 100
+                ? `Localização capturada com precisão de ${Math.round(geolocalizacaoComEndereco.precisaoMetros)} m e endereço identificado.`
+                : `Localização aproximada capturada com precisão de ${Math.round(geolocalizacaoComEndereco.precisaoMetros)} m e endereço identificado.`
+              : "Localização capturada e endereço identificado.",
+        });
+      }
+    } finally {
+      setProcessandoEnderecoCapturado(false);
+    }
+  }
+
   async function enviarEvidencia() {
-    if (!os?.id || !arquivoSelecionado) {
-      setError("Selecione um arquivo para enviar.");
+    if (!os?.id || arquivoSelecionado.length === 0) {
+      setError("Selecione pelo menos um arquivo para enviar.");
+      setFeedbackGeolocalizacao(null);
       return false;
     }
 
     try {
       setProcessandoAcao(true);
       setError("");
+      setFeedbackGeolocalizacao(null);
 
       let payload: string | GeolocalizacaoAnexoPayload = tipoAnexo;
 
       if (tipoAnexo === "foto" && incluirGeolocalizacao) {
-        const geolocalizacao = geolocalizacaoCapturada ?? (await capturarGeolocalizacaoAtual());
+        const geolocalizacao =
+          geolocalizacaoCapturada ?? (await capturarGeolocalizacao());
+
+        if (!geolocalizacao) {
+          const mensagem = "Capture a localização da evidência antes de enviar a foto.";
+
+          setError(mensagem);
+          setFeedbackGeolocalizacao({
+            tipo: "erro",
+            mensagem,
+          });
+          return false;
+        }
 
         setGeolocalizacaoCapturada(geolocalizacao);
 
@@ -226,16 +318,40 @@ export function useOrdemServicoDetalhe({
           longitude: geolocalizacao.longitude,
           precisao_metros: geolocalizacao.precisaoMetros,
           geolocalizacao_capturada_em: geolocalizacao.capturadaEm,
+          rua_capturada: geolocalizacao.rua?.trim() || undefined,
+          bairro_capturado: geolocalizacao.bairro?.trim() || undefined,
+          cidade_capturada: geolocalizacao.cidade?.trim() || undefined,
+          estado_capturado: geolocalizacao.estado?.trim() || undefined,
           endereco_capturado: geolocalizacao.endereco?.trim() || undefined,
         };
       }
 
-      await enviarAnexo(os.id, arquivoSelecionado, payload);
+      let arquivosEnviados = 0;
 
-      setArquivoSelecionado(null);
+      for (const arquivo of arquivoSelecionado) {
+        try {
+          await enviarAnexo(os.id, arquivo, payload);
+          arquivosEnviados += 1;
+        } catch (uploadError) {
+          if (arquivosEnviados > 0) {
+            await carregarOrdem();
+            setArquivoSelecionado([]);
+            setError(
+              `${arquivosEnviados} arquivo(s) foram enviados antes da falha em "${arquivo.name}".`
+            );
+            return false;
+          }
+
+          throw uploadError;
+        }
+      }
+
+      setArquivoSelecionado([]);
       setTipoAnexo("foto");
       setIncluirGeolocalizacao(true);
       setGeolocalizacaoCapturada(null);
+      setFeedbackGeolocalizacao(null);
+      setProcessandoEnderecoCapturado(false);
       await carregarOrdem();
 
       return true;
@@ -249,10 +365,12 @@ export function useOrdemServicoDetalhe({
 
   function selecionarTipoAnexo(proximoTipo: string) {
     setTipoAnexo(proximoTipo);
+    setFeedbackGeolocalizacao(null);
 
     if (proximoTipo !== "foto") {
       setIncluirGeolocalizacao(false);
       setGeolocalizacaoCapturada(null);
+      setProcessandoEnderecoCapturado(false);
       return;
     }
 
@@ -261,9 +379,11 @@ export function useOrdemServicoDetalhe({
 
   function alternarIncluirGeolocalizacao(ativo: boolean) {
     setIncluirGeolocalizacao(ativo);
+    setFeedbackGeolocalizacao(null);
 
     if (!ativo) {
       setGeolocalizacaoCapturada(null);
+      setProcessandoEnderecoCapturado(false);
     }
   }
 
@@ -304,7 +424,10 @@ export function useOrdemServicoDetalhe({
     incluirGeolocalizacao,
     alternarIncluirGeolocalizacao,
     processandoGeolocalizacao,
+    processandoEnderecoCapturado,
     geolocalizacaoCapturada,
+    feedbackGeolocalizacao,
+    diagnosticoGeolocalizacao,
     atualizarEnderecoCapturado,
     carregarOrdem,
     aceitar,
@@ -315,3 +438,7 @@ export function useOrdemServicoDetalhe({
     enviarEvidencia,
   };
 }
+
+
+
+

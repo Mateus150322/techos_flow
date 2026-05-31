@@ -42,9 +42,9 @@ export function StatusBadge({ status }: Props) {
 
   const labels: Record<Status, string> = {
     aberta: "Aberta",
-    em_execucao: "Em execucao",
+    em_execucao: "Em execução",
     finalizada: "Finalizada",
-    nao_executada: "Nao executada",
+    nao_executada: "Não executada",
     cancelada: "Cancelada",
   };
 

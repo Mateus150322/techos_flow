@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -105,7 +105,7 @@ export default function OrdensPage() {
         icone: <FilePlus2 className="h-5 w-5 text-sky-600" />,
       },
       {
-        titulo: "Em execucao",
+        titulo: "Em execução",
         valor: resumo?.em_execucao ?? 0,
         icone: <PlayCircle className="h-5 w-5 text-amber-600" />,
       },
@@ -122,17 +122,17 @@ export default function OrdensPage() {
     () => [
       {
         titulo: "Abertas",
-        descricao: "Ordens aguardando aceite, atribuicao ou inicio da execucao.",
+        descricao: "Ordens aguardando aceite, atribuição ou início da execução.",
         ordens: ordensAbertas,
       },
       {
-        titulo: "Em execucao",
+        titulo: "Em execução",
         descricao: "Ordens em andamento acompanhadas pelo painel administrativo.",
         ordens: ordensEmExecucao,
       },
       {
         titulo: "Encerradas",
-        descricao: "Ordens finalizadas, nao executadas ou canceladas.",
+        descricao: "Ordens finalizadas, não executadas ou canceladas.",
         ordens: ordensEncerradas,
       },
     ],
@@ -156,7 +156,7 @@ export default function OrdensPage() {
   }
 
   function nomeResponsavel(ordem: OrdemServico) {
-    return getTecnicoResponsavel(ordem)?.name || "Sem responsavel";
+    return getTecnicoResponsavel(ordem)?.name || "Sem responsável";
   }
 
   function handleBuscaChange(value: string) {
@@ -183,9 +183,9 @@ export default function OrdensPage() {
       >
         <option value="todos">Todos os status</option>
         <option value="aberta">Aberta</option>
-        <option value="em_execucao">Em execucao</option>
+        <option value="em_execucao">Em execução</option>
         <option value="finalizada">Finalizada</option>
-        <option value="nao_executada">Nao executada</option>
+        <option value="nao_executada">Não executada</option>
         <option value="cancelada">Cancelada</option>
       </select>
 
@@ -208,7 +208,7 @@ export default function OrdensPage() {
     !loading && ordensResponse ? (
       <div className="mt-4 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
         <p className="app-muted">
-          Exibindo {ordens.length} de {ordensResponse.total} ordens de servico.
+          Exibindo {ordens.length} de {ordensResponse.total} ordens de serviço.
         </p>
 
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
@@ -221,7 +221,7 @@ export default function OrdensPage() {
             Anterior
           </button>
           <span className="app-muted col-span-2 text-center sm:col-span-1">
-            Pagina {ordensResponse.current_page} de {ordensResponse.last_page}
+            Página {ordensResponse.current_page} de {ordensResponse.last_page}
           </span>
           <button
             type="button"
@@ -231,7 +231,7 @@ export default function OrdensPage() {
             disabled={ordensResponse.current_page >= ordensResponse.last_page}
             className={`min-h-11 rounded-lg border px-3 py-2 ${buttonSecondary} disabled:cursor-not-allowed disabled:opacity-50`}
           >
-            Proxima
+            Próxima
           </button>
         </div>
       </div>
@@ -240,7 +240,7 @@ export default function OrdensPage() {
   const content = (
     <ConsultaOrdensPainel
       titulo="Consultar OS"
-      descricao="Consulte e acompanhe ordens de servico com filtros administrativos e visao por status."
+      descricao="Consulte e acompanhe ordens de serviço com filtros administrativos e visão por status."
       metricas={metricas}
       secoes={secoes}
       busca={busca}
@@ -282,3 +282,8 @@ export default function OrdensPage() {
     </div>
   );
 }
+
+
+
+
+

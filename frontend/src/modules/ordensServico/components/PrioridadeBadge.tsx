@@ -6,16 +6,16 @@ type Props = {
 
 export function PrioridadeBadge({ prioridade }: Props) {
   const labels: Record<number, string> = {
-    1: "Baixa",
-    2: "Media",
-    3: "Alta",
+    1: "Alta",
+    2: "Média",
+    3: "Baixa",
   };
 
   const styles: Record<number, CSSProperties> = {
     1: {
-      borderColor: "color-mix(in srgb, var(--primary) 22%, transparent)",
-      backgroundColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
-      color: "var(--primary)",
+      borderColor: "color-mix(in srgb, var(--danger) 26%, transparent)",
+      backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)",
+      color: "var(--danger)",
     },
     2: {
       borderColor: "color-mix(in srgb, var(--warning) 26%, transparent)",
@@ -23,9 +23,9 @@ export function PrioridadeBadge({ prioridade }: Props) {
       color: "var(--warning)",
     },
     3: {
-      borderColor: "color-mix(in srgb, var(--danger) 26%, transparent)",
-      backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)",
-      color: "var(--danger)",
+      borderColor: "color-mix(in srgb, var(--primary) 22%, transparent)",
+      backgroundColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
+      color: "var(--primary)",
     },
   };
 
@@ -41,7 +41,7 @@ export function PrioridadeBadge({ prioridade }: Props) {
       }
     >
       <span className="h-2 w-2 rounded-full bg-current" />
-      {labels[prioridade] ?? `Nivel ${prioridade}`}
+      {labels[prioridade] ?? `Nível ${prioridade}`}
     </span>
   );
 }

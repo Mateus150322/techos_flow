@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+﻿import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -13,17 +13,19 @@ import {
 
 import {
   formatarDataHora,
-  listarLinhasEnderecoOperacional,
   formatarStatus,
+  obterResumoUnidadeOperacional,
+  obterUltimaGeolocalizacaoEvidencia,
+  formatarCoordenada,
 } from "./ordemServicoDetalhe.utils";
 import { exportarRelatorioDetalhadoOrdem } from "./ordensServico.service";
 import { AnexoItemCard } from "./components/AnexoItemCard";
 import { EvidenciaUploadPanel } from "./components/EvidenciaUploadPanel";
 import { OrdemServicoAcoesPanel } from "./components/OrdemServicoAcoesPanel";
 import { PrioridadeBadge } from "./components/PrioridadeBadge";
+import { formatPrioridade } from "./prioridade.utils";
 import { StatusBadge } from "./components/StatusBadge";
 import { useOrdemServicoDetalhe } from "./useOrdemServicoDetalhe";
-import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { useTheme } from "@/shared/hooks/useTheme";
 import { getApiErrorMessage } from "@/shared/utils/apiError";
 
@@ -55,7 +57,10 @@ export default function OrdemDetalhePage() {
     incluirGeolocalizacao,
     alternarIncluirGeolocalizacao,
     processandoGeolocalizacao,
+    processandoEnderecoCapturado,
     geolocalizacaoCapturada,
+    feedbackGeolocalizacao,
+    diagnosticoGeolocalizacao,
     atualizarEnderecoCapturado,
     iniciar,
     finalizar,
@@ -108,13 +113,14 @@ export default function OrdemDetalhePage() {
   const bodyText = "text-[var(--text-main)]";
   const buttonSecondary =
     "app-button-outline inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm transition";
+  const podeBaixarRelatorio = currentUser.role === "administrador";
   const temAcoesOperacionais =
     podeIniciarExecucao || podeFinalizarExecucao || podeMarcarNaoExecutada;
-  const linhasEndereco = useMemo(
-    () => listarLinhasEnderecoOperacional(os?.endereco),
-    [os?.endereco]
+  const resumoUnidade = useMemo(() => obterResumoUnidadeOperacional(os), [os]);
+  const ultimaGeolocalizacao = useMemo(
+    () => obterUltimaGeolocalizacaoEvidencia(os?.anexos),
+    [os?.anexos]
   );
-  const enderecoReferencia = linhasEndereco.join("\n");
 
   if (loading) {
     return (
@@ -189,18 +195,17 @@ export default function OrdemDetalhePage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <button
-                type="button"
-                onClick={handleBaixarRelatorio}
-                disabled={baixandoRelatorio}
-                className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${buttonSecondary}`}
-              >
-                <FileDown className="h-4 w-4" />
-                {baixandoRelatorio ? "Gerando PDF..." : "Relatorio PDF"}
-              </button>
-
-              <ThemeToggle />
-
+              {podeBaixarRelatorio ? (
+                <button
+                  type="button"
+                  onClick={handleBaixarRelatorio}
+                  disabled={baixandoRelatorio}
+                  className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${buttonSecondary}`}
+                >
+                  <FileDown className="h-4 w-4" />
+                  {baixandoRelatorio ? "Gerando PDF..." : "Relatório PDF"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => navigate(-1)}
@@ -220,7 +225,7 @@ export default function OrdemDetalhePage() {
 
           {osEhDeOutroTecnico && (
             <div className="app-alert-warning mb-4 rounded-xl px-4 py-3 text-sm">
-              Esta OS esta atribuida a {tecnicoResponsavel?.name || "outro tecnico"}.
+              Esta OS está atribuída a {tecnicoResponsavel?.name || "outro técnico"}.
             </div>
           )}
 
@@ -233,7 +238,7 @@ export default function OrdemDetalhePage() {
               titleText={titleText}
             />
             <ResumoTopCard
-              label="Responsavel"
+              label="Responsável"
               value={tecnicoResponsavel?.name || "Não atribuído"}
               cardBg={innerCardBg}
               mutedText={mutedText}
@@ -262,11 +267,16 @@ export default function OrdemDetalhePage() {
                   <DetailItem label="Tipo de serviço" value={os.tipo} bodyText={bodyText} mutedText={mutedText} />
                   <DetailItem label="Cliente" value={os.nome_cliente} bodyText={bodyText} mutedText={mutedText} />
                   <DetailItem label="Status atual" value={formatarStatus(os.status)} bodyText={bodyText} mutedText={mutedText} />
-                  <DetailItem label="Prioridade" value={String(os.prioridade)} bodyText={bodyText} mutedText={mutedText} />
+                  <DetailItem
+                    label="Prioridade"
+                    value={formatPrioridade(os.prioridade)}
+                    bodyText={bodyText}
+                    mutedText={mutedText}
+                  />
                   <DetailItem label="Responsável atual" value={tecnicoResponsavel?.name || "Não atribuído"} bodyText={bodyText} mutedText={mutedText} />
                   <DetailItem label="Aberto por" value={criadaPor?.name} bodyText={bodyText} mutedText={mutedText} />
                   <DetailItem
-                    label="Descricao"
+                    label="Descrição"
                     value={os.descricao}
                     bodyText={bodyText}
                     mutedText={mutedText}
@@ -277,7 +287,7 @@ export default function OrdemDetalhePage() {
 
               {temAcoesOperacionais && (
                 <Section
-                  title="Acoes da OS"
+                  title="Ações da OS"
                   icon={<CheckCircle2 className="h-4 w-4" />}
                   cardBg={cardBg}
                 >
@@ -314,7 +324,7 @@ export default function OrdemDetalhePage() {
                 </Section>
               )}
 
-              <Section title="Execucoes" icon={<Wrench className="h-4 w-4" />} cardBg={cardBg}>
+              <Section title="Execuções" icon={<Wrench className="h-4 w-4" />} cardBg={cardBg}>
                 {os.execucoes?.length ? (
                   <div className="space-y-3">
                     {os.execucoes.map((execucao) => (
@@ -323,12 +333,12 @@ export default function OrdemDetalhePage() {
                         className={`${innerCardBg} rounded-xl px-4 py-3`}
                       >
                         <div className="grid gap-4 sm:grid-cols-2">
-                          <DetailItem label="Tecnico" value={execucao.tecnico?.name} bodyText={bodyText} mutedText={mutedText} />
-                          <DetailItem label="Inicio" value={formatarDataHora(execucao.data_inicio)} bodyText={bodyText} mutedText={mutedText} />
+                          <DetailItem label="Técnico" value={execucao.tecnico?.name} bodyText={bodyText} mutedText={mutedText} />
+                          <DetailItem label="Início" value={formatarDataHora(execucao.data_inicio)} bodyText={bodyText} mutedText={mutedText} />
                           <DetailItem label="Fim" value={formatarDataHora(execucao.data_fim)} bodyText={bodyText} mutedText={mutedText} />
                           <DetailItem
-                            label="Observacao"
-                            value={execucao.observacao || "Sem observacoes registradas."}
+                            label="Observação"
+                            value={execucao.observacao || "Sem observações registradas."}
                             bodyText={bodyText}
                             mutedText={mutedText}
                             full
@@ -338,31 +348,90 @@ export default function OrdemDetalhePage() {
                     ))}
                   </div>
                 ) : (
-                  <p className={`text-sm ${mutedText}`}>Nenhuma execucao registrada.</p>
+                  <p className={`text-sm ${mutedText}`}>Nenhuma execução registrada.</p>
                 )}
               </Section>
             </div>
 
             <div className="space-y-4">
-              <Section title="Endereco" icon={<MapPin className="h-4 w-4" />} cardBg={cardBg}>
-                {linhasEndereco.length ? (
-                  <div className={`${innerCardBg} rounded-xl px-4 py-4`}>
-                    <p className={`text-xs font-medium uppercase tracking-[0.16em] ${mutedText}`}>
-                      Endereco da OS
-                    </p>
-                    <div className={`mt-3 space-y-1 text-sm ${bodyText}`}>
-                      {linhasEndereco.map((linha) => (
-                        <p key={linha}>{linha}</p>
-                      ))}
-                    </div>
+              <Section title="Unidade e geolocalização" icon={<MapPin className="h-4 w-4" />} cardBg={cardBg}>
+                <div className={`${innerCardBg} rounded-xl px-4 py-4`}>
+                  <p className={`text-xs font-medium uppercase tracking-[0.16em] ${mutedText}`}>
+                    Dados da unidade operacional
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {resumoUnidade.map((item) => (
+                      <DetailItem
+                        key={item.label}
+                        label={item.label}
+                        value={item.value}
+                        bodyText={bodyText}
+                        mutedText={mutedText}
+                      />
+                    ))}
                   </div>
-                ) : (
-                  <p className={`text-sm ${mutedText}`}>Endereco nao informado.</p>
-                )}
+                </div>
+
+                <div className={`${innerCardBg} rounded-xl px-4 py-4`}>
+                  <p className={`text-xs font-medium uppercase tracking-[0.16em] ${mutedText}`}>
+                    Geolocalização da evidência
+                  </p>
+                  {ultimaGeolocalizacao ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <DetailItem
+                        label="Latitude"
+                        value={formatarCoordenada(ultimaGeolocalizacao.latitude)}
+                        bodyText={bodyText}
+                        mutedText={mutedText}
+                      />
+                      <DetailItem
+                        label="Longitude"
+                        value={formatarCoordenada(ultimaGeolocalizacao.longitude)}
+                        bodyText={bodyText}
+                        mutedText={mutedText}
+                      />
+                      <DetailItem
+                        label="Rua"
+                        value={ultimaGeolocalizacao.rua_capturada}
+                        bodyText={bodyText}
+                        mutedText={mutedText}
+                      />
+                      <DetailItem
+                        label="Bairro"
+                        value={ultimaGeolocalizacao.bairro_capturado}
+                        bodyText={bodyText}
+                        mutedText={mutedText}
+                      />
+                      <DetailItem
+                        label="Cidade"
+                        value={ultimaGeolocalizacao.cidade_capturada}
+                        bodyText={bodyText}
+                        mutedText={mutedText}
+                      />
+                      <DetailItem
+                        label="Estado"
+                        value={ultimaGeolocalizacao.estado_capturado}
+                        bodyText={bodyText}
+                        mutedText={mutedText}
+                      />
+                      <DetailItem
+                        label="Endereço capturado"
+                        value={ultimaGeolocalizacao.endereco_capturado}
+                        bodyText={bodyText}
+                        mutedText={mutedText}
+                        full
+                      />
+                    </div>
+                  ) : (
+                    <p className={`mt-3 text-sm ${mutedText}`}>
+                      A localização aparecerá aqui quando o técnico enviar uma evidência com geolocalização.
+                    </p>
+                  )}
+                </div>
               </Section>
 
               {podeEnviarAnexo && (
-                <Section title="Nova evidencia" icon={<Paperclip className="h-4 w-4" />} cardBg={cardBg}>
+                <Section title="Nova evidência" icon={<Paperclip className="h-4 w-4" />} cardBg={cardBg}>
                   <EvidenciaUploadPanel
                     variant="page"
                     isDark={isDark}
@@ -374,7 +443,10 @@ export default function OrdemDetalhePage() {
                     incluirGeolocalizacao={incluirGeolocalizacao}
                     alternarIncluirGeolocalizacao={alternarIncluirGeolocalizacao}
                     processandoGeolocalizacao={processandoGeolocalizacao}
+                    processandoEnderecoCapturado={processandoEnderecoCapturado}
                     geolocalizacaoCapturada={geolocalizacaoCapturada}
+                    feedbackGeolocalizacao={feedbackGeolocalizacao}
+                    diagnosticoGeolocalizacao={diagnosticoGeolocalizacao}
                     atualizarEnderecoCapturado={atualizarEnderecoCapturado}
                     onCapturarGeolocalizacao={handleCapturarGeolocalizacao}
                     onEnviar={handleEnviarAnexo}
@@ -387,8 +459,8 @@ export default function OrdemDetalhePage() {
                 icon={<UserCircle2 className="h-4 w-4" />}
                 cardBg={cardBg}
               >
-                <p className={`text-sm ${bodyText}`}>{criadaPor?.name ?? "-"}</p>
-                <p className={`mt-1 text-xs ${mutedText}`}>{criadaPor?.email ?? ""}</p>
+                <p className={`text-sm ${bodyText}`}>{criadaPor?.name || "-"}</p>
+                <p className={`mt-1 text-xs ${mutedText}`}>{criadaPor?.email || "-"}</p>
               </Section>
 
               <Section title="Anexos" icon={<Paperclip className="h-4 w-4" />} cardBg={cardBg}>
@@ -401,7 +473,6 @@ export default function OrdemDetalhePage() {
                         variant="page"
                         isDark={isDark}
                         wrapper="li"
-                        enderecoReferencia={enderecoReferencia}
                       />
                     ))}
                   </ul>
@@ -476,7 +547,12 @@ function DetailItem({
   return (
     <div className={full ? "sm:col-span-2" : undefined}>
       <p className={`text-xs font-medium uppercase tracking-[0.16em] ${mutedText}`}>{label}</p>
-      <p className={`mt-2 whitespace-pre-wrap text-sm ${bodyText}`}>{value || "-"}</p>
+      <p className={`mt-2 whitespace-pre-wrap break-words text-sm ${bodyText}`}>{value || "-"}</p>
     </div>
   );
 }
+
+
+
+
+

@@ -104,7 +104,7 @@ export function TabelaOrdensSection({
                   Data de abertura
                 </th>
                 <th scope="col" className="p-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">
-                  Acoes
+                  Ações
                 </th>
               </tr>
             </thead>

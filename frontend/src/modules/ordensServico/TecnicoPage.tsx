@@ -136,7 +136,7 @@ export default function TecnicoPage() {
 
   const pageBg = "app-page";
   const headerBg = "app-header-shell";
-  const mutedText = "app-muted";
+  const mutedText = "text-blue-100 dark:text-slate-300";
   const titleText = "text-white dark:text-slate-50";
   const buttonInactive =
     "app-tab-inactive border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-soft)]";

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+﻿import { useEffect, useId, useMemo, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -15,15 +15,22 @@ import {
 } from "../ordensServico.service";
 
 type Variant = "page" | "modal";
+
 type ParticipanteExecucaoInput = {
-  funcionario_id: string;
+  funcionario_id?: string;
+  colaborador_operacional_id?: string;
   data_inicio?: string;
   data_fim?: string;
 };
+
+type ParticipanteTipoVinculo = "usuario" | "colaborador_operacional";
+
 type ParticipanteRow = {
   id: string;
-  funcionarioId: string;
-  data: string;
+  participanteId: string;
+  participanteTipo: ParticipanteTipoVinculo;
+  dataInicio: string;
+  dataFim: string;
   horaInicio: string;
   horaFim: string;
   obrigatorio: boolean;
@@ -58,22 +65,58 @@ type Props = {
 };
 
 const createParticipante = (
-  funcionarioId = "",
-  obrigatorio = false
+  participanteId = "",
+  obrigatorio = false,
+  participanteTipo: ParticipanteTipoVinculo = "usuario"
 ): ParticipanteRow => ({
   id:
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  funcionarioId,
-  data: "",
+  participanteId,
+  participanteTipo,
+  dataInicio: "",
+  dataFim: "",
   horaInicio: "",
   horaFim: "",
   obrigatorio,
 });
 
-const combinarDataHora = (data: string, hora: string) =>
-  data && hora ? `${data}T${hora}` : "";
+const combinarDataHora = (data: string, hora: string) => {
+  if (!data || !hora) {
+    return "";
+  }
+
+  const local = new Date(`${data}T${hora}`);
+
+  return Number.isNaN(local.getTime()) ? "" : local.toISOString();
+};
+
+const encodeParticipanteOption = (
+  tipo: ParticipanteTipoVinculo,
+  id: string
+) => `${tipo}:${id}`;
+
+const decodeParticipanteOption = (
+  value: string
+): {
+  tipo: ParticipanteTipoVinculo;
+  id: string;
+} => {
+  const [tipo, id] = value.split(":");
+
+  if (tipo === "colaborador_operacional" && id) {
+    return {
+      tipo,
+      id,
+    };
+  }
+
+  return {
+    tipo: "usuario",
+    id,
+  };
+};
 
 const badgeClass = (status?: string) =>
   status === "aberta"
@@ -103,31 +146,61 @@ function formatarDuracao(minutos: number) {
   return `${Math.floor(minutos / 60)}h${String(minutos % 60).padStart(2, "0")}`;
 }
 
+function formatarParticipanteOpcao(funcionario: FuncionarioDisponivel) {
+  const funcao = funcionario.funcao?.trim();
+
+  if (funcao) {
+    return `${funcionario.name} (${funcao})`;
+  }
+
+  if (funcionario.role === "tecnico") {
+    return `${funcionario.name} (Técnico)`;
+  }
+
+  if (funcionario.role === "administrador") {
+    return `${funcionario.name} (Administrador)`;
+  }
+
+  return `${funcionario.name} (Auxiliar técnico)`;
+}
+
 function resumoExtras(participante: ParticipanteRow) {
-  if (!participante.data && !participante.horaInicio && !participante.horaFim) {
+  if (
+    !participante.dataInicio &&
+    !participante.dataFim &&
+    !participante.horaInicio &&
+    !participante.horaFim
+  ) {
     return {
       titulo: "Usar período principal",
       detalhe: "O cálculo usará o mesmo período da execução principal.",
     };
   }
 
-  if (!participante.data || !participante.horaInicio || !participante.horaFim) {
+  if (
+    !participante.dataInicio ||
+    !participante.dataFim ||
+    !participante.horaInicio ||
+    !participante.horaFim
+  ) {
     return {
       titulo: "Preenchimento parcial",
       detalhe:
-        "Informe data, hora de início e hora de fim para esse funcionário.",
+        "Informe data e hora de início, além de data e hora de fim para esse participante.",
     };
   }
 
   const inicio = new Date(
-    combinarDataHora(participante.data, participante.horaInicio)
+    combinarDataHora(participante.dataInicio, participante.horaInicio)
   );
-  const fim = new Date(combinarDataHora(participante.data, participante.horaFim));
+  const fim = new Date(
+    combinarDataHora(participante.dataFim, participante.horaFim)
+  );
 
   if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime()) || fim <= inicio) {
     return {
       titulo: "Intervalo inválido",
-      detalhe: "A hora final precisa ser maior que a inicial.",
+      detalhe: "A data e hora final precisam ser maiores que a inicial.",
     };
   }
 
@@ -175,7 +248,8 @@ function EquipeExecucaoSection({
   onAdicionar,
   onRemover,
   onLimparPeriodo,
-  onAtualizar,
+  onAtualizarPeriodo,
+  onAtualizarParticipante,
 }: {
   participantes: ParticipanteRow[];
   currentUserId?: string;
@@ -188,11 +262,15 @@ function EquipeExecucaoSection({
   onAdicionar: () => void;
   onRemover: (id: string) => void;
   onLimparPeriodo: (id: string) => void;
-  onAtualizar: (
+  onAtualizarPeriodo: (
     id: string,
-    campo: keyof Omit<ParticipanteRow, "id">,
+    campo: keyof Pick<
+      ParticipanteRow,
+      "dataInicio" | "dataFim" | "horaInicio" | "horaFim"
+    >,
     valor: string
   ) => void;
+  onAtualizarParticipante: (id: string, valor: string) => void;
 }) {
   const captionId = useId();
 
@@ -202,8 +280,9 @@ function EquipeExecucaoSection({
         <div>
           <p className="text-sm font-semibold text-slate-900">Equipe da execução</p>
           <p className="text-xs text-slate-500">
-            O técnico responsável entra automaticamente no cálculo. Os horários
-            usam o mesmo padrão de data e hora da criação da OS.
+            O técnico responsável entra automaticamente no cálculo. Auxiliares
+            podem participar da OS sem login e entram normalmente na apuração
+            de horas extras do admin.
           </p>
         </div>
         <button
@@ -211,34 +290,85 @@ function EquipeExecucaoSection({
           onClick={onAdicionar}
           disabled={processandoAcao}
           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          aria-label="Adicionar novo funcionário à equipe da execução"
+          aria-label="Adicionar novo participante à equipe da execução"
         >
           <PlusCircle className="h-4 w-4" />
-          Adicionar funcionário
+          Adicionar participante
         </button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] text-sm">
+      <div className="space-y-3 md:hidden">
+        {participantes.map((participante) => {
+          const obrigatorio =
+            participante.obrigatorio &&
+            participante.participanteTipo === "usuario" &&
+            participante.participanteId === currentUserId;
+          const participanteKey = participante.participanteId
+            ? encodeParticipanteOption(
+                participante.participanteTipo,
+                participante.participanteId
+              )
+            : "";
+          const opcoes = funcionariosDisponiveis.filter((item) => {
+            const itemKey = encodeParticipanteOption(item.tipo_vinculo, item.id);
+
+            return itemKey === participanteKey || !participantesSelecionados.includes(itemKey);
+          });
+          const preview = resumoExtras(participante);
+          const nomeParticipante =
+            funcionariosDisponiveis.find(
+              (item) =>
+                item.id === participante.participanteId &&
+                item.tipo_vinculo === participante.participanteTipo
+            )?.name ||
+            (participante.participanteTipo === "usuario" &&
+            participante.participanteId === currentUserId
+              ? currentUserName
+              : undefined) ||
+            "participante";
+
+          return (
+            <EquipeExecucaoMobileCard
+              key={participante.id}
+              participante={participante}
+              participanteKey={participanteKey}
+              opcoes={opcoes}
+              preview={preview}
+              nomeParticipante={nomeParticipante}
+              obrigatorio={obrigatorio}
+              carregandoFuncionarios={carregandoFuncionarios}
+              processandoAcao={processandoAcao}
+              inputClass={inputClass}
+              onAtualizarParticipante={onAtualizarParticipante}
+              onAtualizarPeriodo={onAtualizarPeriodo}
+              onLimparPeriodo={onLimparPeriodo}
+              onRemover={onRemover}
+            />
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[920px] table-fixed text-sm">
           <caption id={captionId} className="sr-only">
-            Tabela da equipe da execução com funcionário, início, fim, resumo
+            Tabela da equipe da execução com participante, início, fim, resumo
             das horas informadas e ações disponíveis.
           </caption>
           <thead className="text-left text-xs uppercase tracking-[0.16em] text-slate-400">
             <tr>
-              <th scope="col" className="pb-2 pr-3 font-medium">
-                Funcionário
+              <th scope="col" className="w-[27%] pb-2 pr-3 font-medium">
+                Participante
               </th>
-              <th scope="col" className="pb-2 pr-3 font-medium">
+              <th scope="col" className="w-[15%] pb-2 pr-3 font-medium">
                 Início
               </th>
-              <th scope="col" className="pb-2 pr-3 font-medium">
+              <th scope="col" className="w-[15%] pb-2 pr-3 font-medium">
                 Fim
               </th>
-              <th scope="col" className="pb-2 pr-3 font-medium">
+              <th scope="col" className="w-[18%] pb-2 pr-3 font-medium">
                 Extras
               </th>
-              <th scope="col" className="pb-2 text-right font-medium">
+              <th scope="col" className="w-[25%] pb-2 text-right font-medium">
                 Ações
               </th>
             </tr>
@@ -247,18 +377,31 @@ function EquipeExecucaoSection({
             {participantes.map((participante) => {
               const obrigatorio =
                 participante.obrigatorio &&
-                participante.funcionarioId === currentUserId;
-              const opcoes = funcionariosDisponiveis.filter(
-                (item) =>
-                  item.id === participante.funcionarioId ||
-                  !participantesSelecionados.includes(item.id)
-              );
+                participante.participanteTipo === "usuario" &&
+                participante.participanteId === currentUserId;
+              const participanteKey = participante.participanteId
+                ? encodeParticipanteOption(
+                    participante.participanteTipo,
+                    participante.participanteId
+                  )
+                : "";
+              const opcoes = funcionariosDisponiveis.filter((item) => {
+                const itemKey = encodeParticipanteOption(item.tipo_vinculo, item.id);
+
+                return (
+                  itemKey === participanteKey ||
+                  !participantesSelecionados.includes(itemKey)
+                );
+              });
               const preview = resumoExtras(participante);
               const nomeParticipante =
                 funcionariosDisponiveis.find(
-                  (item) => item.id === participante.funcionarioId
+                  (item) =>
+                    item.id === participante.participanteId &&
+                    item.tipo_vinculo === participante.participanteTipo
                 )?.name ||
-                (participante.funcionarioId === currentUserId
+                (participante.participanteTipo === "usuario" &&
+                participante.participanteId === currentUserId
                   ? currentUserName
                   : undefined) ||
                 "participante";
@@ -269,30 +412,31 @@ function EquipeExecucaoSection({
                     <div className="relative">
                       <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <select
-                        value={participante.funcionarioId}
+                        value={participanteKey}
                         onChange={(event) =>
-                          onAtualizar(
-                            participante.id,
-                            "funcionarioId",
-                            event.target.value
-                          )
+                          onAtualizarParticipante(participante.id, event.target.value)
                         }
                         disabled={
                           processandoAcao || carregandoFuncionarios || obrigatorio
                         }
                         className={`${inputClass} py-3 pl-10 pr-4`}
-                        aria-label={`Funcionário da linha ${nomeParticipante}`}
+                        aria-label={`Participante da linha ${nomeParticipante}`}
                       >
                         <option value="">
                           {carregandoFuncionarios ? "Carregando..." : "Selecione"}
                         </option>
                         {opcoes.map((funcionario) => (
-                          <option key={funcionario.id} value={funcionario.id}>
-                            {funcionario.name} (
-                            {funcionario.role === "tecnico"
-                              ? "Técnico"
-                              : "Administrador"}
-                            )
+                          <option
+                            key={encodeParticipanteOption(
+                              funcionario.tipo_vinculo,
+                              funcionario.id
+                            )}
+                            value={encodeParticipanteOption(
+                              funcionario.tipo_vinculo,
+                              funcionario.id
+                            )}
+                          >
+                            {formatarParticipanteOpcao(funcionario)}
                           </option>
                         ))}
                       </select>
@@ -308,9 +452,13 @@ function EquipeExecucaoSection({
                     <div className="grid gap-2">
                       <input
                         type="date"
-                        value={participante.data}
+                        value={participante.dataInicio}
                         onChange={(event) =>
-                          onAtualizar(participante.id, "data", event.target.value)
+                          onAtualizarPeriodo(
+                            participante.id,
+                            "dataInicio",
+                            event.target.value
+                          )
                         }
                         disabled={processandoAcao}
                         className={inputClass}
@@ -320,7 +468,7 @@ function EquipeExecucaoSection({
                         type="time"
                         value={participante.horaInicio}
                         onChange={(event) =>
-                          onAtualizar(
+                          onAtualizarPeriodo(
                             participante.id,
                             "horaInicio",
                             event.target.value
@@ -337,9 +485,13 @@ function EquipeExecucaoSection({
                     <div className="grid gap-2">
                       <input
                         type="date"
-                        value={participante.data}
+                        value={participante.dataFim}
                         onChange={(event) =>
-                          onAtualizar(participante.id, "data", event.target.value)
+                          onAtualizarPeriodo(
+                            participante.id,
+                            "dataFim",
+                            event.target.value
+                          )
                         }
                         disabled={processandoAcao}
                         className={inputClass}
@@ -349,7 +501,7 @@ function EquipeExecucaoSection({
                         type="time"
                         value={participante.horaFim}
                         onChange={(event) =>
-                          onAtualizar(
+                          onAtualizarPeriodo(
                             participante.id,
                             "horaFim",
                             event.target.value
@@ -364,7 +516,7 @@ function EquipeExecucaoSection({
 
                   <td className="py-3 pr-3 align-top">
                     <div
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-700"
+                      className="max-w-[15rem] rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-700"
                       role="status"
                       aria-live="polite"
                     >
@@ -376,8 +528,9 @@ function EquipeExecucaoSection({
                   </td>
 
                   <td className="py-3 text-right align-top">
-                    <div className="flex justify-end gap-2">
-                      {(participante.data ||
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {(participante.dataInicio ||
+                        participante.dataFim ||
                         participante.horaInicio ||
                         participante.horaFim) && (
                         <button
@@ -415,6 +568,154 @@ function EquipeExecucaoSection({
         </table>
       </div>
     </div>
+  );
+}
+
+function EquipeExecucaoMobileCard({
+  participante,
+  participanteKey,
+  opcoes,
+  preview,
+  nomeParticipante,
+  obrigatorio,
+  carregandoFuncionarios,
+  processandoAcao,
+  inputClass,
+  onAtualizarParticipante,
+  onAtualizarPeriodo,
+  onLimparPeriodo,
+  onRemover,
+}: {
+  participante: ParticipanteRow;
+  participanteKey: string;
+  opcoes: FuncionarioDisponivel[];
+  preview: { titulo: string; detalhe: string };
+  nomeParticipante: string;
+  obrigatorio: boolean;
+  carregandoFuncionarios: boolean;
+  processandoAcao: boolean;
+  inputClass: string;
+  onAtualizarParticipante: (id: string, valor: string) => void;
+  onAtualizarPeriodo: (
+    id: string,
+    campo: keyof Pick<ParticipanteRow, "dataInicio" | "dataFim" | "horaInicio" | "horaFim">,
+    valor: string
+  ) => void;
+  onLimparPeriodo: (id: string) => void;
+  onRemover: (id: string) => void;
+}) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="relative">
+        <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <select
+          value={participanteKey}
+          onChange={(event) => onAtualizarParticipante(participante.id, event.target.value)}
+          disabled={processandoAcao || carregandoFuncionarios || obrigatorio}
+          className={`${inputClass} py-3 pl-10 pr-4`}
+          aria-label={`Participante da linha ${nomeParticipante}`}
+        >
+          <option value="">{carregandoFuncionarios ? "Carregando..." : "Selecione"}</option>
+          {opcoes.map((funcionario) => (
+            <option
+              key={encodeParticipanteOption(funcionario.tipo_vinculo, funcionario.id)}
+              value={encodeParticipanteOption(funcionario.tipo_vinculo, funcionario.id)}
+            >
+              {formatarParticipanteOpcao(funcionario)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {obrigatorio ? (
+        <p className="mt-2 text-xs font-medium text-blue-600">
+          {nomeParticipante || "Responsável"} obrigatório na apuração.
+        </p>
+      ) : null}
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Início
+          </p>
+          <input
+            type="date"
+            value={participante.dataInicio}
+            onChange={(event) => onAtualizarPeriodo(participante.id, "dataInicio", event.target.value)}
+            disabled={processandoAcao}
+            className={inputClass}
+            aria-label={`Data de início de ${nomeParticipante}`}
+          />
+          <input
+            type="time"
+            value={participante.horaInicio}
+            onChange={(event) => onAtualizarPeriodo(participante.id, "horaInicio", event.target.value)}
+            disabled={processandoAcao}
+            className={inputClass}
+            aria-label={`Hora de início de ${nomeParticipante}`}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Fim
+          </p>
+          <input
+            type="date"
+            value={participante.dataFim}
+            onChange={(event) => onAtualizarPeriodo(participante.id, "dataFim", event.target.value)}
+            disabled={processandoAcao}
+            className={inputClass}
+            aria-label={`Data de fim de ${nomeParticipante}`}
+          />
+          <input
+            type="time"
+            value={participante.horaFim}
+            onChange={(event) => onAtualizarPeriodo(participante.id, "horaFim", event.target.value)}
+            disabled={processandoAcao}
+            className={inputClass}
+            aria-label={`Hora de fim de ${nomeParticipante}`}
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-3 text-slate-700">
+        <p className="font-medium">{preview.titulo}</p>
+        <p className="mt-1 text-xs text-slate-500">{preview.detalhe}</p>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2">
+        {(participante.dataInicio ||
+          participante.dataFim ||
+          participante.horaInicio ||
+          participante.horaFim) && (
+          <button
+            type="button"
+            onClick={() => onLimparPeriodo(participante.id)}
+            disabled={processandoAcao}
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+          >
+            Usar período principal
+          </button>
+        )}
+
+        {!obrigatorio ? (
+          <button
+            type="button"
+            onClick={() => onRemover(participante.id)}
+            disabled={processandoAcao}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+          >
+            <Trash2 className="h-4 w-4" />
+            Remover participante
+          </button>
+        ) : (
+          <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
+            Obrigatório
+          </span>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -460,8 +761,13 @@ export function OrdemServicoAcoesPanel({
   const participantesSelecionados = useMemo(
     () =>
       participantes
-        .map((participante) => participante.funcionarioId)
-        .filter(Boolean),
+        .filter((participante) => !!participante.participanteId)
+        .map((participante) =>
+          encodeParticipanteOption(
+            participante.participanteTipo,
+            participante.participanteId
+          )
+        ),
     [participantes]
   );
 
@@ -472,19 +778,22 @@ export function OrdemServicoAcoesPanel({
       const index = current.findIndex(
         (participante) =>
           participante.obrigatorio ||
-          participante.funcionarioId === currentUserId
+          (participante.participanteTipo === "usuario" &&
+            participante.participanteId === currentUserId)
       );
 
       if (index === -1) {
-        return [createParticipante(currentUserId, true), ...current];
+        return [createParticipante(currentUserId, true, "usuario"), ...current];
       }
 
       const updated = [...current];
       updated[index] = {
         ...updated[index],
-        funcionarioId: currentUserId,
+        participanteId: currentUserId,
+        participanteTipo: "usuario",
         obrigatorio: true,
       };
+
       return updated;
     });
   }, [currentUserId]);
@@ -500,15 +809,20 @@ export function OrdemServicoAcoesPanel({
       try {
         setCarregandoFuncionarios(true);
         const data = await listarFuncionariosDisponiveis();
-        if (ativo) setFuncionariosDisponiveis(data);
+
+        if (ativo) {
+          setFuncionariosDisponiveis(data);
+        }
       } catch {
         if (ativo) {
           onError(
-            "Não foi possível carregar os funcionários disponíveis para a execução."
+            "Não foi possível carregar os participantes disponíveis para a execução."
           );
         }
       } finally {
-        if (ativo) setCarregandoFuncionarios(false);
+        if (ativo) {
+          setCarregandoFuncionarios(false);
+        }
       }
     }
 
@@ -520,68 +834,96 @@ export function OrdemServicoAcoesPanel({
   }, [onError, onFinalizarExecucao, podeFinalizarExecucao, status]);
 
   function resetEquipe() {
-    setParticipantes(currentUserId ? [createParticipante(currentUserId, true)] : []);
+    setParticipantes(
+      currentUserId ? [createParticipante(currentUserId, true, "usuario")] : []
+    );
   }
 
   function normalizarParticipantes() {
     const ativos = participantes.filter(
       (participante) =>
-        participante.funcionarioId ||
-        participante.data.trim() ||
+        participante.participanteId ||
+        participante.dataInicio.trim() ||
+        participante.dataFim.trim() ||
         participante.horaInicio.trim() ||
         participante.horaFim.trim()
     );
     const ids = ativos
-      .map((participante) => participante.funcionarioId)
-      .filter(Boolean);
+      .filter((participante) => !!participante.participanteId)
+      .map((participante) =>
+        encodeParticipanteOption(
+          participante.participanteTipo,
+          participante.participanteId
+        )
+      );
 
     if (ids.some((id, index) => ids.indexOf(id) !== index)) {
-      onError("Um funcionário não pode ser incluído duas vezes na mesma execução.");
+      onError("Um participante não pode ser incluído duas vezes na mesma execução.");
       return null;
     }
 
     for (const participante of ativos) {
-      if (!participante.funcionarioId) {
-        onError("Selecione um funcionário para cada linha preenchida da equipe.");
+      if (!participante.participanteId) {
+        onError("Selecione um participante para cada linha preenchida da equipe.");
         return null;
       }
 
       const temAlgumHorario = !!(
-        participante.data ||
+        participante.dataInicio ||
+        participante.dataFim ||
         participante.horaInicio ||
         participante.horaFim
       );
 
       if (
         temAlgumHorario &&
-        (!participante.data ||
+        (!participante.dataInicio ||
+          !participante.dataFim ||
           !participante.horaInicio ||
           !participante.horaFim)
       ) {
         onError(
-          "Quando informar período individual, preencha data, hora de início e hora de fim do funcionário."
+          "Quando informar período individual, preencha data e hora de início, além de data e hora de fim do participante."
         );
         return null;
       }
 
-      const inicio = combinarDataHora(participante.data, participante.horaInicio);
-      const fim = combinarDataHora(participante.data, participante.horaFim);
+      const inicio = combinarDataHora(
+        participante.dataInicio,
+        participante.horaInicio
+      );
+      const fim = combinarDataHora(participante.dataFim, participante.horaFim);
 
       if ((inicio || fim) && (!inicio || !fim || new Date(fim) <= new Date(inicio))) {
         onError(
-          "A hora final deve ser maior que a hora inicial para cada funcionário."
+          "A data e hora final devem ser maiores que a data e hora inicial para cada participante."
         );
         return null;
       }
     }
 
-    return ativos.map((participante) => ({
-      funcionario_id: participante.funcionarioId,
-      data_inicio:
-        combinarDataHora(participante.data, participante.horaInicio) || undefined,
-      data_fim:
-        combinarDataHora(participante.data, participante.horaFim) || undefined,
-    }));
+    return ativos.map((participante) => {
+      const payloadBase = {
+        data_inicio:
+          combinarDataHora(participante.dataInicio, participante.horaInicio) ||
+          undefined,
+        data_fim:
+          combinarDataHora(participante.dataFim, participante.horaFim) ||
+          undefined,
+      };
+
+      if (participante.participanteTipo === "colaborador_operacional") {
+        return {
+          ...payloadBase,
+          colaborador_operacional_id: participante.participanteId,
+        };
+      }
+
+      return {
+        ...payloadBase,
+        funcionario_id: participante.participanteId,
+      };
+    });
   }
 
   function calcularDataFimPrincipal(funcionarios?: ParticipanteExecucaoInput[]) {
@@ -605,6 +947,7 @@ export function OrdemServicoAcoesPanel({
     }
 
     const funcionarios = normalizarParticipantes();
+
     if (!funcionarios) return;
 
     const dataFimPrincipal = calcularDataFimPrincipal(funcionarios);
@@ -631,7 +974,10 @@ export function OrdemServicoAcoesPanel({
     }
 
     const marcou = await onMarcarNaoExecutada(motivoNaoExecucao.trim());
-    if (marcou) setMotivoNaoExecucao("");
+
+    if (marcou) {
+      setMotivoNaoExecucao("");
+    }
   }
 
   function adicionarParticipante() {
@@ -641,8 +987,7 @@ export function OrdemServicoAcoesPanel({
   function removerParticipante(id: string) {
     setParticipantes((current) =>
       current.filter(
-        (participante) =>
-          participante.id !== id || participante.obrigatorio
+        (participante) => participante.id !== id || participante.obrigatorio
       )
     );
   }
@@ -651,15 +996,24 @@ export function OrdemServicoAcoesPanel({
     setParticipantes((current) =>
       current.map((participante) =>
         participante.id === id
-          ? { ...participante, data: "", horaInicio: "", horaFim: "" }
+          ? {
+              ...participante,
+              dataInicio: "",
+              dataFim: "",
+              horaInicio: "",
+              horaFim: "",
+            }
           : participante
       )
     );
   }
 
-  function atualizarParticipante(
+  function atualizarPeriodoParticipante(
     id: string,
-    campo: keyof Omit<ParticipanteRow, "id">,
+    campo: keyof Pick<
+      ParticipanteRow,
+      "dataInicio" | "dataFim" | "horaInicio" | "horaFim"
+    >,
     valor: string
   ) {
     setParticipantes((current) =>
@@ -667,6 +1021,22 @@ export function OrdemServicoAcoesPanel({
         participante.id === id
           ? { ...participante, [campo]: valor }
           : participante
+      )
+    );
+  }
+
+  function atualizarParticipanteSelecionado(id: string, valor: string) {
+    const participante = valor ? decodeParticipanteOption(valor) : null;
+
+    setParticipantes((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              participanteId: participante?.id ?? "",
+              participanteTipo: participante?.tipo ?? "usuario",
+            }
+          : item
       )
     );
   }
@@ -683,7 +1053,8 @@ export function OrdemServicoAcoesPanel({
     onAdicionar: adicionarParticipante,
     onRemover: removerParticipante,
     onLimparPeriodo: limparPeriodoParticipante,
-    onAtualizar: atualizarParticipante,
+    onAtualizarPeriodo: atualizarPeriodoParticipante,
+    onAtualizarParticipante: atualizarParticipanteSelecionado,
   };
 
   if (variant === "modal") {
@@ -722,9 +1093,7 @@ export function OrdemServicoAcoesPanel({
             className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800 disabled:opacity-60"
           >
             <ClipboardList className="h-4 w-4" />
-            {processandoAcao
-              ? "Processando..."
-              : "Aceitar ordem de serviço"}
+            {processandoAcao ? "Processando..." : "Aceitar ordem de serviço"}
           </button>
         )}
 
@@ -871,3 +1240,7 @@ export function OrdemServicoAcoesPanel({
     </div>
   );
 }
+
+
+
+

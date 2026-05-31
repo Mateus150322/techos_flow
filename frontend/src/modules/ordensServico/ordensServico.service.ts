@@ -33,13 +33,16 @@ export type OrdemServicoUsuarioRelacionamento = Usuario | null | undefined;
 export type FuncionarioDisponivel = {
   id: string;
   name: string;
-  role: "administrador" | "tecnico";
+  role: "administrador" | "tecnico" | "auxiliar_tecnico";
+  funcao: string;
+  tipo_vinculo: "usuario" | "colaborador_operacional";
 };
 
 export type ExecucaoFuncionario = {
   id: string;
   execucao_id: string;
-  funcionario_id: string;
+  funcionario_id?: string | null;
+  colaborador_operacional_id?: string | null;
   data_inicio: string | null;
   data_fim: string | null;
   minutos_trabalhados?: number;
@@ -47,6 +50,12 @@ export type ExecucaoFuncionario = {
   minutos_extras_50?: number;
   minutos_extras_100?: number;
   funcionario?: Usuario;
+  colaborador_operacional?: {
+    id: string;
+    name: string;
+    funcao: string;
+    valor_hora?: string | null;
+  };
 };
 
 export type Execucao = {
@@ -70,6 +79,10 @@ export type Anexo = {
   longitude?: number | null;
   precisao_metros?: number | null;
   geolocalizacao_capturada_em?: string | null;
+  rua_capturada?: string | null;
+  bairro_capturado?: string | null;
+  cidade_capturada?: string | null;
+  estado_capturado?: string | null;
   endereco_capturado?: string | null;
 };
 
@@ -193,7 +206,8 @@ export type FinalizarExecucaoPayload = {
   data_fim?: string;
   observacao?: string;
   funcionarios?: Array<{
-    funcionario_id: string;
+    funcionario_id?: string;
+    colaborador_operacional_id?: string;
     data_inicio?: string;
     data_fim?: string;
   }>;
@@ -236,6 +250,10 @@ export type GeolocalizacaoAnexoPayload = {
   longitude?: number;
   precisao_metros?: number;
   geolocalizacao_capturada_em?: string;
+  rua_capturada?: string;
+  bairro_capturado?: string;
+  cidade_capturada?: string;
+  estado_capturado?: string;
   endereco_capturado?: string;
 };
 
@@ -273,6 +291,22 @@ export async function enviarAnexo(
         "geolocalizacao_capturada_em",
         tipoOuPayload.geolocalizacao_capturada_em
       );
+    }
+
+    if (tipoOuPayload.rua_capturada) {
+      formData.append("rua_capturada", tipoOuPayload.rua_capturada);
+    }
+
+    if (tipoOuPayload.bairro_capturado) {
+      formData.append("bairro_capturado", tipoOuPayload.bairro_capturado);
+    }
+
+    if (tipoOuPayload.cidade_capturada) {
+      formData.append("cidade_capturada", tipoOuPayload.cidade_capturada);
+    }
+
+    if (tipoOuPayload.estado_capturado) {
+      formData.append("estado_capturado", tipoOuPayload.estado_capturado);
     }
 
     if (tipoOuPayload.endereco_capturado) {

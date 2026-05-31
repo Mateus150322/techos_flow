@@ -8,6 +8,25 @@ function toRecord(value: unknown): UnknownRecord | null {
   return null;
 }
 
+function normalizeIncomingText(value: string) {
+  return value
+    .replaceAll("Ã£", "a")
+    .replaceAll("Ã¡", "a")
+    .replaceAll("Ã ", "a")
+    .replaceAll("Ã¢", "a")
+    .replaceAll("Ã©", "e")
+    .replaceAll("Ãª", "e")
+    .replaceAll("Ã­", "i")
+    .replaceAll("Ã³", "o")
+    .replaceAll("Ã´", "o")
+    .replaceAll("Ãµ", "o")
+    .replaceAll("Ãº", "u")
+    .replaceAll("Ã§", "c")
+    .replaceAll("â€¢", "•")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
 export function getApiErrorMessage(error: unknown, fallback: string) {
   const errorRecord = toRecord(error);
   const response = toRecord(errorRecord?.response);
@@ -47,9 +66,12 @@ export function getApiValidationErrors(error: unknown) {
       continue;
     }
 
-    const messages = value.filter(
-      (message): message is string => typeof message === "string" && message.trim().length > 0
-    );
+    const messages = value
+      .filter(
+        (message): message is string =>
+          typeof message === "string" && message.trim().length > 0
+      )
+      .map((message) => normalizeIncomingText(message));
 
     if (messages.length > 0) {
       normalized[field] = messages;
@@ -82,27 +104,27 @@ function normalizeApiMessage(message: string | undefined, status?: number) {
     return "";
   }
 
-  const normalized = fixMojibake(message.trim());
+  const normalized = normalizeIncomingText(message);
   const lower = normalized.toLowerCase();
 
   if (lower === "unauthenticated.") {
-    return "Sua sessão expirou. Faça login novamente.";
+    return "Sua sessao expirou. Faca login novamente.";
   }
 
   if (lower === "forbidden." || lower === "access denied." || lower === "acesso negado") {
-    return "Você não tem permissão para realizar esta ação.";
+    return "Voce nao tem permissao para realizar esta acao.";
   }
 
   if (lower === "too many attempts." || lower.includes("too many login attempts")) {
     return "Muitas tentativas. Aguarde um momento e tente novamente.";
   }
 
-  if (lower === "user inactive." || lower === "usuário inativo." || lower === "usuario inativo.") {
-    return "Seu acesso está inativo. Procure um administrador para reativar seu usuário.";
+  if (lower === "user inactive." || lower === "usuario inativo." || lower === "usuario inativo") {
+    return "Seu acesso esta inativo. Procure um administrador para reativar seu usuario.";
   }
 
-  if (lower === "invalid credentials." || lower === "credenciais inválidas.") {
-    return "Credenciais inválidas. Confira e-mail e senha.";
+  if (lower === "invalid credentials." || lower === "credenciais invalidas.") {
+    return "Credenciais invalidas. Confira e-mail e senha.";
   }
 
   if (status === 500 && lower === "server error") {
@@ -118,7 +140,7 @@ function normalizeClientError(
   status: number | undefined,
   fallback: string
 ) {
-  const normalized = fixMojibake(message.trim());
+  const normalized = normalizeIncomingText(message);
   const lower = normalized.toLowerCase();
   const errorCode = code.toUpperCase();
 
@@ -130,11 +152,15 @@ function normalizeClientError(
     errorCode === "ECONNREFUSED" ||
     errorCode === "ENOTFOUND"
   ) {
-    return "Não foi possível conectar ao servidor. Verifique se a API está disponível e tente novamente.";
+    return "Nao foi possivel conectar ao servidor. Verifique se a API esta disponivel e tente novamente.";
   }
 
   if (lower.includes("timeout") || errorCode === "ECONNABORTED") {
-    return "A conexão com o servidor expirou. Tente novamente.";
+    return "A conexao com o servidor expirou. Tente novamente.";
+  }
+
+  if (normalized && typeof status !== "number") {
+    return normalized;
   }
 
   return mapStatusFallback(status, fallback);
@@ -142,19 +168,19 @@ function normalizeClientError(
 
 function mapStatusFallback(status: number | undefined, fallback: string) {
   if (status === 401) {
-    return "Sua sessão expirou ou o acesso foi negado. Faça login novamente.";
+    return "Sua sessao expirou ou o acesso foi negado. Faca login novamente.";
   }
 
   if (status === 403) {
-    return "Você não tem permissão para realizar esta ação.";
+    return "Voce nao tem permissao para realizar esta acao.";
   }
 
   if (status === 404) {
-    return "Recurso não encontrado.";
+    return "Recurso nao encontrado.";
   }
 
   if (status === 422) {
-    return "Os dados informados são inválidos. Revise os campos e tente novamente.";
+    return "Os dados informados sao invalidos. Revise os campos e tente novamente.";
   }
 
   if (status === 429) {
@@ -166,26 +192,4 @@ function mapStatusFallback(status: number | undefined, fallback: string) {
   }
 
   return fallback;
-}
-
-function fixMojibake(value: string) {
-  return value
-    .replaceAll("NÃ£o", "Não")
-    .replaceAll("nÃ£o", "não")
-    .replaceAll("Ã¡", "á")
-    .replaceAll("Ã©", "é")
-    .replaceAll("Ã­", "í")
-    .replaceAll("Ã³", "ó")
-    .replaceAll("Ãº", "ú")
-    .replaceAll("Ã£", "ã")
-    .replaceAll("Ãµ", "õ")
-    .replaceAll("Ã§", "ç")
-    .replaceAll("Ãª", "ê")
-    .replaceAll("Ã´", "ô")
-    .replaceAll("Ã", "à")
-    .replaceAll("UsuÃ¡rio", "Usuário")
-    .replaceAll("possÃ­vel", "possível")
-    .replaceAll("sessÃ£o", "sessão")
-    .replaceAll("invÃ¡lidas", "inválidas")
-    .replaceAll("estÃ¡", "está");
 }
