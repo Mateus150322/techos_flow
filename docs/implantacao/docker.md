@@ -4,15 +4,15 @@
 
 Padronizar a instalação e execução local do projeto com containers, reduzindo diferenças de ambiente entre máquinas.
 
-## Estrutura criada
+## Estrutura usada
 
 Arquivos principais:
 
-- [compose.yaml](c:/Users/VAIO/Documents/projetos/techos-flow/compose.yaml)
-- [backend/Dockerfile](c:/Users/VAIO/Documents/projetos/techos-flow/backend/Dockerfile)
-- [backend/docker/start.sh](c:/Users/VAIO/Documents/projetos/techos-flow/backend/docker/start.sh)
-- [frontend/Dockerfile](c:/Users/VAIO/Documents/projetos/techos-flow/frontend/Dockerfile)
-- [frontend/docker/start.sh](c:/Users/VAIO/Documents/projetos/techos-flow/frontend/docker/start.sh)
+- [compose.yaml](../../compose.yaml)
+- [backend/Dockerfile](../../backend/Dockerfile)
+- [backend/docker/start.sh](../../backend/docker/start.sh)
+- [frontend/Dockerfile](../../frontend/Dockerfile)
+- [frontend/docker/start.sh](../../frontend/docker/start.sh)
 
 ## Serviços
 
@@ -61,10 +61,17 @@ docker compose exec frontend npx tsc -b
 docker compose exec frontend npm run test:a11y
 ```
 
+## Verificação do estado atual
+
+O `compose.yaml` do projeto continua coerente com esta documentação e hoje define:
+
+- `postgres` com volume persistente local;
+- `backend` em modo `local`, com `APP_DEBUG=true` e disco `local`;
+- `frontend` com Vite em modo de desenvolvimento e proxy interno para o backend.
+
 ## Observações importantes
 
 - o ambiente Docker atual foi preparado para desenvolvimento e validação local;
 - o fluxo atual com Herd continua possível, sem conflito com esta estrutura;
-- o `compose.yaml` usa `APP_ENV=local` e `APP_DEBUG=true`;
 - o frontend sobe via Vite dev server, não como build estático;
 - para produção, recomenda-se uma adaptação específica de build, domínio, HTTPS, storage persistente e segredos.

@@ -36,7 +36,9 @@ techos-flow/
   backend/
   frontend/
   docs/
-  scripts/
+  .gitlab-ci.yml
+  compose.yaml
+  README.md
 ```
 
 ## Como rodar localmente
@@ -62,7 +64,7 @@ docker compose exec backend php artisan test
 docker compose exec frontend npm run test:a11y
 ```
 
-Observação:
+Observações:
 
 - a estrutura Docker atual foi preparada para desenvolvimento e validação local;
 - para produção, recomenda-se configuração específica de build, domínio, HTTPS e storage persistente.
@@ -153,7 +155,7 @@ Checklist prático:
 
 Guia detalhado:
 
-- [validação em ambiente real](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/validacao-ambiente-real.md)
+- [validação em ambiente real](docs/implantacao/validacao-ambiente-real.md)
 
 ## Pipeline
 
@@ -171,16 +173,16 @@ Esse pipeline executa:
 
 A documentação completa do projeto está em:
 
-- [docs/](c:/Users/VAIO/Documents/projetos/techos-flow/docs)
+- [docs/](docs/)
 
 Pontos de entrada mais úteis:
 
-- [docs/README.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/README.md)
-- [docs/manuais/manual-tecnico-projeto.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/manuais/manual-tecnico-projeto.md)
-- [docs/testes/plano-de-testes.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/testes/plano-de-testes.md)
-- [docs/implantacao/documento-implantacao.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/documento-implantacao.md)
-- [docs/implantacao/validacao-ambiente-real.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/validacao-ambiente-real.md)
-- [docs/acessibilidade/checklist-acessibilidade.md](c:/Users/VAIO/Documents/projetos/techos-flow/docs/acessibilidade/checklist-acessibilidade.md)
+- [docs/README.md](docs/README.md)
+- [manual técnico do projeto](docs/manuais/manual-tecnico-projeto.md)
+- [plano de testes](docs/testes/plano-de-testes.md)
+- [documento de implantação](docs/implantacao/documento-implantacao.md)
+- [guia de Docker](docs/implantacao/docker.md)
+- [validação em ambiente real](docs/implantacao/validacao-ambiente-real.md)
 
 ## O que ainda precisa ser decidido
 
@@ -204,5 +206,5 @@ O projeto já conta com:
 - anexos privados com controle de acesso;
 - relatórios administrativos e PDF detalhado da OS;
 - módulo de horas extras e banco de folgas;
-- melhorias práticas de segurança, privacidade, acessibilidade e mobile;
+- melhorias práticas de segurança, privacidade e mobile;
 - documentação técnica organizada.
