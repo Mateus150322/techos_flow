@@ -31,7 +31,18 @@ class RecuperacaoSenhaTest extends TestCase
                 'Se existir uma conta ativa para este e-mail, enviaremos um link de redefinição em instantes.'
             );
 
-        Notification::assertSentTo($user, ResetPasswordLinkNotification::class);
+        Notification::assertSentTo(
+            $user,
+            ResetPasswordLinkNotification::class,
+            function (ResetPasswordLinkNotification $notification) use ($user): bool {
+                $mail = $notification->toMail($user);
+
+                return $mail->view === 'emails.reset-password'
+                    && $mail->subject === 'Redefinição de senha - TechOS Flow'
+                    && str_contains((string) ($mail->viewData['logoUrl'] ?? ''), 'techos-icon.png')
+                    && str_contains((string) ($mail->viewData['resetUrl'] ?? ''), '/redefinir-senha?');
+            }
+        );
     }
 
     public function test_solicitacao_para_email_inexistente_retorna_mensagem_generica(): void

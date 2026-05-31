@@ -23,17 +23,22 @@ class ResetPasswordLinkNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $frontendUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+        $appUrl = rtrim((string) config('app.url', $frontendUrl), '/');
         $email = urlencode((string) $notifiable->getEmailForPasswordReset());
         $token = urlencode($this->token);
         $expire = (int) config('auth.passwords.' . config('auth.defaults.passwords') . '.expire', 60);
         $resetUrl = "{$frontendUrl}/redefinir-senha?token={$token}&email={$email}";
+        $logoUrl = "{$appUrl}/techos-icon.png";
+        $recipientName = trim((string) ($notifiable->name ?? ''));
 
         return (new MailMessage)
             ->subject('Redefinição de senha - TechOS Flow')
-            ->greeting('Olá!')
-            ->line('Recebemos uma solicitação para redefinir a senha da sua conta no TechOS Flow.')
-            ->action('Redefinir senha', $resetUrl)
-            ->line("Este link expira em {$expire} minutos.")
-            ->line('Se você não solicitou a redefinição, pode ignorar este e-mail com segurança.');
+            ->view('emails.reset-password', [
+                'appName' => (string) config('app.name', 'TechOS Flow'),
+                'logoUrl' => $logoUrl,
+                'recipientName' => $recipientName !== '' ? $recipientName : 'Olá',
+                'resetUrl' => $resetUrl,
+                'expire' => $expire,
+            ]);
     }
 }
