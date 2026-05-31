@@ -2,6 +2,8 @@
 
 return [
 
+    'anexos_disk' => env('ANEXOS_DISK', env('FILESYSTEM_DISK', 'local')),
+
     /*
     |--------------------------------------------------------------------------
     | Default Filesystem Disk

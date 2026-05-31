@@ -21,13 +21,19 @@ class OrdemServicoController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'tipo_servico' => 'required|string|max:100',
-            'nome_cliente' => 'required|string|max:255',
-            'prioridade' => 'required|integer|in:1,2,3',
-            'descricao' => 'required|string',
-            'data_abertura' => 'nullable|date',
+        $user = $request->user();
+        $tipoServicoNormalizado = $this->normalizeTipoServico($request->input('tipo_servico'));
 
+        if (
+            $user->role === 'tecnico' &&
+            $tipoServicoNormalizado !== 'manutencao eta/ete'
+        ) {
+            return response()->json([
+                'message' => 'Técnico só pode abrir OS do tipo Manutenção ETA/ETE.',
+            ], 403);
+        }
+
+        $regrasEndereco = [
             'endereco.logradouro' => 'required|string|max:255',
             'endereco.numero' => 'required|string|max:50',
             'endereco.complemento' => 'nullable|string|max:255',
@@ -35,18 +41,22 @@ class OrdemServicoController extends Controller
             'endereco.cidade' => 'required|string|max:255',
             'endereco.estado' => 'required|string|size:2',
             'endereco.cep' => 'required|string|max:9',
-        ]);
+        ];
 
-        $user = $request->user();
-
-        if (
-            $user->role === 'tecnico' &&
-            $this->normalizeTipoServico($data['tipo_servico']) !== 'manutencao eta/ete'
-        ) {
-            return response()->json([
-                'message' => 'Técnico só pode abrir OS do tipo Manutenção ETA/ETE.',
-            ], 403);
+        if ($user->role === 'tecnico' && $tipoServicoNormalizado === 'manutencao eta/ete') {
+            $regrasEndereco['endereco.bairro'] = 'nullable|string|max:255';
+            $regrasEndereco['endereco.cidade'] = 'nullable|string|max:255';
+            $regrasEndereco['endereco.estado'] = 'nullable|string|max:2';
+            $regrasEndereco['endereco.cep'] = 'nullable|string|max:9';
         }
+
+        $data = $request->validate([
+            'tipo_servico' => 'required|string|max:100',
+            'nome_cliente' => 'required|string|max:255',
+            'prioridade' => 'required|integer|in:1,2,3',
+            'descricao' => 'required|string',
+            'data_abertura' => 'nullable|date',
+        ] + $regrasEndereco);
 
         $os = null;
 
@@ -55,12 +65,12 @@ class OrdemServicoController extends Controller
                 $os = DB::transaction(function () use ($data, $user) {
                     $endereco = Endereco::create([
                         'rua' => $data['endereco']['logradouro'],
-                        'numero' => $data['endereco']['numero'],
+                        'numero' => $data['endereco']['numero'] ?: 'SN',
                         'complemento' => $data['endereco']['complemento'] ?? null,
-                        'bairro' => $data['endereco']['bairro'],
-                        'cidade' => $data['endereco']['cidade'],
-                        'estado' => strtoupper($data['endereco']['estado']),
-                        'cep' => preg_replace('/\D/', '', $data['endereco']['cep']),
+                        'bairro' => trim((string) ($data['endereco']['bairro'] ?? '')),
+                        'cidade' => trim((string) ($data['endereco']['cidade'] ?? '')),
+                        'estado' => strtoupper(trim((string) ($data['endereco']['estado'] ?? ''))),
+                        'cep' => preg_replace('/\D/', '', (string) ($data['endereco']['cep'] ?? '')),
                     ]);
 
                     $ano = now()->year;

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AnexoController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\ColaboradorOperacionalController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\ExecucaoController;
 use App\Http\Controllers\Api\V1\FuncionarioController;
@@ -41,6 +42,9 @@ Route::prefix('v1')->group(function () {
                     Route::get('/usuarios/{id}', [UsuarioController::class, 'show']);
                     Route::post('/usuarios', [UsuarioController::class, 'store']);
                     Route::put('/usuarios/{id}', [UsuarioController::class, 'update']);
+                    Route::get('/colaboradores-operacionais', [ColaboradorOperacionalController::class, 'index']);
+                    Route::post('/colaboradores-operacionais', [ColaboradorOperacionalController::class, 'store']);
+                    Route::put('/colaboradores-operacionais/{id}', [ColaboradorOperacionalController::class, 'update']);
                 });
 
                 Route::middleware('role:tecnico')->group(function () {

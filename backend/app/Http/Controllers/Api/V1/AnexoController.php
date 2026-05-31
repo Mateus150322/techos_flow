@@ -6,15 +6,20 @@ use App\Http\Controllers\Api\V1\Concerns\EnsuresTecnicoResponsavel;
 use App\Http\Controllers\Controller;
 use App\Models\Anexo;
 use App\Models\OrdemServico;
+use App\Services\Storage\AnexoStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 
 class AnexoController extends Controller
 {
     use EnsuresTecnicoResponsavel;
+
+    public function __construct(
+        private readonly AnexoStorageService $anexoStorage
+    ) {
+    }
 
     public function store(Request $request, string $id)
     {
@@ -25,6 +30,10 @@ class AnexoController extends Controller
             'longitude' => 'nullable|numeric|between:-180,180',
             'precisao_metros' => 'nullable|numeric|min:0',
             'geolocalizacao_capturada_em' => 'nullable|date',
+            'rua_capturada' => 'nullable|string|max:255',
+            'bairro_capturado' => 'nullable|string|max:255',
+            'cidade_capturada' => 'nullable|string|max:255',
+            'estado_capturado' => 'nullable|string|max:120',
             'endereco_capturado' => 'nullable|string|max:1000',
         ]);
 
@@ -36,7 +45,7 @@ class AnexoController extends Controller
         }
 
         $arquivo = $request->file('arquivo');
-        $caminho = $arquivo->store('anexos', 'local');
+        $caminho = $this->anexoStorage->store($arquivo, 'anexos');
 
         $tipo = $request->input('tipo');
 
@@ -60,6 +69,10 @@ class AnexoController extends Controller
             'longitude' => $request->input('longitude'),
             'precisao_metros' => $request->input('precisao_metros'),
             'geolocalizacao_capturada_em' => $request->input('geolocalizacao_capturada_em'),
+            'rua_capturada' => $request->input('rua_capturada'),
+            'bairro_capturado' => $request->input('bairro_capturado'),
+            'cidade_capturada' => $request->input('cidade_capturada'),
+            'estado_capturado' => $request->input('estado_capturado'),
             'endereco_capturado' => $request->input('endereco_capturado'),
             'submetido_por_id' => Auth::id(),
             'criado_em' => now(),
@@ -108,7 +121,7 @@ class AnexoController extends Controller
             }
         }
 
-        $disk = $this->resolveStorageDisk($anexo->caminho);
+        $disk = $this->anexoStorage->resolveDisk($anexo->caminho);
 
         if (! $disk) {
             abort(404);
@@ -119,21 +132,18 @@ class AnexoController extends Controller
         ]);
 
         $fileName = basename((string) $anexo->caminho);
-        $mimeType = Storage::disk($disk)->mimeType($anexo->caminho) ?: 'application/octet-stream';
+        $mimeType = $this->anexoStorage->mimeType($anexo->caminho, $disk) ?: 'application/octet-stream';
         $disposition = str_starts_with($mimeType, 'image/') || $mimeType === 'application/pdf'
             ? ResponseHeaderBag::DISPOSITION_INLINE
             : ResponseHeaderBag::DISPOSITION_ATTACHMENT;
         $headers = new ResponseHeaderBag();
+        $contentDisposition = $headers->makeDisposition($disposition, $fileName);
 
-        return response()->file(
-            Storage::disk($disk)->path($anexo->caminho),
-            [
-                'Content-Type' => $mimeType,
-                'Content-Disposition' => $headers->makeDisposition($disposition, $fileName),
-                'Cache-Control' => 'private, no-store, max-age=0',
-                'Pragma' => 'no-cache',
-                'X-Content-Type-Options' => 'nosniff',
-            ]
+        return $this->anexoStorage->streamResponse(
+            (string) $anexo->caminho,
+            $mimeType,
+            $fileName,
+            $contentDisposition
         );
     }
 
@@ -147,25 +157,12 @@ class AnexoController extends Controller
             'longitude' => $anexo->longitude,
             'precisao_metros' => $anexo->precisao_metros,
             'geolocalizacao_capturada_em' => optional($anexo->geolocalizacao_capturada_em)->toISOString(),
+            'rua_capturada' => $anexo->rua_capturada,
+            'bairro_capturado' => $anexo->bairro_capturado,
+            'cidade_capturada' => $anexo->cidade_capturada,
+            'estado_capturado' => $anexo->estado_capturado,
             'endereco_capturado' => $anexo->endereco_capturado,
         ];
-    }
-
-    private function resolveStorageDisk(?string $path): ?string
-    {
-        if (! $path) {
-            return null;
-        }
-
-        if (Storage::disk('local')->exists($path)) {
-            return 'local';
-        }
-
-        if (Storage::disk('public')->exists($path)) {
-            return 'public';
-        }
-
-        return null;
     }
 
     private function logAnexoAccess(

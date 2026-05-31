@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\V1\Concerns\EnsuresTecnicoResponsavel;
 use App\Http\Controllers\Controller;
+use App\Models\ColaboradorOperacional;
 use App\Models\Execucao;
 use App\Models\OrdemServico;
 use App\Models\User;
@@ -74,7 +75,8 @@ class ExecucaoController extends Controller
             'data_fim' => 'nullable|date',
             'observacao' => 'nullable|string',
             'funcionarios' => 'nullable|array',
-            'funcionarios.*.funcionario_id' => 'required|uuid|distinct|exists:users,id',
+            'funcionarios.*.funcionario_id' => 'nullable|uuid',
+            'funcionarios.*.colaborador_operacional_id' => 'nullable|uuid',
             'funcionarios.*.data_inicio' => 'nullable|date',
             'funcionarios.*.data_fim' => 'nullable|date',
         ]);
@@ -168,21 +170,49 @@ class ExecucaoController extends Controller
             return [];
         }
 
-        $ids = $funcionarios
+        foreach ($funcionarios as $funcionario) {
+            $temUsuario = ! empty($funcionario['funcionario_id']);
+            $temColaborador = ! empty($funcionario['colaborador_operacional_id']);
+
+            if ($temUsuario === $temColaborador) {
+                throw ValidationException::withMessages([
+                    'funcionarios' => 'Informe um técnico/administrador ou um colaborador operacional em cada linha da equipe.',
+                ]);
+            }
+        }
+
+        $funcionarioIds = $funcionarios
             ->pluck('funcionario_id')
             ->filter(fn (mixed $id) => is_string($id) && $id !== '')
             ->values();
 
+        $colaboradorIds = $funcionarios
+            ->pluck('colaborador_operacional_id')
+            ->filter(fn (mixed $id) => is_string($id) && $id !== '')
+            ->values();
+
         $usuariosValidos = User::query()
-            ->whereIn('id', $ids)
+            ->whereIn('id', $funcionarioIds)
             ->whereIn('role', ['tecnico', 'administrador'])
             ->where('is_active', true)
             ->pluck('id')
             ->all();
 
-        if (count($usuariosValidos) !== $ids->unique()->count()) {
+        if (count($usuariosValidos) !== $funcionarioIds->unique()->count()) {
             throw ValidationException::withMessages([
                 'funcionarios' => 'Selecione apenas usuários ativos com perfil técnico ou administrador.',
+            ]);
+        }
+
+        $colaboradoresValidos = ColaboradorOperacional::query()
+            ->whereIn('id', $colaboradorIds)
+            ->where('is_active', true)
+            ->pluck('id')
+            ->all();
+
+        if (count($colaboradoresValidos) !== $colaboradorIds->unique()->count()) {
+            throw ValidationException::withMessages([
+                'funcionarios' => 'Selecione apenas colaboradores operacionais ativos.',
             ]);
         }
 
@@ -197,12 +227,17 @@ class ExecucaoController extends Controller
 
                 if ($fim->lessThan($inicio)) {
                     throw ValidationException::withMessages([
-                        'funcionarios' => 'O período informado para cada funcionário deve ter fim maior ou igual ao início.',
+                        'funcionarios' => 'O período informado para cada participante deve ter fim maior ou igual ao início.',
                     ]);
                 }
 
                 return [
-                    'funcionario_id' => (string) $funcionario['funcionario_id'],
+                    'funcionario_id' => ! empty($funcionario['funcionario_id'])
+                        ? (string) $funcionario['funcionario_id']
+                        : null,
+                    'colaborador_operacional_id' => ! empty($funcionario['colaborador_operacional_id'])
+                        ? (string) $funcionario['colaborador_operacional_id']
+                        : null,
                     'data_inicio' => ! empty($funcionario['data_inicio']) ? $inicio->toISOString() : null,
                     'data_fim' => ! empty($funcionario['data_fim']) ? $fim->toISOString() : null,
                 ];

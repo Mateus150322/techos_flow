@@ -91,6 +91,10 @@ class FluxoTecnicoTest extends TestCase
             'longitude' => -67.8243,
             'precisao_metros' => 8.5,
             'geolocalizacao_capturada_em' => now()->toISOString(),
+            'rua_capturada' => 'Avenida Ceara',
+            'bairro_capturado' => 'Centro',
+            'cidade_capturada' => 'Rio Branco',
+            'estado_capturado' => 'AC',
             'endereco_capturado' => 'Avenida Ceara, Centro, Rio Branco/AC',
         ]);
 
@@ -100,6 +104,10 @@ class FluxoTecnicoTest extends TestCase
             ->assertJsonPath('anexo.latitude', -9.97499)
             ->assertJsonPath('anexo.longitude', -67.8243)
             ->assertJsonMissingPath('anexo.caminho')
+            ->assertJsonPath('anexo.rua_capturada', 'Avenida Ceara')
+            ->assertJsonPath('anexo.bairro_capturado', 'Centro')
+            ->assertJsonPath('anexo.cidade_capturada', 'Rio Branco')
+            ->assertJsonPath('anexo.estado_capturado', 'AC')
             ->assertJsonPath('anexo.endereco_capturado', 'Avenida Ceara, Centro, Rio Branco/AC');
 
         $this->assertDatabaseHas('anexos', [
@@ -108,6 +116,10 @@ class FluxoTecnicoTest extends TestCase
             'tipo' => 'pdf',
             'latitude' => -9.97499,
             'longitude' => -67.8243,
+            'rua_capturada' => 'Avenida Ceara',
+            'bairro_capturado' => 'Centro',
+            'cidade_capturada' => 'Rio Branco',
+            'estado_capturado' => 'AC',
             'endereco_capturado' => 'Avenida Ceara, Centro, Rio Branco/AC',
         ]);
 
@@ -215,21 +227,18 @@ class FluxoTecnicoTest extends TestCase
         $this->assertStringStartsWith('%PDF-', (string) $response->getContent());
     }
 
-    public function test_tecnico_responsavel_pode_exportar_pdf_detalhado_da_propria_os(): void
+    public function test_tecnico_responsavel_nao_pode_exportar_pdf_detalhado_da_propria_os(): void
     {
         $tecnico = $this->criarUsuario('tecnico');
         $os = $this->criarOs($tecnico->id);
 
         Sanctum::actingAs($tecnico);
 
-        $response = $this->get("/api/v1/ordens-servico/{$os->id}/relatorio/pdf");
+        $response = $this->getJson("/api/v1/ordens-servico/{$os->id}/relatorio/pdf");
 
-        $response->assertOk();
-        $this->assertStringContainsString(
-            'application/pdf',
-            (string) $response->headers->get('content-type')
-        );
-        $this->assertStringStartsWith('%PDF-', (string) $response->getContent());
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Acesso negado ao relatório solicitado.');
     }
 
     public function test_tecnico_nao_pode_exportar_pdf_detalhado_de_os_de_outro_tecnico(): void
