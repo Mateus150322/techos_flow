@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo_pgsql zip gd opcache \
-    && (a2dismod mpm_event mpm_worker || true) \
+    && for mpm in event worker prefork; do a2dismod mpm_$mpm 2>/dev/null || true; done \
     && a2enmod mpm_prefork rewrite headers expires \
     && rm -rf /var/lib/apt/lists/*
 
