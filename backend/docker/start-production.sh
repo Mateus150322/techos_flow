@@ -2,8 +2,9 @@
 set -eu
 
 if [ -z "${APP_KEY:-}" ]; then
-  echo "APP_KEY nao configurada. Gere uma chave antes de subir o ambiente de producao."
-  exit 1
+  echo "APP_KEY not configured. Generating a new one..."
+  export APP_KEY="base64:$(openssl rand -base64 32)"
+  echo "Generated APP_KEY: ${APP_KEY}"
 fi
 
 mkdir -p storage/app storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
