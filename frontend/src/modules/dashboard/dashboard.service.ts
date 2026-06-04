@@ -82,10 +82,11 @@ export async function buscarDashboardAtendente(q?: string) {
   return data;
 }
 
-export async function buscarDashboardTecnico(q?: string) {
+export async function buscarDashboardTecnico(q?: string, status?: string) {
   const { data } = await api.get<TecnicoDashboardResponse>("/dashboard/tecnico", {
     params: {
       q: q?.trim() || undefined,
+      status: status && status !== "todos" ? status : undefined,
     },
   });
 

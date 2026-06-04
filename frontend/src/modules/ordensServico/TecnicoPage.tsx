@@ -24,6 +24,7 @@ import TecnicoOSDetailsModal from "./components/TecnicoOSDetailsModal";
 import { getTecnicoResponsavel, type OrdemServico } from "./ordensServico.service";
 
 type AbaPrincipal = "criar" | "consultar";
+type StatusFiltro = "todos" | "aberta" | "em_execucao" | "finalizada" | "nao_executada" | "cancelada";
 
 export default function TecnicoPage() {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ export default function TecnicoPage() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos");
   const buscaAplicada = useDebouncedValue(busca, 300);
   const [ordemSelecionadaId, setOrdemSelecionadaId] = useState<string | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
@@ -41,11 +43,11 @@ export default function TecnicoPage() {
   const currentUser = useCurrentUser("tecnico");
 
   const carregarOrdens = useCallback(
-    async (search = buscaAplicada) => {
+    async (search = buscaAplicada, status = statusFiltro) => {
       try {
         setLoading(true);
         setErro("");
-        const response = await buscarDashboardTecnico(search);
+        const response = await buscarDashboardTecnico(search, status);
         setDashboard(response);
       } catch (error) {
         setDashboard(null);
@@ -54,7 +56,7 @@ export default function TecnicoPage() {
         setLoading(false);
       }
     },
-    [buscaAplicada]
+    [buscaAplicada, statusFiltro]
   );
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function TecnicoPage() {
     }
 
     void carregarOrdens();
-  }, [abaPrincipal, buscaAplicada, carregarOrdens]);
+  }, [abaPrincipal, buscaAplicada, carregarOrdens, statusFiltro]);
 
   async function handleLogout() {
     await logoutSession();
@@ -102,6 +104,14 @@ export default function TecnicoPage() {
     return getTecnicoResponsavel(os)?.name || "Sem responsavel";
   }
 
+  function handleBuscaChange(value: string) {
+    setBusca(value);
+  }
+
+  function handleStatusFiltroChange(value: string) {
+    setStatusFiltro(value as StatusFiltro);
+  }
+
   const osDisponiveis = dashboard?.secoes.disponiveis ?? [];
   const minhasOS = dashboard?.secoes.minhas ?? [];
   const osEmExecucao = dashboard?.secoes.em_execucao ?? [];
@@ -125,7 +135,7 @@ export default function TecnicoPage() {
         icone: <Wrench className="h-5 w-5 text-amber-600" />,
       },
       {
-        titulo: "Concluidas",
+        titulo: "Encerradas",
         valor: dashboard?.resumo.concluidas ?? 0,
         icone: <CheckCircle2 className="h-5 w-5 text-emerald-600" />,
       },
@@ -138,26 +148,32 @@ export default function TecnicoPage() {
       titulo: "OS Disponiveis",
       descricao: "Ordens abertas e ainda sem responsavel tecnico.",
       ordens: osDisponiveis,
+      statusVisiveis: ["todos", "aberta"],
     },
     {
       titulo: "Minhas OS",
-      descricao: "Ordens ja atribuidas a voce, independentemente do status.",
+      descricao:
+        statusFiltro === "aberta"
+          ? "Ordens abertas ja atribuidas a voce."
+          : "Ordens ja atribuidas a voce, independentemente do status.",
       ordens: minhasOS,
+      statusVisiveis: ["todos", "aberta"],
     },
     {
       titulo: "Em execucao",
       descricao: "Ordens em andamento sob sua responsabilidade.",
       ordens: osEmExecucao,
+      statusVisiveis: ["todos", "em_execucao"],
     },
     {
-      titulo: "Finalizadas",
-      descricao: "Ordens encerradas como finalizadas ou nao executadas.",
+      titulo: "Encerradas",
+      descricao: "Ordens finalizadas, nao executadas ou canceladas.",
       ordens: osFinalizadas,
+      statusVisiveis: ["todos", "finalizada", "nao_executada", "cancelada"],
     },
-  ];
+  ].filter((secao) => secao.statusVisiveis.includes(statusFiltro));
 
-  const totalOrdens =
-    osDisponiveis.length + minhasOS.length + osEmExecucao.length + osFinalizadas.length;
+  const totalOrdens = dashboard?.resumo.total_filtrado ?? 0;
 
   const pageBg = "app-page";
   const headerBg = "app-header-shell";
@@ -167,8 +183,29 @@ export default function TecnicoPage() {
     "app-tab-inactive border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-soft)]";
   const buttonActive = "app-tab-active border border-[var(--border)]";
   const inputClass = "app-input px-4 py-3 pl-11";
+  const inputBg = "app-input bg-[var(--bg-card)] px-4 py-3 text-[var(--text-main)]";
   const buttonSecondary =
     "app-button-outline inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition";
+  const controlesExtras = (
+    <div className="w-full xl:w-56">
+      <label htmlFor="tecnico-status-filtro" className="sr-only">
+        Filtrar OS por status
+      </label>
+      <select
+        id="tecnico-status-filtro"
+        value={statusFiltro}
+        onChange={(event) => handleStatusFiltroChange(event.target.value)}
+        className={`w-full ${inputBg}`}
+      >
+        <option value="todos">Todos os status</option>
+        <option value="aberta">Aberta</option>
+        <option value="em_execucao">Em execucao</option>
+        <option value="finalizada">Finalizada</option>
+        <option value="nao_executada">Nao executada</option>
+        <option value="cancelada">Cancelada</option>
+      </select>
+    </div>
+  );
 
   return (
     <div className={pageBg}>
@@ -219,8 +256,9 @@ export default function TecnicoPage() {
           <FormularioETAETETecnico
             mobileNavOffset
             onCriada={() => {
+              setStatusFiltro("todos");
               handleAbaPrincipalChange("consultar");
-              void carregarOrdens("");
+              void carregarOrdens("", "todos");
             }}
           />
         )}
@@ -232,17 +270,19 @@ export default function TecnicoPage() {
             metricas={metricas}
             secoes={secoes}
             busca={busca}
-            onBuscaChange={setBusca}
+            onBuscaChange={handleBuscaChange}
+            placeholderBusca="Buscar por numero, cliente, tipo, status ou responsavel..."
             loading={loading}
             erro={erro}
             inputClass={inputClass}
             onVer={setOrdemSelecionadaId}
             formatarData={formatarData}
             nomeResponsavel={nomeResponsavel}
+            controlesExtras={controlesExtras}
             rodape={
               !loading ? (
                 <div className="app-muted mt-4 text-sm">
-                  Exibindo ate {totalOrdens} ordens no painel filtrado.
+                  Exibindo ate {totalOrdens} ordens no painel filtrado por busca e status.
                 </div>
               ) : null
             }

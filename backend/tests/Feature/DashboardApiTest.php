@@ -57,6 +57,66 @@ class DashboardApiTest extends TestCase
             ->assertJsonCount(1, 'secoes.em_execucao');
     }
 
+    public function test_tecnico_pode_filtrar_dashboard_tecnico_por_status(): void
+    {
+        $tecnico = $this->criarUsuario('tecnico');
+        $outroTecnico = $this->criarUsuario('tecnico');
+
+        $this->criarOs(null, [
+            'numero' => '2026-000020',
+            'status' => 'aberta',
+        ]);
+        $this->criarOs($tecnico->id, [
+            'numero' => '2026-000021',
+            'status' => 'aberta',
+        ]);
+        $this->criarOs($tecnico->id, [
+            'numero' => '2026-000022',
+            'status' => 'em_execucao',
+        ]);
+        $this->criarOs($tecnico->id, [
+            'numero' => '2026-000023',
+            'status' => 'finalizada',
+        ]);
+        $this->criarOs($outroTecnico->id, [
+            'numero' => '2026-000024',
+            'status' => 'em_execucao',
+        ]);
+
+        Sanctum::actingAs($tecnico);
+
+        $emExecucaoResponse = $this->getJson('/api/v1/dashboard/tecnico?status=em_execucao');
+
+        $emExecucaoResponse
+            ->assertOk()
+            ->assertJsonPath('resumo.disponiveis', 0)
+            ->assertJsonPath('resumo.minhas', 1)
+            ->assertJsonPath('resumo.em_execucao', 1)
+            ->assertJsonPath('resumo.concluidas', 0)
+            ->assertJsonPath('resumo.total_filtrado', 1)
+            ->assertJsonCount(0, 'secoes.disponiveis')
+            ->assertJsonCount(1, 'secoes.minhas')
+            ->assertJsonCount(1, 'secoes.em_execucao')
+            ->assertJsonCount(0, 'secoes.finalizadas');
+
+        $finalizadasResponse = $this->getJson('/api/v1/dashboard/tecnico?status=finalizada');
+
+        $finalizadasResponse
+            ->assertOk()
+            ->assertJsonPath('resumo.disponiveis', 0)
+            ->assertJsonPath('resumo.minhas', 1)
+            ->assertJsonPath('resumo.em_execucao', 0)
+            ->assertJsonPath('resumo.concluidas', 1)
+            ->assertJsonPath('resumo.total_filtrado', 1)
+            ->assertJsonCount(0, 'secoes.disponiveis')
+            ->assertJsonCount(1, 'secoes.minhas')
+            ->assertJsonCount(0, 'secoes.em_execucao')
+            ->assertJsonCount(1, 'secoes.finalizadas');
+
+        $this->getJson('/api/v1/dashboard/tecnico?status=invalido')
+            ->assertUnprocessable();
+    }
+
     public function test_atendente_pode_consultar_dashboard_atendente(): void
     {
         $atendente = $this->criarUsuario('atendente');

@@ -37,6 +37,7 @@ class DashboardController extends Controller
     {
         $data = $request->validate([
             'q' => 'nullable|string|max:255',
+            'status' => 'nullable|in:aberta,em_execucao,finalizada,nao_executada,cancelada',
             'per_section' => 'nullable|integer|min:1|max:25',
         ]);
 
@@ -44,6 +45,7 @@ class DashboardController extends Controller
             $this->dashboardService->buildTecnicoDashboard(
                 $request->user(),
                 $data['q'] ?? null,
+                $data['status'] ?? null,
                 $data['per_section'] ?? 12
             )
         );

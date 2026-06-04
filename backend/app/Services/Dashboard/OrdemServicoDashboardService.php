@@ -6,6 +6,7 @@ use App\Models\OrdemServico;
 use App\Models\User;
 use App\Support\Concerns\UsesCaseInsensitiveLike;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 
 class OrdemServicoDashboardService
 {
@@ -110,30 +111,43 @@ class OrdemServicoDashboardService
         ];
     }
 
-    public function buildTecnicoDashboard(User $tecnico, ?string $search = null, int $perSection = 12): array
+    public function buildTecnicoDashboard(
+        User $tecnico,
+        ?string $search = null,
+        ?string $status = null,
+        int $perSection = 12
+    ): array
     {
-        $baseQuery = $this->applySearch($this->baseListQuery(), $search);
-        $metricsQuery = $this->applySearch($this->baseMetricsQuery(), $search);
-        $statusCounts = $this->buildStatusCounts((clone $metricsQuery)->where('tecnico_responsavel_id', $tecnico->id));
-        $totalFiltrado = $this->buildStatusCounts($metricsQuery)['total'];
+        $baseQuery = $this->applyStatusFilter(
+            $this->applySearch($this->baseListQuery(), $search),
+            $status
+        );
+        $metricsQuery = $this->applyStatusFilter(
+            $this->applySearch($this->baseMetricsQuery(), $search),
+            $status
+        );
+
+        $disponiveisMetricsQuery = (clone $metricsQuery)
+            ->where('status', 'aberta')
+            ->whereNull('tecnico_responsavel_id');
+        $minhasMetricsQuery = (clone $metricsQuery)->where('tecnico_responsavel_id', $tecnico->id);
+        $statusCounts = $this->buildStatusCounts($minhasMetricsQuery);
+        $disponiveisCount = (clone $disponiveisMetricsQuery)->count();
 
         $disponiveisQuery = (clone $baseQuery)
             ->where('status', 'aberta')
             ->whereNull('tecnico_responsavel_id');
         $minhasQuery = (clone $baseQuery)->where('tecnico_responsavel_id', $tecnico->id);
         $emExecucaoQuery = (clone $minhasQuery)->where('status', 'em_execucao');
-        $finalizadasQuery = (clone $minhasQuery)->whereIn('status', ['finalizada', 'nao_executada']);
+        $finalizadasQuery = (clone $minhasQuery)->whereIn('status', ['finalizada', 'nao_executada', 'cancelada']);
 
         return [
             'resumo' => [
-                'disponiveis' => (clone $metricsQuery)
-                    ->where('status', 'aberta')
-                    ->whereNull('tecnico_responsavel_id')
-                    ->count(),
+                'disponiveis' => $disponiveisCount,
                 'minhas' => $statusCounts['total'],
                 'em_execucao' => $statusCounts['em_execucao'],
-                'concluidas' => $statusCounts['finalizada'] + $statusCounts['nao_executada'],
-                'total_filtrado' => $totalFiltrado,
+                'concluidas' => $statusCounts['finalizada'] + $statusCounts['nao_executada'] + $statusCounts['cancelada'],
+                'total_filtrado' => $disponiveisCount + $statusCounts['total'],
             ],
             'secoes' => [
                 'disponiveis' => $disponiveisQuery->latest('data_abertura')->limit($perSection)->get()->values()->all(),
@@ -263,6 +277,8 @@ class OrdemServicoDashboardService
         $pattern = $this->containsPattern($term);
 
         return $query->where(function (Builder $where) use ($likeOperator, $pattern) {
+            $matchingStatuses = $this->matchingStatusesForSearch($pattern);
+
             $where->where('numero', $likeOperator, $pattern)
                 ->orWhere('tipo', $likeOperator, $pattern)
                 ->orWhere('descricao', $likeOperator, $pattern)
@@ -272,7 +288,49 @@ class OrdemServicoDashboardService
 
                     $tecnicoQuery->where('name', $tecnicoLikeOperator, $pattern);
                 });
+
+            if (! empty($matchingStatuses)) {
+                $where->orWhereIn('status', $matchingStatuses);
+            }
         });
+    }
+
+    private function applyStatusFilter(Builder $query, ?string $status): Builder
+    {
+        if (! $status) {
+            return $query;
+        }
+
+        return $query->where('status', $status);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function matchingStatusesForSearch(string $pattern): array
+    {
+        $term = trim($pattern, '%');
+        $term = (string) Str::of($term)->ascii()->lower()->squish();
+
+        if ($term === '') {
+            return [];
+        }
+
+        $labels = [
+            'aberta' => ['aberta', 'abertas', 'disponivel', 'disponiveis'],
+            'em_execucao' => ['em execucao', 'execucao', 'em andamento', 'andamento'],
+            'finalizada' => ['finalizada', 'finalizadas', 'concluida', 'concluidas'],
+            'nao_executada' => ['nao executada', 'nao executadas'],
+            'cancelada' => ['cancelada', 'canceladas'],
+        ];
+
+        return collect($labels)
+            ->filter(fn (array $aliases) => collect($aliases)->contains(
+                fn (string $alias) => str_contains($alias, $term) || str_contains($term, $alias)
+            ))
+            ->keys()
+            ->values()
+            ->all();
     }
 
     private function getStatusCount(array $statusResumo, string $status): int
