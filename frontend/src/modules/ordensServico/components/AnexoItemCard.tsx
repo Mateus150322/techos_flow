@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, MapPin } from "lucide-react";
 
 import { obterArquivoAnexo, type Anexo } from "../ordensServico.service";
 import { formatarCoordenada, formatarDataHora } from "../ordemServicoDetalhe.utils";
 import { getGoogleMapsUrl } from "@/shared/utils/geolocalizacao";
 import { getApiErrorMessage } from "@/shared/utils/apiError";
+import { LeafletGeoPreview } from "@/shared/components/LeafletGeoPreview";
 
 type Props = {
   anexo: Anexo;
@@ -68,8 +69,10 @@ export function AnexoItemCard({
 }: Props) {
   const [baixandoArquivo, setBaixandoArquivo] = useState(false);
   const [carregandoPreview, setCarregandoPreview] = useState(false);
+  const [previewVisivel, setPreviewVisivel] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [erroArquivo, setErroArquivo] = useState("");
+  const previewButtonRef = useRef<HTMLButtonElement | null>(null);
 
   void isDark;
 
@@ -80,6 +83,38 @@ export function AnexoItemCard({
 
   useEffect(() => {
     if (!ehFoto || !anexo.id) {
+      setPreviewVisivel(false);
+      return;
+    }
+
+    const target = previewButtonRef.current;
+
+    if (!target || typeof IntersectionObserver === "undefined") {
+      setPreviewVisivel(true);
+      return;
+    }
+
+    setPreviewVisivel(false);
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setPreviewVisivel(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "240px 0px" }
+    );
+
+    observer.observe(target);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [anexo.id, ehFoto]);
+
+  useEffect(() => {
+    if (!ehFoto || !anexo.id || !previewVisivel) {
       setPreviewUrl("");
       setCarregandoPreview(false);
       return;
@@ -118,7 +153,7 @@ export function AnexoItemCard({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [anexo.id, ehFoto]);
+  }, [anexo.id, ehFoto, previewVisivel]);
 
   async function handleAbrirArquivo() {
     const ehVisualizavel = ehFoto || anexo.tipo === "pdf";
@@ -183,6 +218,7 @@ export function AnexoItemCard({
 
       {ehFoto ? (
         <button
+          ref={previewButtonRef}
           type="button"
           onClick={() => void handleAbrirArquivo()}
           disabled={baixandoArquivo}
@@ -255,6 +291,11 @@ export function AnexoItemCard({
                   }
                 />
               </div>
+              <LeafletGeoPreview
+                latitude={anexo.latitude}
+                longitude={anexo.longitude}
+                accuracyMeters={anexo.precisao_metros}
+              />
               <div className={classes.innerTag}>
                 <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">
                   Endereço capturado pela geolocalização

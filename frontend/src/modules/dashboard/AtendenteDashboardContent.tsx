@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -41,6 +41,8 @@ export function AtendenteDashboardContent({
   const [dashboard, setDashboard] = useState<AtendenteDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const mainRef = useRef<HTMLElement | null>(null);
+  const deveFocarAbaRef = useRef(false);
 
   useEffect(() => {
     if (abaPrincipal !== "consultar") {
@@ -68,6 +70,29 @@ export function AtendenteDashboardContent({
     await logoutSession();
     navigate("/login");
   }
+
+  function handleAbaPrincipalChange(value: AbaPrincipal) {
+    if (value === abaPrincipal) {
+      return;
+    }
+
+    deveFocarAbaRef.current = true;
+    setAbaPrincipal(value);
+  }
+
+  useEffect(() => {
+    if (!deveFocarAbaRef.current) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      mainRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      mainRef.current?.focus({ preventScroll: true });
+      deveFocarAbaRef.current = false;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [abaPrincipal]);
 
   function formatarData(data?: string | null) {
     if (!data) return "-";
@@ -131,7 +156,7 @@ export function AtendenteDashboardContent({
 
   const pageBg = "app-page";
   const headerBg = "app-header-shell";
-  const mutedText = "app-muted";
+  const mutedText = "text-blue-100 dark:text-slate-300";
   const titleText = "text-white dark:text-slate-50";
   const buttonInactive =
     "app-tab-inactive border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-soft)]";
@@ -153,15 +178,18 @@ export function AtendenteDashboardContent({
         subtitle="Painel operacional do atendente"
       />
 
+      <MobileOperationalNav value={abaPrincipal} onChange={handleAbaPrincipalChange} />
+
       <main
+        ref={mainRef}
         id="conteudo-principal"
         tabIndex={-1}
-        className="app-mobile-page-offset mx-auto max-w-7xl px-3 pt-4 sm:px-6 sm:py-6"
+        className="mx-auto max-w-7xl px-3 pt-4 sm:px-6 sm:py-6"
       >
         <div className="mb-6 hidden gap-3 sm:flex sm:flex-wrap">
           <button
             type="button"
-            onClick={() => setAbaPrincipal("criar")}
+            onClick={() => handleAbaPrincipalChange("criar")}
             className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition sm:w-auto ${
               abaPrincipal === "criar" ? buttonActive : buttonInactive
             }`}
@@ -172,7 +200,7 @@ export function AtendenteDashboardContent({
 
           <button
             type="button"
-            onClick={() => setAbaPrincipal("consultar")}
+            onClick={() => handleAbaPrincipalChange("consultar")}
             className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition sm:w-auto ${
               abaPrincipal === "consultar" ? buttonActive : buttonInactive
             }`}
@@ -216,7 +244,6 @@ export function AtendenteDashboardContent({
         )}
       </main>
 
-      <MobileOperationalNav value={abaPrincipal} onChange={setAbaPrincipal} />
     </div>
   );
 }

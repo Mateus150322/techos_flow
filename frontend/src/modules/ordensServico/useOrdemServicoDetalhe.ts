@@ -37,6 +37,11 @@ type FeedbackGeolocalizacao = {
   mensagem: string;
 };
 
+type ActionFeedback = {
+  tipo: "sucesso" | "erro";
+  mensagem: string;
+};
+
 export function useOrdemServicoDetalhe({
   ordemId,
   enabled = true,
@@ -46,6 +51,7 @@ export function useOrdemServicoDetalhe({
 
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
+  const [actionFeedback, setActionFeedback] = useState<ActionFeedback | null>(null);
   const [os, setOs] = useState<OrdemServicoDetalhe | null>(null);
   const [processandoAcao, setProcessandoAcao] = useState(false);
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File[]>([]);
@@ -89,6 +95,10 @@ export function useOrdemServicoDetalhe({
 
     void carregarOrdem();
   }, [carregarOrdem, enabled, ordemId]);
+
+  useEffect(() => {
+    setActionFeedback(null);
+  }, [ordemId]);
 
   const criadaPor = useMemo(() => getCriadaPor(os), [os]);
   const tecnicoResponsavel = useMemo(() => getTecnicoResponsavel(os), [os]);
@@ -146,15 +156,23 @@ export function useOrdemServicoDetalhe({
     osEhMinha &&
     (os?.status === "em_execucao" || os?.status === "finalizada" || os?.status === "nao_executada");
 
-  async function executarAcao(fn: () => Promise<void>, fallback: string) {
+  async function executarAcao(
+    fn: () => Promise<void>,
+    fallback: string,
+    sucesso: string
+  ) {
     try {
       setProcessandoAcao(true);
       setError("");
+      setActionFeedback(null);
       await fn();
       await carregarOrdem();
+      setActionFeedback({ tipo: "sucesso", mensagem: sucesso });
       return true;
     } catch (actionError) {
-      setError(getApiErrorMessage(actionError, fallback));
+      const mensagem = getApiErrorMessage(actionError, fallback);
+      setError(mensagem);
+      setActionFeedback({ tipo: "erro", mensagem });
       return false;
     } finally {
       setProcessandoAcao(false);
@@ -166,7 +184,11 @@ export function useOrdemServicoDetalhe({
       return false;
     }
 
-    return executarAcao(() => aceitarOrdem(os.id), "Não foi possível aceitar a OS.");
+    return executarAcao(
+      () => aceitarOrdem(os.id),
+      "Não foi possível aceitar a OS.",
+      "Ordem de serviço aceita com sucesso."
+    );
   }
 
   async function iniciar(payload?: IniciarExecucaoPayload) {
@@ -176,7 +198,8 @@ export function useOrdemServicoDetalhe({
 
     return executarAcao(
       () => iniciarExecucao(os.id, payload ?? {}),
-      "Não foi possível iniciar a execução."
+      "Não foi possível iniciar a execução.",
+      "Execução iniciada com sucesso."
     );
   }
 
@@ -187,7 +210,8 @@ export function useOrdemServicoDetalhe({
 
     return executarAcao(
       () => finalizarExecucao(os.id, payload),
-      "Não foi possível finalizar a execução."
+      "Não foi possível finalizar a execução.",
+      "Execução finalizada com sucesso."
     );
   }
 
@@ -198,7 +222,8 @@ export function useOrdemServicoDetalhe({
 
     return executarAcao(
       () => marcarNaoExecutada(os.id, payload),
-      "Não foi possível marcar a OS como não executada."
+      "Não foi possível marcar a OS como não executada.",
+      "Ordem de serviço marcada como não executada."
     );
   }
 
@@ -403,6 +428,8 @@ export function useOrdemServicoDetalhe({
     loading,
     error,
     setError,
+    actionFeedback,
+    setActionFeedback,
     os,
     criadaPor,
     tecnicoResponsavel,

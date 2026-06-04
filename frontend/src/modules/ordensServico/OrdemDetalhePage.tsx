@@ -1,4 +1,5 @@
 ﻿import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -34,12 +35,16 @@ export default function OrdemDetalhePage() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const avisoAcaoRef = useRef<HTMLDivElement | null>(null);
 
   const {
     currentUser,
     loading,
     error,
     setError,
+    actionFeedback,
+    setActionFeedback,
     os,
     criadaPor,
     tecnicoResponsavel,
@@ -121,6 +126,28 @@ export default function OrdemDetalhePage() {
     () => obterUltimaGeolocalizacaoEvidencia(os?.anexos),
     [os?.anexos]
   );
+  const osId = os?.id;
+  const avisoAcaoTipo = actionFeedback?.tipo ?? (error ? "erro" : null);
+  const avisoAcaoMensagem = actionFeedback?.mensagem ?? error;
+
+  useEffect(() => {
+    if (!loading && osId) {
+      titleRef.current?.focus({ preventScroll: true });
+    }
+  }, [loading, osId]);
+
+  useEffect(() => {
+    if (!avisoAcaoMensagem) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      avisoAcaoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      avisoAcaoRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [avisoAcaoMensagem, avisoAcaoTipo]);
 
   if (loading) {
     return (
@@ -187,7 +214,13 @@ export default function OrdemDetalhePage() {
                 <PrioridadeBadge prioridade={os.prioridade} />
               </div>
 
-              <h1 className={`mt-3 text-2xl font-bold sm:text-3xl ${titleText}`}>{os.numero}</h1>
+              <h1
+                ref={titleRef}
+                tabIndex={-1}
+                className={`mt-3 text-2xl font-bold outline-none sm:text-3xl ${titleText}`}
+              >
+                {os.numero}
+              </h1>
               <p className={`mt-2 text-sm ${mutedText}`}>
                 {os.tipo}
                 {os.nome_cliente ? ` - ${os.nome_cliente}` : ""}
@@ -217,9 +250,17 @@ export default function OrdemDetalhePage() {
             </div>
           </div>
 
-          {error && (
-            <div className="app-alert-danger mb-4 rounded-xl px-4 py-3 text-sm">
-              {error}
+          {avisoAcaoMensagem && avisoAcaoTipo && (
+            <div
+              ref={avisoAcaoRef}
+              tabIndex={-1}
+              className={`mb-4 rounded-xl px-4 py-3 text-sm outline-none ${
+                avisoAcaoTipo === "sucesso" ? "app-alert-success" : "app-alert-danger"
+              }`}
+              role={avisoAcaoTipo === "sucesso" ? "status" : "alert"}
+              aria-live={avisoAcaoTipo === "sucesso" ? "polite" : "assertive"}
+            >
+              {avisoAcaoMensagem}
             </div>
           )}
 
@@ -301,7 +342,10 @@ export default function OrdemDetalhePage() {
                     podeFinalizarExecucao={podeFinalizarExecucao}
                     podeMarcarNaoExecutada={podeMarcarNaoExecutada}
                     execucaoAbertaId={execucaoParaFinalizacao?.id}
-                    onError={setError}
+                    onError={(mensagem) => {
+                      setError(mensagem);
+                      setActionFeedback({ tipo: "erro", mensagem });
+                    }}
                     onIniciarExecucao={(observacao) =>
                       iniciar({
                         observacao,

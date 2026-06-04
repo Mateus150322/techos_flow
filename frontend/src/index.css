@@ -186,16 +186,6 @@ select:focus-visible,
   display: none;
 }
 
-.app-mobile-page-offset {
-  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
-}
-
-@media (min-width: 640px) {
-  .app-mobile-page-offset {
-    padding-bottom: 0;
-  }
-}
-
 .app-tab-active {
   background: var(--bg-card);
   color: var(--primary-dark);

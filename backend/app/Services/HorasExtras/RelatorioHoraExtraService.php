@@ -24,7 +24,23 @@ class RelatorioHoraExtraService
         $participanteId = $filters['funcionario_id'] ?? $filters['participante_id'] ?? null;
 
         $query = ExecucaoFuncionario::query()
-            ->with(['funcionario', 'colaboradorOperacional', 'execucao.ordemServico.endereco'])
+            ->select([
+                'id',
+                'execucao_id',
+                'funcionario_id',
+                'colaborador_operacional_id',
+                'data_inicio',
+                'data_fim',
+                'minutos_extras_50',
+                'minutos_extras_100',
+            ])
+            ->with([
+                'funcionario:id,name,role,valor_hora',
+                'colaboradorOperacional:id,name,funcao,valor_hora',
+                'execucao:id,os_id',
+                'execucao.ordemServico:id,endereco_id',
+                'execucao.ordemServico.endereco:id,estado,cidade',
+            ])
             ->where(function (Builder $builder) {
                 $builder
                     ->whereNotNull('funcionario_id')

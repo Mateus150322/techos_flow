@@ -1,4 +1,5 @@
 ﻿import { Fragment, useEffect, useId, useState } from "react";
+import { useRef } from "react";
 import { Navigate } from "react-router-dom";
 import {
   Activity,
@@ -43,6 +44,8 @@ export default function RelatoriosPage() {
   const currentUser = useCurrentUser();
   const filtrosHintId = useId();
   const tabelaCaptionId = useId();
+  const resultadoRelatorioRef = useRef<HTMLElement | null>(null);
+  const deveFocarResultadoRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -100,9 +103,28 @@ export default function RelatoriosPage() {
   const rowHover = isDark ? "hover:bg-slate-950/80" : "hover:bg-slate-50";
 
   function aplicarFiltros() {
+    deveFocarResultadoRef.current = true;
     setFiltrosAplicados({ ...filtros });
     setPaginaAtual(1);
   }
+
+  useEffect(() => {
+    if (loading || !dadosRelatorio || !deveFocarResultadoRef.current) {
+      return;
+    }
+
+    deveFocarResultadoRef.current = false;
+
+    const frame = window.requestAnimationFrame(() => {
+      resultadoRelatorioRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      resultadoRelatorioRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [dadosRelatorio, loading]);
 
   function getLabelExportacao(formato: RelatorioExportFormat, labelPadrao: string) {
     return exportandoFormato === formato ? `Exportando ${formato.toUpperCase()}...` : labelPadrao;
@@ -482,7 +504,12 @@ export default function RelatoriosPage() {
         />
       )}
 
-      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading}>
+      <section
+        ref={resultadoRelatorioRef}
+        tabIndex={-1}
+        className={`mb-6 scroll-mt-4 rounded-3xl border p-6 shadow-sm outline-none ${cardBg}`}
+        aria-busy={loading}
+      >
         <div className="mb-5">
           <h3 className={`text-2xl font-semibold ${titleText}`}>{reportDefinition.title}</h3>
           <p className={`mt-1 text-sm ${mutedText}`}>

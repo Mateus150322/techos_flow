@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import PrivateRoute from "@/shared/auth/PrivateRoute";
 
@@ -29,9 +29,20 @@ function RouteLoadingFallback() {
   );
 }
 
+function ScrollToTopOnRouteChange() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [pathname]);
+
+  return null;
+}
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
+      <ScrollToTopOnRouteChange />
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

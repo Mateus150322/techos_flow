@@ -122,9 +122,10 @@ class OrdemServicoController extends Controller
         $include = array_values(array_intersect($include, $allowedIncludes));
 
         $query = OrdemServico::query();
+        $includeLoaders = $this->buildDetailIncludes($include);
 
-        if (! empty($include)) {
-            $query->with($include);
+        if (! empty($includeLoaders)) {
+            $query->with($includeLoaders);
         }
 
         $this->applyListFilters($query, $data);
@@ -145,14 +146,27 @@ class OrdemServicoController extends Controller
         $this->applyListFilters($query, $data);
         $this->applyVisibilityScope($query, $request->user());
 
+        $statusResumo = $query
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN status = 'aberta' THEN 1 ELSE 0 END) as abertas")
+            ->selectRaw("SUM(CASE WHEN status = 'em_execucao' THEN 1 ELSE 0 END) as em_execucao")
+            ->selectRaw("SUM(CASE WHEN status = 'finalizada' THEN 1 ELSE 0 END) as finalizadas")
+            ->selectRaw("SUM(CASE WHEN status = 'nao_executada' THEN 1 ELSE 0 END) as nao_executadas")
+            ->selectRaw("SUM(CASE WHEN status = 'cancelada' THEN 1 ELSE 0 END) as canceladas")
+            ->first();
+
+        $finalizadas = (int) ($statusResumo->finalizadas ?? 0);
+        $naoExecutadas = (int) ($statusResumo->nao_executadas ?? 0);
+        $canceladas = (int) ($statusResumo->canceladas ?? 0);
+
         return response()->json([
-            'total' => (clone $query)->count(),
-            'abertas' => (clone $query)->where('status', 'aberta')->count(),
-            'em_execucao' => (clone $query)->where('status', 'em_execucao')->count(),
-            'finalizadas' => (clone $query)->where('status', 'finalizada')->count(),
-            'nao_executadas' => (clone $query)->where('status', 'nao_executada')->count(),
-            'canceladas' => (clone $query)->where('status', 'cancelada')->count(),
-            'encerradas' => (clone $query)->whereIn('status', ['finalizada', 'nao_executada', 'cancelada'])->count(),
+            'total' => (int) ($statusResumo->total ?? 0),
+            'abertas' => (int) ($statusResumo->abertas ?? 0),
+            'em_execucao' => (int) ($statusResumo->em_execucao ?? 0),
+            'finalizadas' => $finalizadas,
+            'nao_executadas' => $naoExecutadas,
+            'canceladas' => $canceladas,
+            'encerradas' => $finalizadas + $naoExecutadas + $canceladas,
         ]);
     }
 
@@ -294,6 +308,90 @@ class OrdemServicoController extends Controller
             : 1;
 
         return sprintf('%d-%06d', $year, $sequence);
+    }
+
+    private function buildDetailIncludes(array $include): array
+    {
+        $loaders = [];
+
+        if (in_array('endereco', $include, true)) {
+            $loaders['endereco'] = fn ($query) => $query->select([
+                'id',
+                'rua',
+                'numero',
+                'complemento',
+                'bairro',
+                'cidade',
+                'estado',
+                'cep',
+                'latitude',
+                'longitude',
+            ]);
+        }
+
+        if (in_array('criadaPor', $include, true)) {
+            $loaders['criadaPor'] = fn ($query) => $query->select([
+                'id',
+                'name',
+                'email',
+                'role',
+            ]);
+        }
+
+        if (in_array('tecnicoResponsavel', $include, true)) {
+            $loaders['tecnicoResponsavel'] = fn ($query) => $query->select([
+                'id',
+                'name',
+                'email',
+                'role',
+            ]);
+        }
+
+        if (
+            in_array('execucoes', $include, true) ||
+            in_array('execucoes.tecnico', $include, true)
+        ) {
+            $loaders['execucoes'] = fn ($query) => $query->select([
+                'id',
+                'os_id',
+                'tecnico_id',
+                'data_inicio',
+                'data_fim',
+                'observacao',
+            ]);
+        }
+
+        if (in_array('execucoes.tecnico', $include, true)) {
+            $loaders['execucoes.tecnico'] = fn ($query) => $query->select([
+                'id',
+                'name',
+                'email',
+                'role',
+            ]);
+        }
+
+        if (in_array('anexos', $include, true)) {
+            $loaders['anexos'] = fn ($query) => $query
+                ->select([
+                    'id',
+                    'os_id',
+                    'caminho',
+                    'tipo',
+                    'latitude',
+                    'longitude',
+                    'precisao_metros',
+                    'geolocalizacao_capturada_em',
+                    'rua_capturada',
+                    'bairro_capturado',
+                    'cidade_capturada',
+                    'estado_capturado',
+                    'endereco_capturado',
+                    'criado_em',
+                ])
+                ->orderByDesc('criado_em');
+        }
+
+        return $loaders;
     }
 
     private function isDuplicateOrderNumberException(QueryException $exception): bool

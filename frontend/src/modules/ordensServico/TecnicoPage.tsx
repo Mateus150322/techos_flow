@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -35,6 +35,8 @@ export default function TecnicoPage() {
   const [busca, setBusca] = useState("");
   const buscaAplicada = useDebouncedValue(busca, 300);
   const [ordemSelecionadaId, setOrdemSelecionadaId] = useState<string | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const deveFocarAbaRef = useRef(false);
 
   const currentUser = useCurrentUser("tecnico");
 
@@ -67,6 +69,29 @@ export default function TecnicoPage() {
     await logoutSession();
     navigate("/login");
   }
+
+  function handleAbaPrincipalChange(value: AbaPrincipal) {
+    if (value === abaPrincipal) {
+      return;
+    }
+
+    deveFocarAbaRef.current = true;
+    setAbaPrincipal(value);
+  }
+
+  useEffect(() => {
+    if (!deveFocarAbaRef.current) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      mainRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      mainRef.current?.focus({ preventScroll: true });
+      deveFocarAbaRef.current = false;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [abaPrincipal]);
 
   function formatarData(data?: string | null) {
     if (!data) return "-";
@@ -158,15 +183,18 @@ export default function TecnicoPage() {
         subtitle="Painel operacional do tecnico"
       />
 
+      <MobileOperationalNav value={abaPrincipal} onChange={handleAbaPrincipalChange} />
+
       <main
+        ref={mainRef}
         id="conteudo-principal"
         tabIndex={-1}
-        className="app-mobile-page-offset mx-auto max-w-7xl px-3 pt-4 sm:px-6 sm:py-6"
+        className="mx-auto max-w-7xl px-3 pt-4 sm:px-6 sm:py-6"
       >
         <div className="mb-6 hidden gap-3 sm:flex sm:flex-wrap">
           <button
             type="button"
-            onClick={() => setAbaPrincipal("criar")}
+            onClick={() => handleAbaPrincipalChange("criar")}
             className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition sm:w-auto ${
               abaPrincipal === "criar" ? buttonActive : buttonInactive
             }`}
@@ -177,7 +205,7 @@ export default function TecnicoPage() {
 
           <button
             type="button"
-            onClick={() => setAbaPrincipal("consultar")}
+            onClick={() => handleAbaPrincipalChange("consultar")}
             className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition sm:w-auto ${
               abaPrincipal === "consultar" ? buttonActive : buttonInactive
             }`}
@@ -191,7 +219,7 @@ export default function TecnicoPage() {
           <FormularioETAETETecnico
             mobileNavOffset
             onCriada={() => {
-              setAbaPrincipal("consultar");
+              handleAbaPrincipalChange("consultar");
               void carregarOrdens("");
             }}
           />
@@ -221,8 +249,6 @@ export default function TecnicoPage() {
           />
         )}
       </main>
-
-      <MobileOperationalNav value={abaPrincipal} onChange={setAbaPrincipal} />
 
       <TecnicoOSDetailsModal
         ordemId={ordemSelecionadaId}

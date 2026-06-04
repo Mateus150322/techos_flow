@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Pencil, Search, UserPlus, Users, Wrench, X } from "lucide-react";
 
 import { AdminMetricCard } from "./AdminMetricCard";
@@ -55,6 +55,8 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
     ativos: 0,
     inativos: 0,
   });
+  const formPanelRef = useRef<HTMLDivElement | null>(null);
+  const nomeInputRef = useRef<HTMLInputElement | null>(null);
 
   const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
   const softBg = isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200";
@@ -108,6 +110,22 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
       window.clearTimeout(timeoutId);
     };
   }, [busca, statusFiltro, carregarColaboradores]);
+
+  useEffect(() => {
+    if (!showForm) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      formPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      window.setTimeout(() => {
+        nomeInputRef.current?.focus({ preventScroll: true });
+      }, 250);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [editingId, showForm]);
 
   function resetForm() {
     setForm(INITIAL_FORM);
@@ -299,7 +317,7 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
       ) : null}
 
       {showForm ? (
-        <div className={`mb-6 rounded-3xl border p-5 ${softBg}`}>
+        <div ref={formPanelRef} className={`mb-6 rounded-3xl border p-5 ${softBg}`}>
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <h3 className={`text-lg font-semibold ${titleText}`}>
@@ -325,6 +343,7 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
             <label className="block">
               <span className={`mb-2 block text-sm font-medium ${titleText}`}>Nome</span>
               <input
+                ref={nomeInputRef}
                 id={nomeId}
                 type="text"
                 value={form.name}

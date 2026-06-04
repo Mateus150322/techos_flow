@@ -1,4 +1,5 @@
 ﻿import { useEffect, useId, useMemo, useState } from "react";
+import { useRef } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -407,7 +408,7 @@ function EquipeExecucaoSection({
                 "participante";
 
               return (
-                <tr key={participante.id}>
+                <tr key={participante.id} data-equipe-participante-id={participante.id}>
                   <th scope="row" className="py-3 pr-3 text-left align-top">
                     <div className="relative">
                       <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -605,7 +606,10 @@ function EquipeExecucaoMobileCard({
   onRemover: (id: string) => void;
 }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <article
+      data-equipe-participante-id={participante.id}
+      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+    >
       <div className="relative">
         <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <select
@@ -750,6 +754,7 @@ export function OrdemServicoAcoesPanel({
     FuncionarioDisponivel[]
   >([]);
   const [carregandoFuncionarios, setCarregandoFuncionarios] = useState(false);
+  const participanteParaFocarRef = useRef<string | null>(null);
 
   const textInputClass = isDark
     ? "w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:ring-2 disabled:opacity-60"
@@ -833,6 +838,39 @@ export function OrdemServicoAcoesPanel({
     };
   }, [onError, onFinalizarExecucao, podeFinalizarExecucao, status]);
 
+  useEffect(() => {
+    const participanteId = participanteParaFocarRef.current;
+
+    if (!participanteId) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const elementos = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          `[data-equipe-participante-id="${participanteId}"]`
+        )
+      );
+      const alvo =
+        elementos.find((elemento) => elemento.getClientRects().length > 0) ??
+        elementos[0];
+
+      if (!alvo) {
+        return;
+      }
+
+      alvo.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      window.setTimeout(() => {
+        alvo.querySelector<HTMLSelectElement>("select")?.focus({ preventScroll: true });
+      }, 250);
+
+      participanteParaFocarRef.current = null;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [participantes]);
+
   function resetEquipe() {
     setParticipantes(
       currentUserId ? [createParticipante(currentUserId, true, "usuario")] : []
@@ -894,9 +932,9 @@ export function OrdemServicoAcoesPanel({
       );
       const fim = combinarDataHora(participante.dataFim, participante.horaFim);
 
-      if ((inicio || fim) && (!inicio || !fim || new Date(fim) <= new Date(inicio))) {
+      if ((inicio || fim) && (!inicio || !fim || new Date(fim) < new Date(inicio))) {
         onError(
-          "A data e hora final devem ser maiores que a data e hora inicial para cada participante."
+          "A data e hora final devem ser maiores ou iguais à data e hora inicial para cada participante."
         );
         return null;
       }
@@ -981,7 +1019,10 @@ export function OrdemServicoAcoesPanel({
   }
 
   function adicionarParticipante() {
-    setParticipantes((current) => [...current, createParticipante()]);
+    const novoParticipante = createParticipante();
+
+    participanteParaFocarRef.current = novoParticipante.id;
+    setParticipantes((current) => [...current, novoParticipante]);
   }
 
   function removerParticipante(id: string) {

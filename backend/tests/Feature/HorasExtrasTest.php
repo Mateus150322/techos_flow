@@ -392,6 +392,7 @@ class HorasExtrasTest extends TestCase
             'status' => 'aberta',
             'prioridade' => 2,
             'descricao' => 'Descricao de teste',
+            'data_abertura' => '2026-04-01 08:00:00',
             'endereco_id' => $endereco->id,
             'criada_por_id' => $criador->id,
             'tecnico_responsavel_id' => $tecnicoResponsavelId,

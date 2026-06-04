@@ -9,6 +9,7 @@ import type {
   DiagnosticoGeolocalizacao,
   GeolocalizacaoCapturada,
 } from "@/shared/utils/geolocalizacao";
+import { LeafletGeoPreview } from "@/shared/components/LeafletGeoPreview";
 
 type Props = {
   variant: "page" | "modal";
@@ -221,6 +222,12 @@ export function EvidenciaUploadPanel({
                       {formatarDataHora(geolocalizacaoCapturada.capturadaEm)}
                     </p>
                   ) : null}
+
+                  <LeafletGeoPreview
+                    latitude={geolocalizacaoCapturada.latitude}
+                    longitude={geolocalizacaoCapturada.longitude}
+                    accuracyMeters={geolocalizacaoCapturada.precisaoMetros}
+                  />
 
                   <div className={variant === "page" ? "mt-3" : undefined}>
                     <p className="mb-2 text-sm font-medium text-[var(--success)]">

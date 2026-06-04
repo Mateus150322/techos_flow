@@ -85,6 +85,9 @@ class OrdemServicoDashboardService
     public function buildAtendenteDashboard(?string $search = null, int $perSection = 12): array
     {
         $baseQuery = $this->applySearch($this->baseListQuery(), $search);
+        $statusCounts = $this->buildStatusCounts(
+            $this->applySearch($this->baseMetricsQuery(), $search)
+        );
 
         $abertasQuery = (clone $baseQuery)->where('status', 'aberta');
         $emExecucaoQuery = (clone $baseQuery)->where('status', 'em_execucao');
@@ -92,10 +95,12 @@ class OrdemServicoDashboardService
 
         return [
             'resumo' => [
-                'total' => (clone $baseQuery)->count(),
-                'abertas' => (clone $abertasQuery)->count(),
-                'em_execucao' => (clone $emExecucaoQuery)->count(),
-                'encerradas' => (clone $encerradasQuery)->count(),
+                'total' => $statusCounts['total'],
+                'abertas' => $statusCounts['aberta'],
+                'em_execucao' => $statusCounts['em_execucao'],
+                'encerradas' => $statusCounts['finalizada']
+                    + $statusCounts['nao_executada']
+                    + $statusCounts['cancelada'],
             ],
             'secoes' => [
                 'abertas' => $abertasQuery->latest('data_abertura')->limit($perSection)->get()->values()->all(),
@@ -108,6 +113,9 @@ class OrdemServicoDashboardService
     public function buildTecnicoDashboard(User $tecnico, ?string $search = null, int $perSection = 12): array
     {
         $baseQuery = $this->applySearch($this->baseListQuery(), $search);
+        $metricsQuery = $this->applySearch($this->baseMetricsQuery(), $search);
+        $statusCounts = $this->buildStatusCounts((clone $metricsQuery)->where('tecnico_responsavel_id', $tecnico->id));
+        $totalFiltrado = $this->buildStatusCounts($metricsQuery)['total'];
 
         $disponiveisQuery = (clone $baseQuery)
             ->where('status', 'aberta')
@@ -118,11 +126,14 @@ class OrdemServicoDashboardService
 
         return [
             'resumo' => [
-                'disponiveis' => (clone $disponiveisQuery)->count(),
-                'minhas' => (clone $minhasQuery)->count(),
-                'em_execucao' => (clone $emExecucaoQuery)->count(),
-                'concluidas' => (clone $finalizadasQuery)->count(),
-                'total_filtrado' => (clone $baseQuery)->count(),
+                'disponiveis' => (clone $metricsQuery)
+                    ->where('status', 'aberta')
+                    ->whereNull('tecnico_responsavel_id')
+                    ->count(),
+                'minhas' => $statusCounts['total'],
+                'em_execucao' => $statusCounts['em_execucao'],
+                'concluidas' => $statusCounts['finalizada'] + $statusCounts['nao_executada'],
+                'total_filtrado' => $totalFiltrado,
             ],
             'secoes' => [
                 'disponiveis' => $disponiveisQuery->latest('data_abertura')->limit($perSection)->get()->values()->all(),
@@ -209,6 +220,35 @@ class OrdemServicoDashboardService
                 'tecnico_responsavel_id',
             ])
             ->with(['tecnicoResponsavel:id,name']);
+    }
+
+    private function baseMetricsQuery(): Builder
+    {
+        return OrdemServico::query();
+    }
+
+    /**
+     * @return array{total:int,aberta:int,em_execucao:int,finalizada:int,nao_executada:int,cancelada:int}
+     */
+    private function buildStatusCounts(Builder $query): array
+    {
+        $row = (clone $query)
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN status = 'aberta' THEN 1 ELSE 0 END) as aberta")
+            ->selectRaw("SUM(CASE WHEN status = 'em_execucao' THEN 1 ELSE 0 END) as em_execucao")
+            ->selectRaw("SUM(CASE WHEN status = 'finalizada' THEN 1 ELSE 0 END) as finalizada")
+            ->selectRaw("SUM(CASE WHEN status = 'nao_executada' THEN 1 ELSE 0 END) as nao_executada")
+            ->selectRaw("SUM(CASE WHEN status = 'cancelada' THEN 1 ELSE 0 END) as cancelada")
+            ->first();
+
+        return [
+            'total' => (int) ($row->total ?? 0),
+            'aberta' => (int) ($row->aberta ?? 0),
+            'em_execucao' => (int) ($row->em_execucao ?? 0),
+            'finalizada' => (int) ($row->finalizada ?? 0),
+            'nao_executada' => (int) ($row->nao_executada ?? 0),
+            'cancelada' => (int) ($row->cancelada ?? 0),
+        ];
     }
 
     private function applySearch(Builder $query, ?string $search): Builder

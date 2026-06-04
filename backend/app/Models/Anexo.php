@@ -30,6 +30,14 @@ class Anexo extends Model
 
     public $timestamps = true;
 
+    protected $appends = [
+        'nome_arquivo',
+    ];
+
+    protected $hidden = [
+        'caminho',
+    ];
+
     protected $casts = [
         'latitude' => 'float',
         'longitude' => 'float',
@@ -45,5 +53,10 @@ class Anexo extends Model
     public function submetidoPor()
     {
         return $this->belongsTo(User::class, 'submetido_por_id');
+    }
+
+    public function getNomeArquivoAttribute(): string
+    {
+        return basename((string) $this->caminho);
     }
 }

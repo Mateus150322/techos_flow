@@ -38,7 +38,10 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
   }, []);
 
   const resumo = dashboard?.resumo;
-  const distribuicaoStatus = dashboard?.distribuicao_status ?? [];
+  const distribuicaoStatus = useMemo(
+    () => dashboard?.distribuicao_status ?? [],
+    [dashboard?.distribuicao_status]
+  );
   const tiposBreakdown = useMemo(() => dashboard?.tipos_breakdown ?? [], [dashboard?.tipos_breakdown]);
   const produtividadeTecnicos = dashboard?.produtividade_tecnicos ?? [];
   const resumoMesAtual = dashboard?.resumo_mes_atual;
@@ -59,6 +62,10 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
   const abertas = resumo?.abertas ?? 0;
   const finalizadas = resumo?.finalizadas ?? 0;
   const total = resumo?.total ?? 0;
+  const statusSlices = useMemo(
+    () => buildStatusSlices(distribuicaoStatus, isDark ? "#334155" : "#e2e8f0"),
+    [distribuicaoStatus, isDark]
+  );
 
   const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
   const softBg = isDark ? "bg-slate-950/80 border-slate-800" : "bg-slate-50 border-slate-200";
@@ -131,37 +138,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
             <div
               className="relative h-56 w-56 rounded-full p-8"
               style={{
-                background: `conic-gradient(
-                  #3b82f6 0 ${getPercentual(distribuicaoStatus, "aberta")}%, 
-                  #f4b400 ${getPercentual(distribuicaoStatus, "aberta")}% ${
-                    getPercentual(distribuicaoStatus, "aberta") +
-                    getPercentual(distribuicaoStatus, "em_execucao")
-                  }%,
-                  #22c55e ${
-                    getPercentual(distribuicaoStatus, "aberta") +
-                    getPercentual(distribuicaoStatus, "em_execucao")
-                  }% ${
-                    getPercentual(distribuicaoStatus, "aberta") +
-                    getPercentual(distribuicaoStatus, "em_execucao") +
-                    getPercentual(distribuicaoStatus, "finalizada")
-                  }%,
-                  #ef4444 ${
-                    getPercentual(distribuicaoStatus, "aberta") +
-                    getPercentual(distribuicaoStatus, "em_execucao") +
-                    getPercentual(distribuicaoStatus, "finalizada")
-                  }% ${
-                    getPercentual(distribuicaoStatus, "aberta") +
-                    getPercentual(distribuicaoStatus, "em_execucao") +
-                    getPercentual(distribuicaoStatus, "finalizada") +
-                    getPercentual(distribuicaoStatus, "nao_executada")
-                  }%,
-                  #6b7280 ${
-                    getPercentual(distribuicaoStatus, "aberta") +
-                    getPercentual(distribuicaoStatus, "em_execucao") +
-                    getPercentual(distribuicaoStatus, "finalizada") +
-                    getPercentual(distribuicaoStatus, "nao_executada")
-                  } 100%
-                )`,
+                background: `conic-gradient(${statusSlices.join(", ")})`,
               }}
             >
               <div className={`h-full w-full rounded-full ${centerCircleBg}`} />
@@ -360,11 +337,51 @@ function statusColor(status: string) {
   }
 }
 
-function getPercentual(
+function statusHexColor(status: string) {
+  switch (status) {
+    case "aberta":
+      return "#3b82f6";
+    case "em_execucao":
+      return "#f4b400";
+    case "finalizada":
+      return "#22c55e";
+    case "nao_executada":
+      return "#ef4444";
+    default:
+      return "#6b7280";
+  }
+}
+
+function buildStatusSlices(
   distribuicaoStatus: AdminDashboardResponse["distribuicao_status"],
-  status: string
+  fallbackColor: string
 ) {
-  return distribuicaoStatus.find((item) => item.status === status)?.percentual ?? 0;
+  const statuses = ["aberta", "em_execucao", "finalizada", "nao_executada", "cancelada"];
+  const total = distribuicaoStatus.reduce((sum, item) => sum + item.quantidade, 0);
+
+  if (total <= 0) {
+    return [`${fallbackColor} 0% 100%`];
+  }
+
+  const slices = statuses
+    .map((status) => ({
+      status,
+      quantidade: distribuicaoStatus.find((item) => item.status === status)?.quantidade ?? 0,
+    }))
+    .filter((item) => item.quantidade > 0);
+
+  let start = 0;
+
+  return slices.map((slice, index) => {
+    const end =
+      index === slices.length - 1
+        ? 100
+        : Math.min(100, start + (slice.quantidade / total) * 100);
+    const stop = `${statusHexColor(slice.status)} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+    start = end;
+
+    return stop;
+  });
 }
 
 function LegendItem({

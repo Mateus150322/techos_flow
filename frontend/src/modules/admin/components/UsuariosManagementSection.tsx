@@ -1,4 +1,5 @@
 ﻿import { useId, type FormEvent } from "react";
+import { useEffect, useRef } from "react";
 import { Pencil, Search, ShieldAlert, UserPlus, X } from "lucide-react";
 
 import type { PerfilUsuario, UsuarioAdmin } from "../usuarios.service";
@@ -110,6 +111,24 @@ export function UsuariosManagementSection({
   const confirmarSenhaId = useId();
   const valorHoraId = useId();
   const tabelaCaptionId = useId();
+  const formPanelRef = useRef<HTMLDivElement | null>(null);
+  const nomeInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!showForm) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      formPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      window.setTimeout(() => {
+        nomeInputRef.current?.focus({ preventScroll: true });
+      }, 250);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [editingUserId, showForm]);
 
   return (
     <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading || saving}>
@@ -160,7 +179,7 @@ export function UsuariosManagementSection({
       ) : null}
 
       {showForm ? (
-        <div className={`mb-6 rounded-3xl border p-5 ${softBg}`}>
+        <div ref={formPanelRef} className={`mb-6 rounded-3xl border p-5 ${softBg}`}>
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <h3 className={`text-lg font-semibold ${titleText}`}>
@@ -187,6 +206,7 @@ export function UsuariosManagementSection({
             <label className="block">
               <span className={`mb-2 block text-sm font-medium ${titleText}`}>Nome</span>
               <input
+                ref={nomeInputRef}
                 id={nomeId}
                 type="text"
                 value={form.name}

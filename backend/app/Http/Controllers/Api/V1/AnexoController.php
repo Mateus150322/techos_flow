@@ -89,7 +89,9 @@ class AnexoController extends Controller
     public function show(Request $request, string $id)
     {
         $user = $request->user();
-        $anexo = Anexo::query()->with('ordemServico')->findOrFail($id);
+        $anexo = Anexo::query()
+            ->with(['ordemServico:id,status,tecnico_responsavel_id'])
+            ->findOrFail($id);
         $ordemServico = $anexo->ordemServico;
 
         if (! $ordemServico) {

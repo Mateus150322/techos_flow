@@ -90,19 +90,17 @@ export function AdminShell({ currentUser, activeTab, children }: AdminShellProps
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-              <div className="order-1 flex gap-3">
-                <ThemeToggle />
-              </div>
-
-              <div className="order-3 text-left sm:order-2 sm:text-right">
+              <div className="text-left sm:order-3 sm:ml-auto sm:text-right">
                 <p className={`text-sm font-medium ${titleText}`}>{currentUser.name}</p>
                 <p className={`text-sm ${mutedText}`}>Administrador</p>
               </div>
 
+              <ThemeToggle />
+
               <button
                 type="button"
                 onClick={() => void handleLogout()}
-                className={`order-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm transition sm:order-3 sm:w-auto ${buttonSecondary}`}
+                className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm transition sm:w-auto ${buttonSecondary}`}
               >
                 <LogOut className="h-4 w-4" />
                 Sair

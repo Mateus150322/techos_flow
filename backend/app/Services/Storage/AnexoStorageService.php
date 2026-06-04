@@ -15,13 +15,51 @@ class AnexoStorageService
 
     public function store(UploadedFile $arquivo, string $directory = 'anexos'): string
     {
-        $storedPath = $arquivo->store($directory, $this->configuredDisk());
+        $disk = $this->configuredDisk();
+
+        try {
+            $this->ensureDirectoryExists($disk, $directory);
+            $storedPath = $arquivo->store($directory, $disk);
+        } catch (\Throwable $exception) {
+            if (! $this->supportsLocalPath($disk)) {
+                throw $exception;
+            }
+
+            $storedPath = $arquivo->storeAs('', $directory . '-' . $arquivo->hashName(), $disk);
+        }
 
         if (! is_string($storedPath) || $storedPath === '') {
             throw new \RuntimeException('Nao foi possivel armazenar o anexo no disco configurado.');
         }
 
         return $storedPath;
+    }
+
+    private function ensureDirectoryExists(string $disk, string $directory): void
+    {
+        if (! $this->supportsLocalPath($disk)) {
+            return;
+        }
+
+        try {
+            $path = Storage::disk($disk)->path($directory);
+        } catch (\Throwable) {
+            return;
+        }
+
+        if (is_dir($path)) {
+            return;
+        }
+
+        if (@mkdir($path, 0775, true) || is_dir($path)) {
+            return;
+        }
+
+        usleep(100_000);
+
+        if (! is_dir($path) && ! @mkdir($path, 0775, true) && ! is_dir($path)) {
+            throw new \RuntimeException('Nao foi possivel preparar a pasta de anexos.');
+        }
     }
 
     public function resolveDisk(?string $path): ?string

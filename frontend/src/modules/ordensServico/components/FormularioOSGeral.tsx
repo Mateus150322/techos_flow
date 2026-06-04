@@ -195,7 +195,7 @@ export default function FormularioOSGeral({
 
       <form
         onSubmit={handleSubmit}
-        className={`space-y-6 ${mobileNavOffset ? "pb-40" : "pb-24"} sm:space-y-8 sm:pb-0`}
+        className={`space-y-6 ${mobileNavOffset ? "pb-6" : "pb-0"} sm:space-y-8 sm:pb-0`}
         aria-busy={enviando}
       >
         {erro ? (
@@ -393,11 +393,7 @@ export default function FormularioOSGeral({
         </section>
 
         <div
-          className={`fixed inset-x-0 z-20 border-t border-[var(--border)] bg-[color-mix(in_srgb,var(--bg-card)_92%,transparent)] px-4 py-3 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none ${
-            mobileNavOffset
-              ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
-              : "bottom-0"
-          }`}
+          className="border-t border-[var(--border)] bg-transparent pt-4 sm:border-0 sm:pt-0"
         >
           <div className="mx-auto max-w-7xl">
             <button

@@ -42,6 +42,7 @@ export default function TecnicoOSDetailsModal({
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const avisoAcaoRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedElementRef = useRef<HTMLElement | null>(null);
   const titleId = "modal-os-titulo";
   const descriptionId = "modal-os-descricao";
@@ -51,6 +52,8 @@ export default function TecnicoOSDetailsModal({
     loading,
     error: erro,
     setError,
+    actionFeedback,
+    setActionFeedback,
     os,
     criadaPor,
     tecnicoResponsavel,
@@ -95,6 +98,29 @@ export default function TecnicoOSDetailsModal({
     () => obterUltimaGeolocalizacaoEvidencia(os?.anexos),
     [os?.anexos]
   );
+  const avisoAcaoTipo = actionFeedback?.tipo ?? (erro ? "erro" : null);
+  const avisoAcaoMensagem = actionFeedback?.mensagem ?? erro;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    dialogRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [loading, open, ordemId]);
+
+  useEffect(() => {
+    if (!open || !avisoAcaoMensagem) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      avisoAcaoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      avisoAcaoRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [avisoAcaoMensagem, avisoAcaoTipo, open]);
 
   async function executarAcao(fn: () => Promise<boolean>) {
     const ok = await fn();
@@ -220,9 +246,17 @@ export default function TecnicoOSDetailsModal({
 
         {loading && <p className="app-muted p-6 text-sm" role="status" aria-live="polite">Carregando...</p>}
 
-        {!loading && erro && (
-          <div className="app-alert-danger m-6 rounded-xl px-4 py-3 text-sm" role="alert" aria-live="assertive">
-            {erro}
+        {!loading && avisoAcaoMensagem && avisoAcaoTipo && (
+          <div
+            ref={avisoAcaoRef}
+            tabIndex={-1}
+            className={`m-6 rounded-xl px-4 py-3 text-sm outline-none ${
+              avisoAcaoTipo === "sucesso" ? "app-alert-success" : "app-alert-danger"
+            }`}
+            role={avisoAcaoTipo === "sucesso" ? "status" : "alert"}
+            aria-live={avisoAcaoTipo === "sucesso" ? "polite" : "assertive"}
+          >
+            {avisoAcaoMensagem}
           </div>
         )}
 
@@ -319,7 +353,10 @@ export default function TecnicoOSDetailsModal({
                     osEhDeOutroTecnico={osEhDeOutroTecnico}
                     tecnicoResponsavelNome={tecnicoResponsavel?.name}
                     execucaoAbertaId={execucaoParaFinalizacao?.id}
-                    onError={setError}
+                    onError={(mensagem) => {
+                      setError(mensagem);
+                      setActionFeedback({ tipo: "erro", mensagem });
+                    }}
                     onAceitar={() => executarAcao(() => aceitar())}
                     onIniciarExecucao={() => executarAcao(() => iniciar({}))}
                     onFinalizarExecucao={({ execucaoId, dataFim, funcionarios }) =>

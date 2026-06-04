@@ -10,7 +10,7 @@ export function ThemeToggle() {
       type="button"
       onClick={toggleTheme}
       aria-pressed={theme === "dark"}
-      className="app-button-outline inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium shadow-sm transition"
+      className="app-button-outline inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition sm:min-w-[6.25rem]"
       aria-label="Alternar tema"
       title={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
     >

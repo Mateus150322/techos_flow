@@ -31,7 +31,7 @@ export function MobileOperationalNav({
   return (
     <nav
       aria-label="Navegação operacional"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-[color-mix(in_srgb,var(--bg-card)_92%,transparent)] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur sm:hidden"
+      className="mx-auto max-w-7xl px-3 pt-4 sm:hidden"
     >
       <div className="mx-auto max-w-7xl">
         <div className="grid grid-cols-2 gap-2 rounded-[1.4rem] border border-[var(--border)] bg-[var(--bg-card)] p-2 shadow-[var(--shadow-soft)]">

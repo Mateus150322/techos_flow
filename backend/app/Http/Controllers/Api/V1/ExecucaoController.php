@@ -110,24 +110,36 @@ class ExecucaoController extends Controller
             ], 422);
         }
 
+        $dataInicioExecucao = CarbonImmutable::parse($os->data_abertura);
+        $dataInicioParticipantePadrao = CarbonImmutable::parse($execucao->data_inicio);
         $dataFimExecucao = CarbonImmutable::parse($data['data_fim'] ?? now());
+        $dataFimParticipantePadrao = $dataFimExecucao;
 
-        if ($dataFimExecucao->lessThan(CarbonImmutable::parse($execucao->data_inicio))) {
+        if ($dataFimExecucao->lessThan($dataInicioExecucao)) {
             throw ValidationException::withMessages([
                 'data_fim' => 'A data final da execução deve ser maior ou igual à data de início.',
             ]);
         }
 
-        $participantesPayload = $this->resolveFuncionariosPayload($data, $execucao);
+        $execucao->data_inicio = $dataInicioExecucao;
+        $execucao->data_fim = $dataFimExecucao;
+        $participantesPayload = $this->resolveFuncionariosPayload(
+            $data,
+            $execucao,
+            $dataInicioParticipantePadrao,
+            $dataFimParticipantePadrao
+        );
 
         $participantes = DB::transaction(function () use (
             $data,
+            $dataInicioExecucao,
             $dataFimExecucao,
             $execucao,
             $horaExtraService,
             $os,
             $participantesPayload
         ) {
+            $execucao->data_inicio = $dataInicioExecucao;
             $execucao->data_fim = $dataFimExecucao;
 
             if (! empty($data['observacao'])) {
@@ -142,7 +154,7 @@ class ExecucaoController extends Controller
             );
 
             $os->status = 'finalizada';
-            $os->data_encerramento = now();
+            $os->data_encerramento = $dataFimExecucao;
             $os->save();
 
             return $participantesRegistrados;
@@ -160,15 +172,16 @@ class ExecucaoController extends Controller
      * @param array<string, mixed> $data
      * @return array<int, array<string, string|null>>
      */
-    private function resolveFuncionariosPayload(array $data, Execucao $execucao): array
+    private function resolveFuncionariosPayload(
+        array $data,
+        Execucao $execucao,
+        CarbonImmutable $dataInicioPadrao,
+        CarbonImmutable $dataFimPadrao
+    ): array
     {
         $funcionarios = collect($data['funcionarios'] ?? [])
             ->map(fn (mixed $item) => is_array($item) ? $item : [])
             ->values();
-
-        if ($funcionarios->isEmpty()) {
-            return [];
-        }
 
         foreach ($funcionarios as $funcionario) {
             $temUsuario = ! empty($funcionario['funcionario_id']);
@@ -216,14 +229,14 @@ class ExecucaoController extends Controller
             ]);
         }
 
-        return $funcionarios
-            ->map(function (array $funcionario) use ($execucao) {
+        $participantes = $funcionarios
+            ->map(function (array $funcionario) use ($dataFimPadrao, $dataInicioPadrao) {
                 $inicio = ! empty($funcionario['data_inicio'])
                     ? CarbonImmutable::parse((string) $funcionario['data_inicio'])
-                    : CarbonImmutable::parse($execucao->data_inicio);
+                    : $dataInicioPadrao;
                 $fim = ! empty($funcionario['data_fim'])
                     ? CarbonImmutable::parse((string) $funcionario['data_fim'])
-                    : CarbonImmutable::parse($execucao->data_fim);
+                    : $dataFimPadrao;
 
                 if ($fim->lessThan($inicio)) {
                     throw ValidationException::withMessages([
@@ -238,10 +251,27 @@ class ExecucaoController extends Controller
                     'colaborador_operacional_id' => ! empty($funcionario['colaborador_operacional_id'])
                         ? (string) $funcionario['colaborador_operacional_id']
                         : null,
-                    'data_inicio' => ! empty($funcionario['data_inicio']) ? $inicio->toISOString() : null,
-                    'data_fim' => ! empty($funcionario['data_fim']) ? $fim->toISOString() : null,
+                    'data_inicio' => $inicio->toISOString(),
+                    'data_fim' => $fim->toISOString(),
                 ];
             })
+            ->values();
+
+        if (! $participantes->contains(fn (array $participante) => $participante['funcionario_id'] === $execucao->tecnico_id)) {
+            $participantes->prepend([
+                'funcionario_id' => $execucao->tecnico_id,
+                'colaborador_operacional_id' => null,
+                'data_inicio' => $dataInicioPadrao->toISOString(),
+                'data_fim' => $dataFimPadrao->toISOString(),
+            ]);
+        }
+
+        return $participantes
+            ->unique(fn (array $participante) => ! empty($participante['funcionario_id'])
+                ? 'usuario:' . $participante['funcionario_id']
+                : 'colaborador:' . ($participante['colaborador_operacional_id'] ?? '')
+            )
+            ->values()
             ->all();
     }
 }
