@@ -11,7 +11,7 @@ O projeto adota estratégia em camadas:
 - testes automatizados de backend para regras críticas;
 - testes automatizados de frontend para acessibilidade, tipagem e consistência visual básica;
 - validação manual dos fluxos principais por perfil;
-- smoke test em ambiente real para domínio, `HTTPS`, SMTP, anexos e geolocalização.
+- smoke test em ambiente real para domínio, `HTTPS`, Resend, anexos e geolocalização.
 
 ## 3. Escopo de teste
 
@@ -96,7 +96,7 @@ Além do fluxo principal, a rodada mais recente de testes deve observar:
 Deve incluir:
 
 - login no domínio final;
-- recuperação de senha com SMTP real;
+- recuperação de senha com Resend;
 - criação e execução de OS;
 - envio de evidência em smartphone com `HTTPS`;
 - consulta do anexo após novo acesso;
@@ -105,7 +105,7 @@ Deve incluir:
 
 Referência:
 
-- [Validação em ambiente real](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/validacao-ambiente-real.md)
+- [Validação em ambiente real](../implantacao/validacao-ambiente-real.md)
 
 ## 9. Melhorias futuras recomendadas
 

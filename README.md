@@ -27,7 +27,7 @@ Perfis atuais do sistema:
 - Banco de dados: `PostgreSQL`
 - API: `REST versionada (/api/v1)`
 - Autenticação: `Laravel Sanctum`
-- E-mail transacional atual: `Zoho Mail`
+- E-mail transacional atual: `Resend`
 
 ## Estrutura do repositório
 
@@ -133,14 +133,25 @@ npm run build
 npm run test:a11y
 ```
 
+## Ambiente publicado atual
+
+O ambiente online atual usa:
+
+- frontend/domínio público: `https://www.techosflow.com.br`
+- backend Railway: `https://techosflow-production.up.railway.app`
+- API consumida pelo frontend: `/api/v1` no domínio publicado ou `https://techosflow-production.up.railway.app/api/v1`, conforme a configuração do build;
+- e-mail transacional: `Resend`;
+- repositório usado pelo Railway: `GitHub`, branch `main`;
+- GitLab: espelho secundário do projeto, mantido para histórico e pipeline.
+
 ## Validação em ambiente real
 
-Antes do deploy final, vale validar o sistema em um domínio com `HTTPS` e storage persistente.
+Antes de homologar a entrega final, vale validar o sistema em domínio com `HTTPS`, e-mail transacional e storage persistente.
 
 Checklist prático:
 
 1. Publicar frontend, backend e banco em ambiente de homologação.
-2. Configurar domínio, HTTPS, SMTP e volume persistente para anexos.
+2. Configurar domínio, HTTPS, Resend e volume persistente para anexos.
 3. Executar smoke test completo:
    - login;
    - recuperação de senha;
@@ -159,11 +170,11 @@ Guia detalhado:
 
 ## Pipeline
 
-O projeto já possui pipeline base para qualidade do frontend em:
+O projeto possui pipeline base para qualidade do frontend em:
 
 - `.gitlab-ci.yml`
 
-Esse pipeline executa:
+Quando o repositório do GitLab está sincronizado com a `main`, esse pipeline executa:
 
 - `npm run lint`
 - `npx tsc -b`
@@ -184,17 +195,15 @@ Pontos de entrada mais úteis:
 - [guia de Docker](docs/implantacao/docker.md)
 - [validação em ambiente real](docs/implantacao/validacao-ambiente-real.md)
 
-Guia novo de deploy em nuvem:
+Guias de deploy em nuvem:
 
 - [deploy na Oracle Cloud](docs/implantacao/oracle-cloud.md)
+- [documento de implantação](docs/implantacao/documento-implantacao.md)
 
-## O que ainda precisa ser decidido
+## Pontos de infraestrutura ainda pendentes
 
-O sistema já está funcionalmente maduro. O que ainda precisa ser fechado para produção é principalmente infraestrutura:
+O sistema já está funcionalmente maduro e possui domínio publicado. Os principais pontos ainda dependentes de fechamento operacional são:
 
-- provedor de hospedagem;
-- domínio final do frontend e da API;
-- HTTPS;
 - storage persistente para anexos;
 - rotina de backup e restauração;
 - monitoramento e logs.

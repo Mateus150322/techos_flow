@@ -13,7 +13,8 @@ O `TechOS Flow` expõe uma API REST versionada em `/api/v1`. Ela é consumida pe
 
 ### Produção
 
-- `https://api.techosflow.com.br/api/v1`
+- domínio próprio: `https://www.techosflow.com.br/api/v1`
+- backend Railway direto: `https://techosflow-production.up.railway.app/api/v1`
 
 ## 3. Autenticação
 
@@ -268,4 +269,4 @@ Content-Type: application/json
 
 O arquivo OpenAPI do projeto está disponível em:
 
-- [openapi-techos-flow.yaml](c:/Users/VAIO/Documents/projetos/techos-flow/docs/api/openapi-techos-flow.yaml)
+- [openapi-techos-flow.yaml](openapi-techos-flow.yaml)

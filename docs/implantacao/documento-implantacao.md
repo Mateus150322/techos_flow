@@ -11,16 +11,23 @@ O projeto já está pronto para:
 - homologação online;
 - deploy controlado em pequena escala;
 - separação entre frontend, backend e banco;
-- uso de SMTP real para recuperação de senha;
+- uso do Resend para recuperação de senha por e-mail;
 - uso de domínio próprio com HTTPS.
+
+Ambiente online atual:
+
+- frontend/domínio público: `https://www.techosflow.com.br`
+- backend Railway: `https://techosflow-production.up.railway.app`
+- API: `/api/v1` pelo domínio publicado ou `https://techosflow-production.up.railway.app/api/v1`, conforme o build do frontend;
+- banco: PostgreSQL;
+- e-mail transacional: Resend.
 
 Pontos que ainda exigem definição de infraestrutura:
 
 - storage persistente para anexos;
 - política de backup;
 - monitoramento;
-- domínio final e HTTPS;
-- estratégia de hospedagem.
+- estratégia de hospedagem definitiva, caso o Railway deixe de ser usado.
 
 ## 3. Requisitos do servidor
 
@@ -47,19 +54,23 @@ Definir no `.env`:
 
 - `APP_ENV=production`
 - `APP_DEBUG=false`
-- `APP_URL=A_preencher`
-- `FRONTEND_URL=A_preencher`
+- `APP_URL=https://techosflow-production.up.railway.app` ou a URL pública final do backend
+- `FRONTEND_URL=https://www.techosflow.com.br`
 - `DB_*`
 - `ANEXOS_DISK=local` ou storage institucional definido
 - `SESSION_DRIVER=database` ou outro conforme estratégia
 - `SANCTUM_STATEFUL_DOMAINS`
-- `MAIL_*`
+- `MAIL_MAILER=resend`
+- `RESEND_KEY`
+- `MAIL_FROM_ADDRESS`
+- `MAIL_FROM_NAME`
 
 ### Frontend
 
-Definir:
+Definir conforme o tipo de publicação:
 
-- `VITE_API_URL=https://api.exemplo.gov.br/api/v1`
+- mesmo domínio/proxy: `VITE_API_URL=/api/v1`
+- backend Railway direto: `VITE_API_URL=https://techosflow-production.up.railway.app/api/v1`
 
 ## 5. Build do frontend
 
@@ -88,12 +99,12 @@ Publicar o conteúdo gerado em `frontend/dist`.
 ### Sugestão
 
 - frontend: `www.techosflow.com.br`
-- backend: `api.techosflow.com.br`
+- backend/API: `www.techosflow.com.br/api/v1` quando houver proxy no domínio próprio, ou `techosflow-production.up.railway.app/api/v1` quando o frontend chamar o Railway diretamente
 
 ### Campos pendentes
 
-- domínio oficial do frontend: `A preencher`
-- domínio oficial do backend: `A preencher`
+- domínio oficial do frontend: `www.techosflow.com.br`
+- domínio oficial do backend: definir entre domínio próprio com proxy ou URL Railway
 - DNS institucional: `A preencher`
 
 ## 8. HTTPS
@@ -159,12 +170,13 @@ O ambiente de produção deve preservar:
 
 ### Railway
 
-Boa opção para simplificar:
+Ambiente usado atualmente para simplificar:
 
 - backend Laravel;
 - PostgreSQL no mesmo projeto;
 - volume persistente para anexos;
-- domínios customizados.
+- domínios customizados;
+- deploy pela branch `main` do GitHub.
 
 Ponto de atenção:
 
@@ -190,15 +202,15 @@ Ponto de atenção:
 - [ ] migrations executadas
 - [ ] usuários iniciais preparados
 - [ ] frontend buildado
-- [ ] domínio configurado
-- [ ] HTTPS ativo
+- [x] domínio configurado
+- [x] HTTPS ativo
 - [ ] backup definido
 - [ ] monitoramento definido
 - [ ] política de logs definida
 - [ ] estratégia de storage persistente validada
-- [ ] recuperação de senha testada no ambiente final
+- [x] recuperação de senha testada no ambiente final
 - [ ] evidência com geolocalização testada em smartphone com HTTPS
 
 ## 15. Próximo passo recomendado
 
-Depois da implantação técnica, executar o guia de [validação em ambiente real](c:/Users/VAIO/Documents/projetos/techos-flow/docs/implantacao/validacao-ambiente-real.md).
+Depois da implantação técnica, executar o guia de [validação em ambiente real](validacao-ambiente-real.md).

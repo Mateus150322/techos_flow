@@ -141,6 +141,7 @@ Observações:
 - `ANEXOS_DISK`
 - `SANCTUM_STATEFUL_DOMAINS`
 - `MAIL_*`
+- `RESEND_KEY`, quando `MAIL_MAILER=resend`
 
 ### Frontend
 
@@ -153,18 +154,16 @@ Observações:
 
 O projeto já possui fluxo de recuperação de senha por e-mail.
 
-Exemplo de configuração SMTP atualmente compatível com o projeto:
+Em produção, o envio transacional atual usa Resend. O pacote `resend/resend-php` deve estar instalado no backend via Composer.
 
 ```env
-MAIL_MAILER=smtp
-MAIL_SCHEME=smtps
-MAIL_HOST=smtp.zoho.com
-MAIL_PORT=465
-MAIL_USERNAME=suporte@techosflow.com.br
-MAIL_PASSWORD=A_preencher
-MAIL_FROM_ADDRESS=suporte@techosflow.com.br
+MAIL_MAILER=resend
+RESEND_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+MAIL_FROM_ADDRESS=suporte@mail.techosflow.com.br
 MAIL_FROM_NAME="TechOS Flow"
 ```
+
+O domínio de envio precisa estar verificado no painel do Resend. No ambiente atual, o domínio de envio configurado é `mail.techosflow.com.br`.
 
 ## 8. Comandos úteis
 

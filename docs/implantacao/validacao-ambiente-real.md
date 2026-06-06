@@ -9,7 +9,7 @@ Este checklist serve para homologar o `TechOS Flow` antes da publicação final 
 - geolocalização em smartphone;
 - persistência de anexos;
 - relatórios e exportações;
-- readiness para deploy em ambiente real, como Oracle Cloud.
+- readiness para deploy em ambiente real, como Railway ou Oracle Cloud.
 
 ## 2. Situação Atual
 
@@ -22,10 +22,10 @@ Este checklist serve para homologar o `TechOS Flow` antes da publicação final 
 
 ### O que ainda precisa de validação manual
 
-- [ ] deploy com domínio real
-- [ ] `HTTPS` válido no frontend e na API
-- [ ] envio real de e-mail
-- [ ] geolocalização em smartphone no domínio final
+- [x] deploy com domínio real
+- [x] `HTTPS` válido no frontend
+- [x] envio real de e-mail via Resend
+- [x] geolocalização em smartphone no domínio final
 - [ ] persistência dos anexos após reinício e novo deploy
 - [ ] backup e restauração mínima
 
@@ -33,26 +33,25 @@ Este checklist serve para homologar o `TechOS Flow` antes da publicação final 
 
 Antes de iniciar a homologação, o ambiente deve ter:
 
-- [ ] frontend publicado
-- [ ] backend publicado
-- [ ] banco PostgreSQL acessível
+- [x] frontend publicado
+- [x] backend publicado
+- [x] banco PostgreSQL acessível
 - [ ] `APP_ENV=production`
 - [ ] `APP_DEBUG=false`
 - [ ] `APP_URL` configurado com URL pública
 - [ ] `FRONTEND_URL` configurado com URL pública
-- [ ] `MAIL_*` válidos
-- [ ] `SANCTUM_STATEFUL_DOMAINS` alinhado ao domínio real
+- [x] `MAIL_*` e `RESEND_KEY` válidos
+- [x] `SANCTUM_STATEFUL_DOMAINS` alinhado ao domínio real
 - [ ] storage persistente configurado para anexos
 - [ ] pelo menos um usuário de cada perfil
 - [ ] pelo menos um colaborador operacional cadastrado
 
 ## 4. Checklist de Infraestrutura
 
-- [ ] o domínio do frontend abre sem erro
-- [ ] a API responde sem erro
-- [ ] `HTTPS` está válido no frontend
-- [ ] `HTTPS` está válido na API
-- [ ] o backend envia e-mail
+- [x] o domínio do frontend abre sem erro
+- [x] a API responde sem erro
+- [x] `HTTPS` está válido no frontend
+- [x] o backend envia e-mail
 - [ ] os anexos não dependem de diretório temporário
 - [ ] anexos persistem após reinício do serviço
 - [ ] anexos persistem após novo deploy
@@ -180,7 +179,7 @@ O ambiente pode ser considerado pronto quando:
 - [ ] anexos persistem após reinício e deploy
 - [ ] não existe falha crítica de autenticação, permissão ou persistência
 
-## 12. Pendências Comuns Antes do Oracle Cloud
+## 12. Pendências Comuns Antes de Produção Final
 
 Se algum ponto falhar, estas são as prioridades:
 

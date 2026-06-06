@@ -143,4 +143,4 @@ Nos detalhes da OS, o administrador pode:
 - revisar colaboradores operacionais sem login;
 - exportar relatórios apenas quando necessário;
 - acompanhar anexos e evidências somente quando houver finalidade legítima;
-- validar o ambiente publicado com `HTTPS`, storage persistente e SMTP real antes de homologar.
+- validar o ambiente publicado com `HTTPS`, Resend, storage persistente e backup antes de homologar.

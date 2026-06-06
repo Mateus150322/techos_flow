@@ -11,8 +11,10 @@ servers:
     description: Backend local direto
   - url: http://techosflow.test:5173/api/v1
     description: Frontend local com proxy do Vite
-  - url: https://api.techosflow.com.br/api/v1
-    description: Produção
+  - url: https://www.techosflow.com.br/api/v1
+    description: Produção com domínio próprio
+  - url: https://techosflow-production.up.railway.app/api/v1
+    description: Backend Railway direto
 security:
   - bearerAuth: []
 tags:
