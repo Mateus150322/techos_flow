@@ -474,7 +474,7 @@ export default function FormularioETAETETecnico({
               ) : (
                 <>
                   <PlusCircle className="h-4 w-4" />
-                  Criar Ordem de Serviço ETA/ETE
+                  Criar Ordem de Serviço
                 </>
               )}
             </button>
