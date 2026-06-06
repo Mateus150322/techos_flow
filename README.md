@@ -140,9 +140,12 @@ O ambiente online atual usa:
 - frontend/domínio público: `https://www.techosflow.com.br`
 - backend Railway: `https://techosflow-production.up.railway.app`
 - API consumida pelo frontend: `/api/v1` no domínio publicado ou `https://techosflow-production.up.railway.app/api/v1`, conforme a configuração do build;
+- banco de produção: PostgreSQL interno do Railway, acessado pelo endpoint privado;
 - e-mail transacional: `Resend`;
 - repositório usado pelo Railway: `GitHub`, branch `main`;
 - GitLab: espelho secundário do projeto, mantido para histórico e pipeline.
+
+O banco de produção foi migrado do Neon para o Postgres interno do Railway. Após a migração, as chamadas medidas no navegador caíram de aproximadamente 3 segundos para menos de 1 segundo (`login` em cerca de 682 ms e dashboard técnico em cerca de 478 ms).
 
 ## Validação em ambiente real
 

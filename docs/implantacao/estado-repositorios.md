@@ -3,12 +3,11 @@
 ## 1. Referência atual
 
 - branch principal: `main`
-- commit local/GitHub atual: `49a5c5a Update technician OS create button label`
-- commit rastreado no GitLab antes da sincronização: `588a355 feat(deploy): add Oracle Cloud production stack`
+- commit local/GitHub/GitLab atual: `310fceb Update deployment docs and repository status`
 - repositório usado pelo Railway: GitHub `Mateus150322/techos_flow`
 - GitLab: espelho secundário para histórico e pipeline
 
-## 2. Blocos de commits pendentes no GitLab
+## 2. Blocos de commits já sincronizados
 
 ### Deploy Railway, Apache e banco
 
@@ -36,12 +35,25 @@
 
 - `49a5c5a` remove `ETA/ETE` do botão de criação de OS do técnico.
 
-## 3. Comando de sincronização
+### Documentação de deploy
 
-Quando a rede permitir acesso ao GitLab, executar na raiz do projeto:
+- `310fceb` atualiza documentação de implantação e estado dos repositórios.
+
+## 3. Migração do banco de produção
+
+O ambiente online passou a usar o Postgres interno do Railway em vez do Neon. A migração copiou os dados principais para o banco Railway e o backend passou a se conectar pelo endpoint privado `postgres.railway.internal`.
+
+Resultado medido no navegador após a mudança:
+
+- `login`: cerca de 682 ms;
+- dashboard técnico: cerca de 478 ms.
+
+Antes da migração, essas chamadas estavam próximas de 3 segundos.
+
+## 4. Comando de sincronização
 
 ```bash
 git push origin main
 ```
 
-Depois da sincronização, o GitLab deve apontar para o mesmo commit da `main` local/GitHub.
+Depois de novas alterações, o GitLab deve apontar para o mesmo commit da `main` local/GitHub.

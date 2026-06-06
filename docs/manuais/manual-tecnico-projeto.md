@@ -143,6 +143,22 @@ Observações:
 - `MAIL_*`
 - `RESEND_KEY`, quando `MAIL_MAILER=resend`
 
+No ambiente publicado no Railway, o backend deve usar o Postgres interno do próprio Railway:
+
+```env
+DB_CONNECTION=pgsql
+DB_HOST=postgres.railway.internal
+DB_PORT=5432
+DB_DATABASE=railway
+DB_USERNAME=postgres
+DB_PASSWORD=senha_configurada_no_Railway
+DB_SSLMODE=prefer
+```
+
+Não registrar a senha real em documentação ou repositório. A conexão deve usar o endpoint privado do Railway, evitando `DATABASE_PUBLIC_URL` para não gerar tráfego externo desnecessário.
+
+O banco foi migrado do Neon para o Postgres interno do Railway. Nos testes manuais de rede do navegador, o tempo das chamadas principais caiu de aproximadamente 3 segundos para menos de 1 segundo.
+
 ### Frontend
 
 - `VITE_API_URL`

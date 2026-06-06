@@ -36,6 +36,7 @@ Antes de iniciar a homologação, o ambiente deve ter:
 - [x] frontend publicado
 - [x] backend publicado
 - [x] banco PostgreSQL acessível
+- [x] banco de produção migrado para o Postgres interno do Railway
 - [ ] `APP_ENV=production`
 - [ ] `APP_DEBUG=false`
 - [ ] `APP_URL` configurado com URL pública
@@ -52,6 +53,7 @@ Antes de iniciar a homologação, o ambiente deve ter:
 - [x] a API responde sem erro
 - [x] `HTTPS` está válido no frontend
 - [x] o backend envia e-mail
+- [x] login e dashboard técnico respondem em menos de 1 segundo após a migração do banco para o Railway
 - [ ] os anexos não dependem de diretório temporário
 - [ ] anexos persistem após reinício do serviço
 - [ ] anexos persistem após novo deploy

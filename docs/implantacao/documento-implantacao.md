@@ -19,8 +19,10 @@ Ambiente online atual:
 - frontend/domínio público: `https://www.techosflow.com.br`
 - backend Railway: `https://techosflow-production.up.railway.app`
 - API: `/api/v1` pelo domínio publicado ou `https://techosflow-production.up.railway.app/api/v1`, conforme o build do frontend;
-- banco: PostgreSQL;
+- banco: PostgreSQL interno do Railway;
 - e-mail transacional: Resend.
+
+O banco de produção inicialmente usava Neon. Os dados foram migrados para o Postgres interno do Railway, usando conexão privada, para reduzir latência entre backend e banco e evitar tráfego externo desnecessário.
 
 Pontos que ainda exigem definição de infraestrutura:
 
@@ -56,7 +58,13 @@ Definir no `.env`:
 - `APP_DEBUG=false`
 - `APP_URL=https://techosflow-production.up.railway.app` ou a URL pública final do backend
 - `FRONTEND_URL=https://www.techosflow.com.br`
-- `DB_*`
+- `DB_CONNECTION=pgsql`
+- `DB_HOST=postgres.railway.internal` ou referência equivalente ao domínio privado do serviço Postgres
+- `DB_PORT=5432`
+- `DB_DATABASE=railway`
+- `DB_USERNAME=postgres`
+- `DB_PASSWORD` com a senha do usuário PostgreSQL no Railway
+- `DB_SSLMODE=prefer`
 - `ANEXOS_DISK=local` ou storage institucional definido
 - `SESSION_DRIVER=database` ou outro conforme estratégia
 - `SANCTUM_STATEFUL_DOMAINS`
@@ -71,6 +79,10 @@ Definir conforme o tipo de publicação:
 
 - mesmo domínio/proxy: `VITE_API_URL=/api/v1`
 - backend Railway direto: `VITE_API_URL=https://techosflow-production.up.railway.app/api/v1`
+
+### Observação sobre conexão com banco
+
+No Railway, evitar `DATABASE_PUBLIC_URL` ou `RAILWAY_TCP_PROXY_DOMAIN` para o backend quando ele estiver no mesmo projeto do banco. A conexão pública pode gerar tráfego externo e custos de egress. Preferir sempre o domínio privado, como `postgres.railway.internal` ou a variável baseada em `RAILWAY_PRIVATE_DOMAIN`.
 
 ## 5. Build do frontend
 
@@ -173,10 +185,15 @@ O ambiente de produção deve preservar:
 Ambiente usado atualmente para simplificar:
 
 - backend Laravel;
-- PostgreSQL no mesmo projeto;
+- PostgreSQL no mesmo projeto, via endpoint privado;
 - volume persistente para anexos;
 - domínios customizados;
 - deploy pela branch `main` do GitHub.
+
+Resultado observado após migrar o banco do Neon para o Postgres interno do Railway:
+
+- `login`: de aproximadamente 3,55 s para cerca de 682 ms;
+- dashboard técnico: de aproximadamente 3,21 s para cerca de 478 ms.
 
 Ponto de atenção:
 
