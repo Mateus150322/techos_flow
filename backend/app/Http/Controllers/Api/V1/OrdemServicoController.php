@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Endereco;
 use App\Models\OrdemServico;
 use App\Models\User;
+use App\Services\Auditoria\OrdemServicoAuditService;
 use App\Support\Concerns\UsesCaseInsensitiveLike;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
@@ -18,6 +19,10 @@ class OrdemServicoController extends Controller
 {
     use EnsuresTecnicoResponsavel;
     use UsesCaseInsensitiveLike;
+
+    public function __construct(
+        private readonly OrdemServicoAuditService $auditService
+    ) {}
 
     public function store(Request $request)
     {
@@ -76,7 +81,7 @@ class OrdemServicoController extends Controller
                     $ano = now()->year;
                     $numero = $this->generateOrderNumber($ano);
 
-                    return OrdemServico::create([
+                    $ordemServico = OrdemServico::create([
                         'numero' => $numero,
                         'tipo' => $data['tipo_servico'],
                         'nome_cliente' => $data['nome_cliente'],
@@ -87,6 +92,21 @@ class OrdemServicoController extends Controller
                         'criada_por_id' => $user->id,
                         'tecnico_responsavel_id' => $user->role === 'tecnico' ? $user->id : null,
                     ]);
+
+                    $this->auditService->registrar(
+                        $ordemServico,
+                        $user,
+                        'os_criada',
+                        'Ordem de serviço criada.',
+                        null,
+                        [
+                            'status' => $ordemServico->status,
+                            'prioridade' => $ordemServico->prioridade,
+                            'tecnico_responsavel_id' => $ordemServico->tecnico_responsavel_id,
+                        ]
+                    );
+
+                    return $ordemServico;
                 });
 
                 break;
@@ -206,8 +226,13 @@ class OrdemServicoController extends Controller
             'execucoes',
             'execucoes.tecnico',
             'anexos',
+            'eventos',
         ];
         $include = array_values(array_intersect($include, $allowedIncludes));
+
+        if (in_array('eventos', $include, true)) {
+            $include[] = 'eventos.usuario';
+        }
 
         $query = OrdemServico::query();
 
@@ -230,6 +255,7 @@ class OrdemServicoController extends Controller
     {
         $data = $request->validate([
             'motivo_nao_execucao' => 'required|string|max:1000',
+            'client_operation_id' => 'nullable|uuid',
         ]);
 
         $user = $request->user();
@@ -239,16 +265,42 @@ class OrdemServicoController extends Controller
             return $response;
         }
 
+        if (
+            ! empty($data['client_operation_id'])
+            && $os->encerramento_client_operation_id === $data['client_operation_id']
+            && $os->status === 'nao_executada'
+        ) {
+            return response()->json([
+                'message' => 'OS ja sincronizada anteriormente.',
+                'os' => $os,
+            ]);
+        }
+
         if (in_array($os->status, ['finalizada', 'cancelada', 'nao_executada'], true)) {
             return response()->json([
                 'message' => 'Não é possível marcar como não executada uma OS já encerrada.',
             ], 422);
         }
 
-        $os->status = 'nao_executada';
-        $os->motivo_nao_execucao = $data['motivo_nao_execucao'];
-        $os->data_encerramento = now();
-        $os->save();
+        DB::transaction(function () use ($data, $os, $user) {
+            $statusAnterior = $os->status;
+            $os->status = 'nao_executada';
+            $os->motivo_nao_execucao = $data['motivo_nao_execucao'];
+            $os->data_encerramento = now();
+            $os->encerramento_client_operation_id =
+                $data['client_operation_id'] ?? null;
+            $os->save();
+
+            $this->auditService->registrar(
+                $os,
+                $user,
+                'os_nao_executada',
+                $data['motivo_nao_execucao'],
+                ['status' => $statusAnterior],
+                ['status' => $os->status],
+                $data['client_operation_id'] ?? null
+            );
+        });
 
         return response()->json([
             'message' => 'OS marcada como não executada com sucesso.',
@@ -258,6 +310,9 @@ class OrdemServicoController extends Controller
 
     public function aceitar(Request $request, string $id)
     {
+        $data = $request->validate([
+            'client_operation_id' => 'nullable|uuid',
+        ]);
         $user = $request->user();
 
         if ($user->role !== 'tecnico') {
@@ -265,6 +320,17 @@ class OrdemServicoController extends Controller
         }
 
         $os = OrdemServico::query()->findOrFail($id);
+
+        if (
+            ! empty($data['client_operation_id'])
+            && $os->aceite_client_operation_id === $data['client_operation_id']
+            && $os->tecnico_responsavel_id === $user->id
+        ) {
+            return response()->json([
+                'message' => 'OS ja sincronizada anteriormente.',
+                'data' => $os->loadMissing('tecnicoResponsavel'),
+            ]);
+        }
 
         if ($os->status !== 'aberta') {
             return response()->json([
@@ -285,13 +351,55 @@ class OrdemServicoController extends Controller
             ], 409);
         }
 
-        $os->update([
-            'tecnico_responsavel_id' => $user->id,
-        ]);
+        $aceita = DB::transaction(function () use ($data, $id, $user) {
+            $updated = OrdemServico::query()
+                ->whereKey($id)
+                ->where('status', 'aberta')
+                ->whereNull('tecnico_responsavel_id')
+                ->update([
+                    'tecnico_responsavel_id' => $user->id,
+                    'aceite_client_operation_id' => $data['client_operation_id'] ?? null,
+                    'updated_at' => now(),
+                ]);
+
+            if ($updated !== 1) {
+                return false;
+            }
+
+            $ordemServico = OrdemServico::query()->findOrFail($id);
+            $this->auditService->registrar(
+                $ordemServico,
+                $user,
+                'os_aceita',
+                'OS aceita pelo técnico responsável.',
+                ['tecnico_responsavel_id' => null],
+                ['tecnico_responsavel_id' => $user->id],
+                $data['client_operation_id'] ?? null
+            );
+
+            return true;
+        });
+
+        if (! $aceita) {
+            $os = OrdemServico::query()->findOrFail($id);
+
+            if ($os->tecnico_responsavel_id === $user->id) {
+                return response()->json([
+                    'message' => 'Essa OS já está atribuída a você.',
+                    'data' => $os->loadMissing('tecnicoResponsavel'),
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'Essa OS já foi aceita por outro técnico.',
+            ], 409);
+        }
 
         return response()->json([
             'message' => 'OS aceita com sucesso.',
-            'data' => $os->fresh(['tecnicoResponsavel']),
+            'data' => OrdemServico::query()
+                ->with('tecnicoResponsavel')
+                ->findOrFail($id),
         ]);
     }
 
@@ -358,6 +466,9 @@ class OrdemServicoController extends Controller
                 'data_inicio',
                 'data_fim',
                 'observacao',
+                'diagnostico',
+                'procedimento',
+                'material_utilizado',
             ]);
         }
 
@@ -389,6 +500,27 @@ class OrdemServicoController extends Controller
                     'criado_em',
                 ])
                 ->orderByDesc('criado_em');
+        }
+
+        if (in_array('eventos', $include, true)) {
+            $loaders['eventos'] = fn ($query) => $query
+                ->select([
+                    'id',
+                    'os_id',
+                    'usuario_id',
+                    'evento',
+                    'descricao',
+                    'dados_anteriores',
+                    'dados_novos',
+                    'created_at',
+                ])
+                ->orderByDesc('created_at');
+            $loaders['eventos.usuario'] = fn ($query) => $query->select([
+                'id',
+                'name',
+                'email',
+                'role',
+            ]);
         }
 
         return $loaders;

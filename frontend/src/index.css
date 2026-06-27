@@ -57,6 +57,8 @@ html,
 body,
 #root {
   min-height: 100%;
+  width: 100%;
+  min-width: 0;
 }
 
 html,
@@ -67,6 +69,8 @@ body {
 
 html {
   color-scheme: light;
+  scroll-padding-top: 1rem;
+  -webkit-text-size-adjust: 100%;
 }
 
 html.dark {
@@ -75,6 +79,7 @@ html.dark {
 
 body {
   margin: 0;
+  min-width: 320px;
   width: 100%;
   background: var(--bg-main);
   color: var(--text-main);
@@ -87,6 +92,26 @@ body {
 * {
   box-sizing: border-box;
   min-width: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+select,
+summary,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
 }
 
 img,
@@ -140,8 +165,17 @@ select:focus-visible,
 
 .app-page {
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  min-width: 0;
+  overflow-x: clip;
   background: var(--bg-main);
   color: var(--text-main);
+}
+
+.app-mobile-safe {
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  padding-right: max(0.75rem, env(safe-area-inset-right));
 }
 
 .app-card {
@@ -180,6 +214,8 @@ select:focus-visible,
 .app-touch-scroll {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
 }
 
 .app-touch-scroll::-webkit-scrollbar {
@@ -247,6 +283,7 @@ select:focus-visible,
 
 .app-input {
   width: 100%;
+  min-height: 3rem;
   border-radius: 1rem;
   border: 1px solid var(--border);
   background: var(--bg-card);
@@ -272,6 +309,75 @@ select:focus-visible,
   border-radius: 1.5rem;
   border: 1px solid var(--border);
   background: var(--bg-card);
+}
+
+.app-table-shell table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.app-table-shell th,
+.app-table-shell td,
+.app-responsive-text,
+p,
+dd {
+  overflow-wrap: anywhere;
+}
+
+.app-mobile-sticky-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  margin-right: -1rem;
+  margin-left: -1rem;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+  padding: 0.75rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+  backdrop-filter: blur(14px);
+}
+
+@media (min-width: 640px) {
+  .app-mobile-sticky-actions {
+    position: static;
+    margin-right: 0;
+    margin-left: 0;
+    border-top: 0;
+    background: transparent;
+    padding: 0;
+    backdrop-filter: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .app-card {
+    border-radius: 1rem;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .app-card-soft,
+  .app-table-shell {
+    border-radius: 0.9rem;
+  }
+
+  .app-header-shell {
+    border-radius: 1.25rem;
+  }
+
+  .app-nav-shell {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .app-button-primary,
+  .app-button-outline,
+  .app-button-ghost {
+    min-height: 2.75rem;
+  }
+
+  .app-tab-active,
+  .app-tab-inactive {
+    scroll-snap-align: start;
+  }
 }
 
 .app-table-header {

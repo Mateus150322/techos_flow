@@ -26,6 +26,7 @@ class Anexo extends Model
         'endereco_capturado',
         'submetido_por_id',
         'criado_em',
+        'client_operation_id',
     ];
 
     public $timestamps = true;

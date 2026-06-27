@@ -48,16 +48,139 @@ class FluxoTecnicoTest extends TestCase
 
         $finalizar = $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
             'execucao_id' => $execucaoId,
+            'diagnostico' => 'Rolamento da bomba danificado.',
+            'procedimento' => 'Substituicao do rolamento e teste operacional.',
+            'material_utilizado' => 'Rolamento 6204 e graxa.',
         ]);
 
         $finalizar
             ->assertOk()
-            ->assertJsonPath('os.status', 'finalizada');
+            ->assertJsonPath('os.status', 'finalizada')
+            ->assertJsonPath('execucao.diagnostico', 'Rolamento da bomba danificado.')
+            ->assertJsonPath(
+                'execucao.procedimento',
+                'Substituicao do rolamento e teste operacional.'
+            )
+            ->assertJsonPath('execucao.material_utilizado', 'Rolamento 6204 e graxa.');
 
         $this->assertDatabaseHas('ordem_servicos', [
             'id' => $os->id,
             'status' => 'finalizada',
         ]);
+        $this->assertDatabaseHas('execucoes', [
+            'id' => $execucaoId,
+            'diagnostico' => 'Rolamento da bomba danificado.',
+            'procedimento' => 'Substituicao do rolamento e teste operacional.',
+            'material_utilizado' => 'Rolamento 6204 e graxa.',
+        ]);
+    }
+
+    public function test_finalizacao_exige_diagnostico_e_procedimento(): void
+    {
+        $tecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnico->id);
+
+        Sanctum::actingAs($tecnico);
+
+        $iniciar = $this->postJson("/api/v1/ordens-servico/{$os->id}/iniciar");
+
+        $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
+            'execucao_id' => $iniciar->json('execucao.id'),
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['diagnostico', 'procedimento']);
+    }
+
+    public function test_operacoes_offline_repetidas_nao_duplicam_execucao_ou_finalizacao(): void
+    {
+        $tecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnico->id);
+        $inicioOperationId = '11111111-1111-4111-8111-111111111111';
+        $fimOperationId = '22222222-2222-4222-8222-222222222222';
+
+        Sanctum::actingAs($tecnico);
+
+        $primeiroInicio = $this->postJson(
+            "/api/v1/ordens-servico/{$os->id}/iniciar",
+            ['client_operation_id' => $inicioOperationId]
+        );
+        $segundoInicio = $this->postJson(
+            "/api/v1/ordens-servico/{$os->id}/iniciar",
+            ['client_operation_id' => $inicioOperationId]
+        );
+        $execucaoId = $primeiroInicio->json('execucao.id');
+
+        $segundoInicio
+            ->assertOk()
+            ->assertJsonPath('execucao.id', $execucaoId);
+
+        $payloadFinalizacao = [
+            'execucao_id' => $execucaoId,
+            'diagnostico' => 'Diagnostico offline.',
+            'procedimento' => 'Procedimento offline.',
+            'client_operation_id' => $fimOperationId,
+        ];
+
+        $this->postJson(
+            "/api/v1/ordens-servico/{$os->id}/execucoes/finalizar",
+            $payloadFinalizacao
+        )->assertOk();
+        $this->postJson(
+            "/api/v1/ordens-servico/{$os->id}/execucoes/finalizar",
+            $payloadFinalizacao
+        )
+            ->assertOk()
+            ->assertJsonPath('execucao.id', $execucaoId);
+
+        $this->assertDatabaseCount('execucoes', 1);
+        $this->assertDatabaseHas('execucoes', [
+            'id' => $execucaoId,
+            'client_operation_id' => $inicioOperationId,
+            'finalizacao_client_operation_id' => $fimOperationId,
+        ]);
+    }
+
+    public function test_upload_offline_repetido_nao_duplica_anexo(): void
+    {
+        Storage::fake('local');
+
+        $tecnico = $this->criarUsuario('tecnico');
+        $os = $this->criarOs($tecnico->id);
+        $operationId = '33333333-3333-4333-8333-333333333333';
+
+        Sanctum::actingAs($tecnico);
+
+        $payload = [
+            'arquivo' => UploadedFile::fake()->create(
+                'evidencia.pdf',
+                200,
+                'application/pdf'
+            ),
+            'client_operation_id' => $operationId,
+        ];
+
+        $primeiro = $this->postJson(
+            "/api/v1/ordens-servico/{$os->id}/anexos",
+            $payload
+        );
+        $segundo = $this->postJson(
+            "/api/v1/ordens-servico/{$os->id}/anexos",
+            [
+                'arquivo' => UploadedFile::fake()->create(
+                    'evidencia.pdf',
+                    200,
+                    'application/pdf'
+                ),
+                'client_operation_id' => $operationId,
+            ]
+        );
+
+        $primeiro->assertCreated();
+        $segundo
+            ->assertOk()
+            ->assertJsonPath('anexo.id', $primeiro->json('anexo.id'));
+
+        $this->assertDatabaseCount('anexos', 1);
     }
 
     public function test_tecnico_nao_pode_marcar_como_nao_executada_os_de_outro_tecnico(): void
@@ -94,7 +217,7 @@ class FluxoTecnicoTest extends TestCase
             'rua_capturada' => 'Avenida Ceara',
             'bairro_capturado' => 'Centro',
             'cidade_capturada' => 'Rio Branco',
-            'estado_capturado' => 'AC',
+            'estado_capturado' => 'Acre',
             'endereco_capturado' => 'Avenida Ceara, Centro, Rio Branco/AC',
         ]);
 
@@ -107,7 +230,9 @@ class FluxoTecnicoTest extends TestCase
             ->assertJsonPath('anexo.rua_capturada', 'Avenida Ceara')
             ->assertJsonPath('anexo.bairro_capturado', 'Centro')
             ->assertJsonPath('anexo.cidade_capturada', 'Rio Branco')
-            ->assertJsonPath('anexo.estado_capturado', 'AC')
+            ->assertJsonPath('anexo.estado_capturado', 'Acre')
+            ->assertJsonPath('endereco_os.rua', 'Avenida Ceara')
+            ->assertJsonPath('endereco_os.estado', 'AC')
             ->assertJsonPath('anexo.endereco_capturado', 'Avenida Ceara, Centro, Rio Branco/AC');
 
         $this->assertDatabaseHas('anexos', [
@@ -119,8 +244,20 @@ class FluxoTecnicoTest extends TestCase
             'rua_capturada' => 'Avenida Ceara',
             'bairro_capturado' => 'Centro',
             'cidade_capturada' => 'Rio Branco',
-            'estado_capturado' => 'AC',
+            'estado_capturado' => 'Acre',
             'endereco_capturado' => 'Avenida Ceara, Centro, Rio Branco/AC',
+        ]);
+
+        $this->assertDatabaseHas('enderecos', [
+            'id' => $os->endereco_id,
+            'rua' => 'Avenida Ceara',
+            'numero' => '100',
+            'bairro' => 'Centro',
+            'cidade' => 'Rio Branco',
+            'estado' => 'AC',
+            'cep' => '69900000',
+            'latitude' => -9.97499,
+            'longitude' => -67.8243,
         ]);
 
         $caminho = (string) Anexo::query()
@@ -403,10 +540,34 @@ class FluxoTecnicoTest extends TestCase
         $response->assertStatus(403);
     }
 
+    public function test_administrador_nao_pode_criar_ordem_de_servico(): void
+    {
+        $admin = $this->criarUsuario('administrador');
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/v1/ordens-servico', [
+            'tipo_servico' => 'Manutencao',
+            'nome_cliente' => 'Cliente Teste',
+            'prioridade' => 2,
+            'descricao' => 'Teste de criacao de OS por administrador',
+            'endereco' => [
+                'logradouro' => 'Rua Teste',
+                'numero' => '100',
+                'bairro' => 'Centro',
+                'cidade' => 'Rio Branco',
+                'estado' => 'AC',
+                'cep' => '69900000',
+            ],
+        ]);
+
+        $response->assertStatus(403);
+    }
+
     private function criarUsuario(string $role): User
     {
         return User::query()->create([
-            'name' => ucfirst($role) . ' Teste',
+            'name' => ucfirst($role).' Teste',
             'email' => fake()->unique()->safeEmail(),
             'password' => Hash::make('password'),
             'role' => $role,

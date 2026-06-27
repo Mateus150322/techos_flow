@@ -1,10 +1,18 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Loader2, PlusCircle } from "lucide-react";
+import { ClipboardList, Loader2, MapPin, PlusCircle } from "lucide-react";
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   getApiErrorMessage,
   getApiValidationErrors,
 } from "@/shared/utils/apiError";
+import { useCurrentUser } from "@/shared/auth/session";
+import { usePersistedDraft } from "@/shared/hooks/usePersistedDraft";
 import {
   criarOrdem,
   type OrdemServicoDetalhe,
@@ -32,6 +40,8 @@ type FormularioOSGeralProps = {
   descricao?: string;
   mobileNavOffset?: boolean;
 };
+
+type FormSection = "dados" | "endereco";
 
 function getDataAtualLocal() {
   const now = new Date();
@@ -65,9 +75,18 @@ export default function FormularioOSGeral({
   descricao = "Preencha os dados para criar uma nova OS.",
   mobileNavOffset = false,
 }: FormularioOSGeralProps) {
-  const [form, setForm] = useState<FormularioOSData>(initialForm);
+  const currentUser = useCurrentUser("atendente");
+  const {
+    value: form,
+    setValue: setForm,
+    clearDraft,
+  } = usePersistedDraft<FormularioOSData>(
+    `draft:ordem-geral:${currentUser.id ?? "atendente"}`,
+    initialForm
+  );
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [secoesAbertas, setSecoesAbertas] = useState<FormSection[]>(["dados"]);
 
   function updateField<K extends keyof FormularioOSData>(
     field: K,
@@ -104,22 +123,22 @@ export default function FormularioOSGeral({
   }
 
   function validarFormulario() {
-    if (!form.dataAbertura) return "Informe a data de abertura.";
-    if (!form.horaAbertura) return "Informe a hora de abertura.";
-    if (!form.tipoServico.trim()) return "Informe o tipo de serviço.";
-    if (!form.nomeCliente.trim()) return "Informe o nome do cliente.";
-    if (!form.prioridade.trim()) return "Informe a prioridade.";
-    if (!form.descricao.trim()) return "Informe a descrição do serviço.";
-    if (!form.logradouro.trim()) return "Informe o logradouro.";
-    if (!form.numero.trim()) return "Informe o número.";
-    if (!form.bairro.trim()) return "Informe o bairro.";
-    if (!form.cidade.trim()) return "Informe a cidade.";
-    if (!form.estado.trim()) return "Informe o estado.";
-    if (form.estado.trim().length !== 2) return "Informe a UF com 2 letras.";
-    if (!form.cep.trim()) return "Informe o CEP.";
-    if (form.cep.replace(/\D/g, "").length !== 8) return "Informe um CEP válido.";
+    if (!form.dataAbertura) return { mensagem: "Informe a data de abertura.", secao: "dados" as const };
+    if (!form.horaAbertura) return { mensagem: "Informe a hora de abertura.", secao: "dados" as const };
+    if (!form.tipoServico.trim()) return { mensagem: "Informe o tipo de serviço.", secao: "dados" as const };
+    if (!form.nomeCliente.trim()) return { mensagem: "Informe o nome do cliente.", secao: "dados" as const };
+    if (!form.prioridade.trim()) return { mensagem: "Informe a prioridade.", secao: "dados" as const };
+    if (!form.descricao.trim()) return { mensagem: "Informe a descrição do serviço.", secao: "dados" as const };
+    if (!form.logradouro.trim()) return { mensagem: "Informe o logradouro.", secao: "endereco" as const };
+    if (!form.numero.trim()) return { mensagem: "Informe o número.", secao: "endereco" as const };
+    if (!form.bairro.trim()) return { mensagem: "Informe o bairro.", secao: "endereco" as const };
+    if (!form.cidade.trim()) return { mensagem: "Informe a cidade.", secao: "endereco" as const };
+    if (!form.estado.trim()) return { mensagem: "Informe o estado.", secao: "endereco" as const };
+    if (form.estado.trim().length !== 2) return { mensagem: "Informe a UF com 2 letras.", secao: "endereco" as const };
+    if (!form.cep.trim()) return { mensagem: "Informe o CEP.", secao: "endereco" as const };
+    if (form.cep.replace(/\D/g, "").length !== 8) return { mensagem: "Informe um CEP válido.", secao: "endereco" as const };
 
-    return "";
+    return null;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -129,7 +148,12 @@ export default function FormularioOSGeral({
     const mensagemErro = validarFormulario();
 
     if (mensagemErro) {
-      setErro(mensagemErro);
+      setErro(mensagemErro.mensagem);
+      setSecoesAbertas((current) =>
+        current.includes(mensagemErro.secao)
+          ? current
+          : [...current, mensagemErro.secao]
+      );
       return;
     }
 
@@ -153,7 +177,7 @@ export default function FormularioOSGeral({
         },
       });
 
-      setForm({
+      await clearDraft({
         ...initialForm,
         dataAbertura: getDataAtualLocal(),
         horaAbertura: getHoraAtualLocal(),
@@ -202,15 +226,20 @@ export default function FormularioOSGeral({
           <div className="app-alert-danger rounded-xl px-4 py-3 text-sm" role="alert" aria-live="assertive">{erro}</div>
         ) : null}
 
-        <section className="app-section-soft rounded-[1.2rem] p-4 sm:rounded-[1.35rem] sm:p-5">
-          <div className="mb-5">
-            <h3 className="text-lg font-semibold text-[var(--text-main)] sm:text-xl">Dados da OS</h3>
-            <p className="app-muted mt-1 text-sm">
-              Registre a abertura da OS e identifique a solicitacao.
-            </p>
-          </div>
+        <Accordion
+          type="multiple"
+          value={secoesAbertas}
+          onValueChange={(value) => setSecoesAbertas(value as FormSection[])}
+          className="space-y-4"
+        >
+          <FormAccordionSection
+            value="dados"
+            title="Dados da OS"
+            description="Registre a abertura da OS e identifique a solicitação."
+            icon={<ClipboardList className="h-5 w-5" />}
+          >
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-6">
             <FormField label="Data de abertura *" htmlFor="dataAbertura">
               <input
                 id="dataAbertura"
@@ -263,47 +292,44 @@ export default function FormularioOSGeral({
                 <option value="3">Baixa</option>
               </select>
             </FormField>
-          </div>
+            </div>
 
-          <div className="mt-4 sm:mt-6">
-            <FormField label="Nome do cliente *" htmlFor="nomeCliente">
-              <input
-                id="nomeCliente"
-                type="text"
-                value={form.nomeCliente}
-                onChange={(event) => updateField("nomeCliente", event.target.value)}
-                disabled={enviando}
-                className="app-input px-4 py-3 disabled:opacity-60"
-              />
-            </FormField>
-          </div>
+            <div className="mt-4 sm:mt-6">
+              <FormField label="Nome do cliente *" htmlFor="nomeCliente">
+                <input
+                  id="nomeCliente"
+                  type="text"
+                  value={form.nomeCliente}
+                  onChange={(event) => updateField("nomeCliente", event.target.value)}
+                  disabled={enviando}
+                  className="app-input px-4 py-3 disabled:opacity-60"
+                />
+              </FormField>
+            </div>
 
-          <div className="mt-4 sm:mt-6">
-            <FormField label="Descricao do servico *" htmlFor="descricao">
-              <textarea
-                id="descricao"
-                rows={4}
-                value={form.descricao}
-                onChange={(event) => updateField("descricao", event.target.value)}
-                placeholder="Descreva o servico a ser realizado"
-                disabled={enviando}
-                className="app-input px-4 py-3 disabled:opacity-60"
-              />
-            </FormField>
-          </div>
-        </section>
+            <div className="mt-4 sm:mt-6">
+              <FormField label="Descrição do serviço *" htmlFor="descricao">
+                <textarea
+                  id="descricao"
+                  rows={4}
+                  value={form.descricao}
+                  onChange={(event) => updateField("descricao", event.target.value)}
+                  placeholder="Descreva o serviço a ser realizado"
+                  disabled={enviando}
+                  className="app-input px-4 py-3 disabled:opacity-60"
+                />
+              </FormField>
+            </div>
+          </FormAccordionSection>
 
-        <section className="app-section-soft rounded-[1.2rem] p-4 sm:rounded-[1.35rem] sm:p-5">
-          <div className="mb-5">
-            <h3 className="text-xl font-semibold text-[var(--text-main)]">
-              Endereco do cliente
-            </h3>
-            <p className="app-muted mt-1 text-sm">
-              Informe o local que sera usado como referencia para atendimento.
-            </p>
-          </div>
+          <FormAccordionSection
+            value="endereco"
+            title="Endereço do cliente"
+            description="Informe o local usado como referência para o atendimento."
+            icon={<MapPin className="h-5 w-5" />}
+          >
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
             <div className="md:col-span-2">
               <FormField label="Logradouro *" htmlFor="logradouro">
                 <input
@@ -327,9 +353,9 @@ export default function FormularioOSGeral({
                 className="app-input px-4 py-3 disabled:opacity-60"
               />
             </FormField>
-          </div>
+            </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
             <FormField label="Complemento" htmlFor="complemento">
               <input
                 id="complemento"
@@ -351,9 +377,9 @@ export default function FormularioOSGeral({
                 className="app-input px-4 py-3 disabled:opacity-60"
               />
             </FormField>
-          </div>
+            </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
             <FormField label="Cidade *" htmlFor="cidade">
               <input
                 id="cidade"
@@ -389,12 +415,11 @@ export default function FormularioOSGeral({
                 className="app-input px-4 py-3 disabled:opacity-60"
               />
             </FormField>
-          </div>
-        </section>
+            </div>
+          </FormAccordionSection>
+        </Accordion>
 
-        <div
-          className="border-t border-[var(--border)] bg-transparent pt-4 sm:border-0 sm:pt-0"
-        >
+        <div className="app-mobile-sticky-actions">
           <div className="mx-auto max-w-7xl">
             <button
               type="submit"
@@ -417,6 +442,44 @@ export default function FormularioOSGeral({
         </div>
       </form>
     </div>
+  );
+}
+
+function FormAccordionSection({
+  value,
+  title,
+  description,
+  icon,
+  children,
+}: {
+  value: FormSection;
+  title: string;
+  description: string;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <AccordionItem
+      value={value}
+      className="app-section-soft overflow-hidden rounded-[1.2rem] border border-[var(--border)] px-4 sm:rounded-[1.35rem] sm:px-5"
+    >
+      <AccordionTrigger className="py-4 sm:py-5">
+        <span className="flex min-w-0 items-start gap-3">
+          <span className="app-card inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--primary)] shadow-none">
+            {icon}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-base font-semibold text-[var(--text-main)] sm:text-lg">
+              {title}
+            </span>
+            <span className="app-muted mt-1 block text-xs font-normal leading-5 sm:text-sm">
+              {description}
+            </span>
+          </span>
+        </span>
+      </AccordionTrigger>
+      <AccordionContent className="pb-5">{children}</AccordionContent>
+    </AccordionItem>
   );
 }
 

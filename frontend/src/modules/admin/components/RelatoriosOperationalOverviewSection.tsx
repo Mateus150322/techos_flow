@@ -132,9 +132,8 @@ export function RelatoriosOperationalOverviewSection({
               ))
             )}
           </div>
-          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-sm">
+          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 lg:block">
+              <table className="w-full table-fixed text-sm">
                 <thead className={isDark ? "bg-slate-950 text-slate-300" : "bg-slate-100 text-slate-600"}>
                   <tr>
                     <th className="p-3 text-left font-semibold">Técnico</th>
@@ -171,7 +170,6 @@ export function RelatoriosOperationalOverviewSection({
                   )}
                 </tbody>
               </table>
-            </div>
           </div>
         </div>
 

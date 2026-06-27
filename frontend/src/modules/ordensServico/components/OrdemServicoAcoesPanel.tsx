@@ -1,5 +1,6 @@
 ﻿import { useEffect, useId, useMemo, useState } from "react";
 import { useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   CheckCircle2,
   ClipboardList,
@@ -14,6 +15,7 @@ import {
   listarFuncionariosDisponiveis,
   type FuncionarioDisponivel,
 } from "../ordensServico.service";
+import { queryKeys } from "@/shared/query/queryClient";
 
 type Variant = "page" | "modal";
 
@@ -60,6 +62,9 @@ type Props = {
     execucaoId: string;
     dataFim?: string;
     observacao?: string;
+    diagnostico: string;
+    procedimento: string;
+    materialUtilizado?: string;
     funcionarios?: ParticipanteExecucaoInput[];
   }) => Promise<boolean>;
   onMarcarNaoExecutada?: (motivo: string) => Promise<boolean>;
@@ -298,7 +303,7 @@ function EquipeExecucaoSection({
         </button>
       </div>
 
-      <div className="space-y-3 md:hidden">
+      <div className="space-y-3 xl:hidden">
         {participantes.map((participante) => {
           const obrigatorio =
             participante.obrigatorio &&
@@ -349,8 +354,8 @@ function EquipeExecucaoSection({
         })}
       </div>
 
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[920px] table-fixed text-sm">
+      <div className="hidden xl:block">
+        <table className="w-full table-fixed text-sm">
           <caption id={captionId} className="sr-only">
             Tabela da equipe da execução com participante, início, fim, resumo
             das horas informadas e ações disponíveis.
@@ -723,6 +728,75 @@ function EquipeExecucaoMobileCard({
   );
 }
 
+function ResolucaoTecnicaSection({
+  diagnostico,
+  procedimento,
+  materialUtilizado,
+  processandoAcao,
+  inputClass,
+  onDiagnosticoChange,
+  onProcedimentoChange,
+  onMaterialUtilizadoChange,
+}: {
+  diagnostico: string;
+  procedimento: string;
+  materialUtilizado: string;
+  processandoAcao: boolean;
+  inputClass: string;
+  onDiagnosticoChange: (value: string) => void;
+  onProcedimentoChange: (value: string) => void;
+  onMaterialUtilizadoChange: (value: string) => void;
+}) {
+  return (
+    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-900">
+          Resolução técnica
+        </h3>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          Registre o que foi identificado e realizado durante esta execução.
+        </p>
+      </div>
+
+      <label className="block text-sm font-medium text-slate-700">
+        Diagnóstico *
+        <textarea
+          rows={3}
+          value={diagnostico}
+          onChange={(event) => onDiagnosticoChange(event.target.value)}
+          placeholder="Descreva a causa ou condição encontrada"
+          disabled={processandoAcao}
+          className={`${inputClass} mt-2`}
+        />
+      </label>
+
+      <label className="block text-sm font-medium text-slate-700">
+        Procedimento executado *
+        <textarea
+          rows={3}
+          value={procedimento}
+          onChange={(event) => onProcedimentoChange(event.target.value)}
+          placeholder="Descreva os procedimentos realizados"
+          disabled={processandoAcao}
+          className={`${inputClass} mt-2`}
+        />
+      </label>
+
+      <label className="block text-sm font-medium text-slate-700">
+        Material utilizado
+        <textarea
+          rows={2}
+          value={materialUtilizado}
+          onChange={(event) => onMaterialUtilizadoChange(event.target.value)}
+          placeholder="Liste os materiais utilizados, quando houver"
+          disabled={processandoAcao}
+          className={`${inputClass} mt-2`}
+        />
+      </label>
+    </section>
+  );
+}
+
 export function OrdemServicoAcoesPanel({
   variant,
   status,
@@ -747,14 +821,30 @@ export function OrdemServicoAcoesPanel({
 }: Props) {
   const [observacaoInicio, setObservacaoInicio] = useState("");
   const [observacaoFim, setObservacaoFim] = useState("");
+  const [diagnostico, setDiagnostico] = useState("");
+  const [procedimento, setProcedimento] = useState("");
+  const [materialUtilizado, setMaterialUtilizado] = useState("");
   const [motivoNaoExecucao, setMotivoNaoExecucao] = useState("");
   const [novoStatus, setNovoStatus] = useState("");
-  const [participantes, setParticipantes] = useState<ParticipanteRow[]>([]);
-  const [funcionariosDisponiveis, setFuncionariosDisponiveis] = useState<
-    FuncionarioDisponivel[]
-  >([]);
-  const [carregandoFuncionarios, setCarregandoFuncionarios] = useState(false);
+  const [participantes, setParticipantes] = useState<ParticipanteRow[]>(() =>
+    currentUserId
+      ? [createParticipante(currentUserId, true, "usuario")]
+      : []
+  );
   const participanteParaFocarRef = useRef<string | null>(null);
+  const erroFuncionariosReportadoRef = useRef(false);
+  const deveCarregarFuncionarios =
+    Boolean(onFinalizarExecucao) &&
+    (podeFinalizarExecucao || status === "em_execucao");
+  const funcionariosQuery = useQuery<FuncionarioDisponivel[]>({
+    queryKey: queryKeys.funcionariosDisponiveis,
+    queryFn: () => listarFuncionariosDisponiveis(),
+    enabled: deveCarregarFuncionarios,
+  });
+  const funcionariosDisponiveis = funcionariosQuery.data ?? [];
+  const carregandoFuncionarios =
+    funcionariosQuery.isPending &&
+    funcionariosQuery.fetchStatus !== "paused";
 
   const textInputClass = isDark
     ? "w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:ring-2 disabled:opacity-60"
@@ -777,66 +867,20 @@ export function OrdemServicoAcoesPanel({
   );
 
   useEffect(() => {
-    if (!currentUserId) return;
-
-    setParticipantes((current) => {
-      const index = current.findIndex(
-        (participante) =>
-          participante.obrigatorio ||
-          (participante.participanteTipo === "usuario" &&
-            participante.participanteId === currentUserId)
-      );
-
-      if (index === -1) {
-        return [createParticipante(currentUserId, true, "usuario"), ...current];
-      }
-
-      const updated = [...current];
-      updated[index] = {
-        ...updated[index],
-        participanteId: currentUserId,
-        participanteTipo: "usuario",
-        obrigatorio: true,
-      };
-
-      return updated;
-    });
-  }, [currentUserId]);
-
-  useEffect(() => {
-    if (!onFinalizarExecucao || (!podeFinalizarExecucao && status !== "em_execucao")) {
+    if (!funcionariosQuery.error || funcionariosQuery.data) {
+      erroFuncionariosReportadoRef.current = false;
       return;
     }
 
-    let ativo = true;
-
-    async function carregarFuncionarios() {
-      try {
-        setCarregandoFuncionarios(true);
-        const data = await listarFuncionariosDisponiveis();
-
-        if (ativo) {
-          setFuncionariosDisponiveis(data);
-        }
-      } catch {
-        if (ativo) {
-          onError(
-            "Não foi possível carregar os participantes disponíveis para a execução."
-          );
-        }
-      } finally {
-        if (ativo) {
-          setCarregandoFuncionarios(false);
-        }
-      }
+    if (erroFuncionariosReportadoRef.current) {
+      return;
     }
 
-    void carregarFuncionarios();
-
-    return () => {
-      ativo = false;
-    };
-  }, [onError, onFinalizarExecucao, podeFinalizarExecucao, status]);
+    erroFuncionariosReportadoRef.current = true;
+    onError(
+      "Não foi possível carregar os participantes disponíveis para a execução."
+    );
+  }, [funcionariosQuery.data, funcionariosQuery.error, onError]);
 
   useEffect(() => {
     const participanteId = participanteParaFocarRef.current;
@@ -984,6 +1028,16 @@ export function OrdemServicoAcoesPanel({
       return;
     }
 
+    if (!diagnostico.trim()) {
+      onError("Informe o diagnóstico da execução.");
+      return;
+    }
+
+    if (!procedimento.trim()) {
+      onError("Informe o procedimento executado.");
+      return;
+    }
+
     const funcionarios = normalizarParticipantes();
 
     if (!funcionarios) return;
@@ -994,11 +1048,17 @@ export function OrdemServicoAcoesPanel({
       execucaoId: execucaoAbertaId,
       dataFim: dataFimPrincipal,
       observacao: observacaoFim.trim() || undefined,
+      diagnostico: diagnostico.trim(),
+      procedimento: procedimento.trim(),
+      materialUtilizado: materialUtilizado.trim() || undefined,
       funcionarios,
     });
 
     if (finalizou) {
       setObservacaoFim("");
+      setDiagnostico("");
+      setProcedimento("");
+      setMaterialUtilizado("");
       resetEquipe();
     }
   }
@@ -1170,7 +1230,19 @@ export function OrdemServicoAcoesPanel({
             </select>
 
             {novoStatus === "finalizada" && (
-              <EquipeExecucaoSection {...equipeProps} />
+              <div className="space-y-3">
+                <ResolucaoTecnicaSection
+                  diagnostico={diagnostico}
+                  procedimento={procedimento}
+                  materialUtilizado={materialUtilizado}
+                  processandoAcao={processandoAcao}
+                  inputClass={compactInputClass}
+                  onDiagnosticoChange={setDiagnostico}
+                  onProcedimentoChange={setProcedimento}
+                  onMaterialUtilizadoChange={setMaterialUtilizado}
+                />
+                <EquipeExecucaoSection {...equipeProps} />
+              </div>
             )}
 
             {novoStatus === "nao_executada" && (
@@ -1184,21 +1256,23 @@ export function OrdemServicoAcoesPanel({
               />
             )}
 
-            <button
-              type="button"
-              onClick={() =>
-                void (
-                  novoStatus === "finalizada"
-                    ? handleFinalizarExecucao()
-                    : handleMarcarNaoExecutada()
-                )
-              }
-              disabled={!novoStatus || processandoAcao}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800 disabled:opacity-60"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              {processandoAcao ? "Salvando..." : "Confirmar atualização"}
-            </button>
+            <div className="app-mobile-sticky-actions">
+              <button
+                type="button"
+                onClick={() =>
+                  void (
+                    novoStatus === "finalizada"
+                      ? handleFinalizarExecucao()
+                      : handleMarcarNaoExecutada()
+                  )
+                }
+                disabled={!novoStatus || processandoAcao}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800 disabled:opacity-60"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {processandoAcao ? "Salvando..." : "Confirmar atualização"}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1234,6 +1308,16 @@ export function OrdemServicoAcoesPanel({
 
       {podeFinalizarExecucao && onFinalizarExecucao && (
         <div className="space-y-4">
+          <ResolucaoTecnicaSection
+            diagnostico={diagnostico}
+            procedimento={procedimento}
+            materialUtilizado={materialUtilizado}
+            processandoAcao={processandoAcao}
+            inputClass={textInputClass}
+            onDiagnosticoChange={setDiagnostico}
+            onProcedimentoChange={setProcedimento}
+            onMaterialUtilizadoChange={setMaterialUtilizado}
+          />
           <EquipeExecucaoSection {...equipeProps} />
           <textarea
             rows={4}
@@ -1244,15 +1328,17 @@ export function OrdemServicoAcoesPanel({
             className={`${textInputClass} focus:ring-blue-500`}
             aria-label="Observação opcional ao finalizar a execução"
           />
-          <button
-            type="button"
-            onClick={() => void handleFinalizarExecucao()}
-            disabled={processandoAcao}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/10 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            {processandoAcao ? "Finalizando..." : "Finalizar execução"}
-          </button>
+          <div className="app-mobile-sticky-actions">
+            <button
+              type="button"
+              onClick={() => void handleFinalizarExecucao()}
+              disabled={processandoAcao}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/10 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              {processandoAcao ? "Finalizando..." : "Finalizar execução"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -1267,15 +1353,17 @@ export function OrdemServicoAcoesPanel({
             className={`${textInputClass} focus:ring-red-500`}
             aria-label="Motivo pelo qual a ordem de serviço não foi executada"
           />
-          <button
-            type="button"
-            onClick={() => void handleMarcarNaoExecutada()}
-            disabled={processandoAcao}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-900/10 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-          >
-            <FileText className="h-4 w-4" />
-            {processandoAcao ? "Salvando..." : "Marcar como não executada"}
-          </button>
+          <div className="app-mobile-sticky-actions">
+            <button
+              type="button"
+              onClick={() => void handleMarcarNaoExecutada()}
+              disabled={processandoAcao}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-900/10 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              <FileText className="h-4 w-4" />
+              {processandoAcao ? "Salvando..." : "Marcar como não executada"}
+            </button>
+          </div>
         </div>
       )}
     </div>

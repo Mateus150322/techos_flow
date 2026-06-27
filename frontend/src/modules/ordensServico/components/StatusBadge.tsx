@@ -50,10 +50,10 @@ export function StatusBadge({ status }: Props) {
 
   return (
     <span
-      className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold"
+      className="inline-flex max-w-full items-center justify-center gap-2 rounded-full border px-3 py-1.5 text-center text-xs font-semibold leading-4"
       style={styles[status]}
     >
-      <span className="h-2 w-2 rounded-full bg-current" />
+      <span className="h-2 w-2 shrink-0 rounded-full bg-current" />
       {labels[status]}
     </span>
   );

@@ -2,12 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use App\Models\Endereco;
-use App\Models\User;
-use App\Models\Execucao;
-use App\Models\Anexo;
+use Illuminate\Database\Eloquent\Model;
 
 class OrdemServico extends Model
 {
@@ -28,7 +24,9 @@ class OrdemServico extends Model
         'motivo_nao_execucao',
         'endereco_id',
         'criada_por_id',
-        'tecnico_responsavel_id'
+        'tecnico_responsavel_id',
+        'aceite_client_operation_id',
+        'encerramento_client_operation_id',
     ];
 
     protected $casts = [
@@ -55,8 +53,15 @@ class OrdemServico extends Model
     {
         return $this->hasMany(Anexo::class, 'os_id');
     }
+
+    public function eventos()
+    {
+        return $this->hasMany(OrdemServicoEvento::class, 'os_id')
+            ->orderByDesc('created_at');
+    }
+
     public function tecnicoResponsavel()
-{
-    return $this->belongsTo(User::class, 'tecnico_responsavel_id');
-}
+    {
+        return $this->belongsTo(User::class, 'tecnico_responsavel_id');
+    }
 }

@@ -8,14 +8,14 @@ Este manual descreve como preparar, executar, manter e evoluir o TechOS Flow em 
 
 ### Backend
 
-- PHP 8.2 ou superior
+- PHP 8.4 recomendado para producao; PHP 8.2 permanece compativel para desenvolvimento local
 - Composer
 - PostgreSQL
 - extensões necessárias do Laravel: `pdo_pgsql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `gd`, `zip`
 
 ### Frontend
 
-- Node.js 20 ou superior recomendado
+- Node.js 22 recomendado; minimo compativel: Node.js 20.19
 - npm
 
 ## 3. Estrutura do projeto
@@ -108,6 +108,10 @@ Serviços disponíveis:
 - frontend em `http://localhost:5173`
 - backend em `http://localhost:8000`
 - PostgreSQL em `localhost:5432`
+
+Para validar geolocalização no próprio computador, use `http://localhost:5173`.
+O navegador considera `localhost` um contexto seguro para a API de localização.
+Para validar em celular ou em outro aparelho da rede local, sirva o frontend com HTTPS local e acesse por `https://<host-ou-ip>:5173`.
 
 Comandos úteis:
 

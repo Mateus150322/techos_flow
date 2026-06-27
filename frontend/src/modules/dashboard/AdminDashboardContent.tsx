@@ -128,15 +128,15 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
       </section>
 
       <section className="mb-6 grid gap-6 xl:grid-cols-2">
-        <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+        <div className={`rounded-3xl border p-4 shadow-sm sm:p-6 ${cardBg}`}>
           <h2 className={`text-2xl font-semibold ${titleText}`}>Distribuição por status</h2>
           <p className={`mt-1 text-sm ${mutedText}`}>
             Visão geral do status das ordens de serviço.
           </p>
 
-          <div className="mt-8 flex flex-col items-center gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="mt-6 flex flex-col items-center gap-6 sm:mt-8 lg:flex-row lg:items-center lg:justify-between">
             <div
-              className="relative h-56 w-56 rounded-full p-8"
+              className="relative h-48 w-48 rounded-full p-6 sm:h-56 sm:w-56 sm:p-8"
               style={{
                 background: `conic-gradient(${statusSlices.join(", ")})`,
               }}
@@ -162,11 +162,11 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
           </div>
         </div>
 
-        <div className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+        <div className={`rounded-3xl border p-4 shadow-sm sm:p-6 ${cardBg}`}>
           <h2 className={`text-2xl font-semibold ${titleText}`}>OS por tipo de serviço</h2>
           <p className={`mt-1 text-sm ${mutedText}`}>Quantidade de ordens por categoria.</p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-6 grid gap-4 sm:mt-8 sm:grid-cols-2 xl:grid-cols-3">
               {tiposBreakdown.map((item) => (
                 <div key={item.tipo} className={`rounded-2xl border p-4 ${softBg}`}>
                   <div className={`flex h-48 items-end rounded-2xl ${barTrack}`}>
@@ -190,13 +190,13 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
         </div>
       </section>
 
-      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+      <section className={`mb-6 rounded-3xl border p-4 shadow-sm sm:p-6 ${cardBg}`}>
         <h2 className={`text-2xl font-semibold ${titleText}`}>Produtividade dos técnicos</h2>
         <p className={`mt-1 text-sm ${mutedText}`}>
           Comparação entre OS atribuídas e finalizadas por técnico.
         </p>
 
-        <div className="mt-8 space-y-6">
+        <div className="mt-6 space-y-6 sm:mt-8">
           {loading ? (
             <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
               Carregando produtividade...
@@ -208,9 +208,9 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
           ) : (
             produtividadeTecnicos.map((item) => (
               <div key={item.id}>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className={`font-medium ${titleText}`}>{item.nome}</span>
-                  <span className={`text-sm ${mutedText}`}>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <span className={`min-w-0 break-words font-medium ${titleText}`}>{item.nome}</span>
+                  <span className={`break-words text-sm ${mutedText}`}>
                     {item.finalizadas} finalizadas de {item.atribuidas} atribuídas
                   </span>
                 </div>
@@ -248,7 +248,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
         </div>
       </section>
 
-      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+      <section className={`mb-6 rounded-3xl border p-4 shadow-sm sm:p-6 ${cardBg}`}>
         <h2 className={`text-2xl font-semibold ${titleText}`}>Resumo do mês atual</h2>
         <p className={`mt-1 text-sm ${mutedText}`}>Indicadores com base nas OS abertas neste mês.</p>
 
@@ -284,7 +284,7 @@ export function AdminDashboardContent({ currentUser }: AdminDashboardContentProp
         </div>
       </section>
 
-      <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`}>
+      <section className={`rounded-3xl border p-4 shadow-sm sm:p-6 ${cardBg}`}>
         <h2 className={`text-2xl font-semibold ${titleText}`}>Atividade recente</h2>
         <p className={`mt-1 text-sm ${mutedText}`}>Últimas ordens de serviço atualizadas.</p>
 

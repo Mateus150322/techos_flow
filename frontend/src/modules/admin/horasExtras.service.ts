@@ -30,6 +30,18 @@ export type HoraExtraRow = {
   saldo_banco_minutos: number;
   saldo_banco: string;
   valor_estimado_financeiro: number;
+  minutos_feriados: number;
+  minutos_pontos_facultativos: number;
+  minutos_fins_semana: number;
+  minutos_plantao: number;
+  horas_feriados: string;
+  horas_pontos_facultativos: string;
+  horas_fins_semana: string;
+  horas_plantao: string;
+  aprovacao_status: "pendente" | "aprovada" | "reprovada" | "parcial" | "sem_lancamentos";
+  aprovacao_pendentes: number;
+  aprovacao_aprovadas: number;
+  aprovacao_reprovadas: number;
 };
 
 export type HorasExtrasResponse = {
@@ -49,6 +61,33 @@ export type HorasExtrasResponse = {
     saldo_total_banco_minutos: number;
     saldo_total_banco: string;
     total_estimado_financeiro: number;
+    total_minutos_feriados: number;
+    total_feriados: string;
+    total_minutos_pontos_facultativos: number;
+    total_pontos_facultativos: string;
+    total_minutos_fins_semana: number;
+    total_fins_semana: string;
+    total_minutos_plantao: number;
+    total_plantao: string;
+  };
+  aprovacao: {
+    pendentes: number;
+    aprovadas: number;
+    reprovadas: number;
+    status_geral:
+      | "pendente"
+      | "parcial"
+      | "aprovada"
+      | "com_reprovacoes"
+      | "sem_lancamentos";
+  };
+  fechamento: null | {
+    status: "aberta" | "fechada";
+    id: string | null;
+    competencia: string;
+    fechado_em: string | null;
+    fechado_por: string | null;
+    observacao: string | null;
   };
   indicadores: {
     top_funcionarios: Array<{
@@ -123,4 +162,49 @@ export async function exportarRelatorioHorasExtras(
     blob: response.data,
     fileName,
   };
+}
+
+export async function atualizarAprovacaoHorasExtras(
+  status: "pendente" | "aprovada" | "reprovada",
+  params: Omit<BuscarHorasExtrasParams, "page" | "perPage"> & { observacao?: string }
+) {
+  const { data } = await api.post<{
+    status: string;
+    registros_atualizados: number;
+  }>("/relatorios/horas-extras/aprovacoes", {
+    status,
+    observacao: params.observacao || undefined,
+    funcionario_id: params.funcionarioId || undefined,
+    data_inicio: params.dataInicio || undefined,
+    data_fim: params.dataFim || undefined,
+    mes: params.mes || undefined,
+    ano: params.ano || undefined,
+  });
+
+  return data;
+}
+
+export async function fecharCompetenciaHorasExtras(params: {
+  mes: string;
+  ano: string;
+  observacao?: string;
+}) {
+  const { data } = await api.post<NonNullable<HorasExtrasResponse["fechamento"]>>(
+    "/relatorios/horas-extras/fechamentos",
+    {
+      mes: params.mes,
+      ano: params.ano,
+      observacao: params.observacao || undefined,
+    }
+  );
+
+  return data;
+}
+
+export async function reabrirCompetenciaHorasExtras(fechamentoId: string) {
+  const { data } = await api.delete<{ message: string }>(
+    `/relatorios/horas-extras/fechamentos/${fechamentoId}`
+  );
+
+  return data;
 }

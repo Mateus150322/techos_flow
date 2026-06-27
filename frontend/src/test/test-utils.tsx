@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 
 import { ThemeProvider } from "@/shared/hooks/ThemeProvider";
@@ -12,11 +13,21 @@ export function renderWithProviders(
   ui: ReactElement,
   { route = "/" }: Options = {}
 ) {
+  const testQueryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
   function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <MemoryRouter initialEntries={[route]}>
-        <ThemeProvider>{children}</ThemeProvider>
-      </MemoryRouter>
+      <QueryClientProvider client={testQueryClient}>
+        <MemoryRouter initialEntries={[route]}>
+          <ThemeProvider>{children}</ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>
     );
   }
 

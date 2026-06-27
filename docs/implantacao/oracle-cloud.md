@@ -24,7 +24,7 @@ Para simplificar a operacao em uma unica VM:
 
 - `Caddy` faz o TLS/HTTPS e o proxy reverso;
 - `frontend` serve o build do React;
-- `backend` roda Laravel em Apache + PHP 8.2;
+- `backend` roda Laravel em Apache + PHP 8.4;
 - `postgres` mantem os dados;
 - um volume/ponto persistente do host guarda banco, anexos e certificados.
 

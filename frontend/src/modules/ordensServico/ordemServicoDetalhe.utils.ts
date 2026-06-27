@@ -7,6 +7,7 @@ export const ORDEM_SERVICO_DETALHE_INCLUDES = [
   "execucoes",
   "execucoes.tecnico",
   "anexos",
+  "eventos",
 ] as const;
 
 export function formatarDataHora(valor?: string | null) {

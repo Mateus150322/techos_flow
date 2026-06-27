@@ -42,7 +42,7 @@ O `TechOS Flow` expõe uma API REST versionada em `/api/v1`. Ela é consumida pe
 | Esqueci senha / redefinir senha | Sim | Sim | Sim |
 | Alterar senha | Sim | Sim | Sim |
 | Criar OS geral | Sim | Não | Não |
-| Criar OS ETA/ETE | Não | Sim | Não no fluxo operacional padrão |
+| Criar OS ETA/ETE | Não | Sim | Não |
 | Listar e consultar OS | Sim | Sim, com restrição de escopo | Sim |
 | Aceitar OS | Não | Sim | Não |
 | Iniciar execução | Não | Sim | Não |
@@ -84,7 +84,7 @@ O `TechOS Flow` expõe uma API REST versionada em `/api/v1`. Ela é consumida pe
 - `GET /ordens-servico/resumo`
 - `GET /ordens-servico/opcoes-filtro`
 - `GET /ordens-servico/{id}`
-- `POST /ordens-servico`
+- `POST /ordens-servico` — disponível para atendente e técnico; administrador apenas consulta e gera relatórios.
 - `POST /ordens-servico/{id}/aceitar`
 - `POST /ordens-servico/{id}/iniciar`
 - `POST /ordens-servico/{id}/execucoes/finalizar`

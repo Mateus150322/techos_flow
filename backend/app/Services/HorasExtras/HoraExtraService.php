@@ -184,19 +184,28 @@ class HoraExtraService
     ): array {
         $minutosTrabalhados = $inicio->diffInMinutes($fim);
         $ehFimDeSemana = $inicio->isWeekend();
-        $ehFeriado = $this->feriadoService->isFeriado($inicio, $estado, $municipio);
+        $dataEspecial = $this->feriadoService->classificarData($inicio, $estado, $municipio);
 
-        if ($ehFimDeSemana || $ehFeriado) {
-            return [
-                'data' => $inicio->toDateString(),
-                'inicio' => $inicio->toISOString(),
-                'fim' => $fim->toISOString(),
-                'minutos_trabalhados' => $minutosTrabalhados,
-                'minutos_normais' => 0,
-                'minutos_extras_50' => 0,
-                'minutos_extras_100' => $minutosTrabalhados,
-                'minutos_extras_total' => $minutosTrabalhados,
-            ];
+        if ($dataEspecial && (int) ($dataEspecial['percentual_hora_extra'] ?? 100) > 0) {
+            return $this->calcularTrechoEspecial(
+                $inicio,
+                $fim,
+                $minutosTrabalhados,
+                (string) ($dataEspecial['tipo'] ?? 'feriado'),
+                (string) ($dataEspecial['nome'] ?? 'Data especial'),
+                (int) ($dataEspecial['percentual_hora_extra'] ?? 100)
+            );
+        }
+
+        if ($ehFimDeSemana) {
+            return $this->calcularTrechoEspecial(
+                $inicio,
+                $fim,
+                $minutosTrabalhados,
+                'fim_de_semana',
+                $inicio->isSunday() ? 'Domingo' : 'Sabado',
+                100
+            );
         }
 
         $inicioDia = $inicio->startOfDay();
@@ -220,6 +229,38 @@ class HoraExtraService
             'minutos_extras_50' => $minutosExtras50,
             'minutos_extras_100' => 0,
             'minutos_extras_total' => $minutosExtras50,
+            'classificacao' => 'dia_util',
+            'descricao_calendario' => null,
+            'percentual_hora_extra' => 50,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function calcularTrechoEspecial(
+        CarbonImmutable $inicio,
+        CarbonImmutable $fim,
+        int $minutosTrabalhados,
+        string $classificacao,
+        string $descricao,
+        int $percentual
+    ): array {
+        $minutos50 = $percentual >= 100 ? 0 : $minutosTrabalhados;
+        $minutos100 = $percentual >= 100 ? $minutosTrabalhados : 0;
+
+        return [
+            'data' => $inicio->toDateString(),
+            'inicio' => $inicio->toISOString(),
+            'fim' => $fim->toISOString(),
+            'minutos_trabalhados' => $minutosTrabalhados,
+            'minutos_normais' => 0,
+            'minutos_extras_50' => $minutos50,
+            'minutos_extras_100' => $minutos100,
+            'minutos_extras_total' => $minutos50 + $minutos100,
+            'classificacao' => $classificacao,
+            'descricao_calendario' => $descricao,
+            'percentual_hora_extra' => $percentual,
         ];
     }
 

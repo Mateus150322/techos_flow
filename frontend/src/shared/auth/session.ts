@@ -1,4 +1,10 @@
 import { useMemo, useSyncExternalStore } from "react";
+import {
+  clearOfflineSession,
+  clearUserDrafts,
+  saveOfflineSession,
+} from "@/shared/offline/database";
+import { clearFieldQueryCache } from "@/shared/query/queryClient";
 
 export type UserRole = "administrador" | "tecnico" | "atendente";
 
@@ -134,6 +140,7 @@ export function hasFreshSessionValidation(ttlMs = SESSION_VALIDATION_TTL_MS) {
 }
 
 export function saveSession(token: string, user: CurrentUser, tokenExpiresAt?: string | null) {
+  void clearFieldQueryCache();
   localStorage.setItem(TOKEN_STORAGE_KEY, token);
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
 
@@ -144,6 +151,11 @@ export function saveSession(token: string, user: CurrentUser, tokenExpiresAt?: s
   }
 
   setSessionValidatedAt(Date.now());
+
+  if (user.id) {
+    void saveOfflineSession(user.id, token, tokenExpiresAt);
+  }
+
   emitSessionChange();
 }
 
@@ -154,6 +166,11 @@ export function updateStoredUser(user: CurrentUser) {
 }
 
 export function clearSession() {
+  const currentUser = getStoredUser();
+
+  void clearFieldQueryCache();
+  void clearOfflineSession();
+  void clearUserDrafts(currentUser.id);
   localStorage.removeItem(TOKEN_STORAGE_KEY);
   localStorage.removeItem(USER_STORAGE_KEY);
   localStorage.removeItem(TOKEN_EXPIRES_AT_STORAGE_KEY);

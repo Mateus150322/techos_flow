@@ -36,7 +36,7 @@ Pontos que ainda exigem definição de infraestrutura:
 ### Backend
 
 - sistema operacional Linux recomendado;
-- PHP 8.2 ou superior;
+- PHP 8.4 recomendado para producao;
 - Composer;
 - servidor web (Nginx ou Apache);
 - PostgreSQL;

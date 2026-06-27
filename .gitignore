@@ -10,4 +10,30 @@ docs/tcc_media/
 docs/_tmp_*
 deploy/oracle/.env.production
 deploy/oracle/.env.production.localtest
+deploy/oracle/keys/
 .docker-prod/
+frontend/playwright-report/
+frontend/test-results/
+
+# Arquivos locais de ambiente / credenciais
+env railway *.txt
+
+# Saidas temporarias geradas por conversoes, prints e validacoes locais
+.codex-tcc-docx/
+.compare-tcc/
+.docx-media-inspect/
+.lo-profile-tcc/
+.tcc-convert-original/
+.tcc-convert/
+.tcc-final-build/
+.tcc-final-diagrams/
+.tcc-png-check/
+.tmp/
+outputs/
+phone-contact-sheets/
+prints-checklist-local/
+prints-techosflow-local/
+prints-techosflow/
+tcccompare/
+tccfinalconvert/
+tccfinalpng/

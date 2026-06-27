@@ -10,10 +10,16 @@ const modalMock = vi.hoisted(() => ({
   useOrdemServicoDetalhe: vi.fn(),
 }));
 
-vi.mock("../ordensServico.service", () => ({
-  exportarRelatorioDetalhadoOrdem:
-    modalMock.exportarRelatorioDetalhadoOrdem,
-}));
+vi.mock("../ordensServico.service", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../ordensServico.service")>();
+
+  return {
+    ...actual,
+    exportarRelatorioDetalhadoOrdem:
+      modalMock.exportarRelatorioDetalhadoOrdem,
+  };
+});
 
 vi.mock("../useOrdemServicoDetalhe", () => ({
   useOrdemServicoDetalhe: modalMock.useOrdemServicoDetalhe,
@@ -120,6 +126,9 @@ describe("TecnicoOSDetailsModal", () => {
     expect(
       screen.getByRole("button", { name: /fechar detalhes da ordem de serviço/i })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /dados principais/i })
+    ).toHaveAttribute("aria-expanded", "true");
 
     const results = await axe(container);
     expect(results.violations).toHaveLength(0);

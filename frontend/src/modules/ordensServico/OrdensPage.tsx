@@ -266,7 +266,7 @@ export default function OrdensPage() {
 
   return (
     <div className={pageBg}>
-      <main id="conteudo-principal" tabIndex={-1} className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
+      <main id="conteudo-principal" tabIndex={-1} className="app-mobile-safe mx-auto max-w-7xl py-3 sm:px-4 sm:py-6">
         <div className="mb-4">
           <button
             type="button"

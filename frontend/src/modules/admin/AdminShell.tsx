@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BarChart3,
+  CalendarDays,
   ClipboardList,
   FileText,
   LogOut,
@@ -16,7 +17,7 @@ import { useTheme } from "@/shared/hooks/useTheme";
 
 type AdminShellProps = {
   currentUser: CurrentUser;
-  activeTab: "indicadores" | "ordens" | "relatorios" | "horas_extras" | "usuarios";
+  activeTab: "indicadores" | "ordens" | "relatorios" | "horas_extras" | "calendario" | "usuarios";
   children: ReactNode;
 };
 
@@ -65,6 +66,12 @@ export function AdminShell({ currentUser, activeTab, children }: AdminShellProps
       to: "/admin/horas-extras",
     },
     {
+      key: "calendario",
+      label: "Calendário",
+      icon: CalendarDays,
+      to: "/admin/calendario",
+    },
+    {
       key: "usuarios",
       label: "Usuários",
       icon: Users,
@@ -77,11 +84,11 @@ export function AdminShell({ currentUser, activeTab, children }: AdminShellProps
       <a href="#conteudo-principal" className="app-skip-link">
         Pular para o conteúdo principal
       </a>
-      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
+      <div className="app-mobile-safe mx-auto max-w-7xl py-3 sm:px-4 sm:py-6">
         <header className={`mb-4 px-4 py-4 sm:mb-5 sm:px-6 sm:py-5 ${panelBg}`}>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="flex items-center gap-3 sm:gap-4">
-              <BrandMark className="h-11 w-11 rounded-2xl shadow-sm ring-1 ring-white/10 sm:h-12 sm:w-12" />
+              <BrandMark className="h-10 w-10 rounded-xl shadow-sm ring-1 ring-white/10 sm:h-12 sm:w-12 sm:rounded-2xl" />
 
               <div>
                 <h1 className={`text-xl font-semibold sm:text-2xl ${titleText}`}>TechOS Flow</h1>
@@ -89,31 +96,33 @@ export function AdminShell({ currentUser, activeTab, children }: AdminShellProps
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-              <div className="text-left sm:order-3 sm:ml-auto sm:text-right">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-center lg:justify-end">
+              <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left sm:order-3 sm:min-w-40 sm:text-right">
                 <p className={`text-sm font-medium ${titleText}`}>{currentUser.name}</p>
                 <p className={`text-sm ${mutedText}`}>Administrador</p>
               </div>
 
-              <ThemeToggle />
+              <div className="grid grid-cols-2 gap-2 sm:contents">
+                <ThemeToggle className="w-full sm:w-auto" />
 
-              <button
-                type="button"
-                onClick={() => void handleLogout()}
-                className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm transition sm:w-auto ${buttonSecondary}`}
-              >
-                <LogOut className="h-4 w-4" />
-                Sair
-              </button>
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm transition sm:w-auto ${buttonSecondary}`}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </button>
+              </div>
             </div>
           </div>
         </header>
 
         <nav
-          className="app-touch-scroll mb-5 overflow-x-auto pb-1"
+          className="mb-5"
           aria-label="Navegação administrativa"
         >
-          <div className={`${softBg} flex min-w-max flex-nowrap gap-1`}>
+          <div className={`${softBg} grid w-full grid-cols-2 gap-1 sm:flex sm:flex-wrap`}>
             {tabs.map((tab) => {
               const Icon = tab.icon;
 
@@ -123,7 +132,7 @@ export function AdminShell({ currentUser, activeTab, children }: AdminShellProps
                   type="button"
                   onClick={() => navigate(tab.to)}
                   aria-current={activeTab === tab.key ? "page" : undefined}
-                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition ${
+                  className={`inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-center text-sm font-medium transition sm:px-4 ${
                     activeTab === tab.key ? tabActive : tabInactive
                   }`}
                 >

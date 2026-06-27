@@ -1,10 +1,25 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Loader2, PlusCircle } from "lucide-react";
+import {
+  ClipboardList,
+  Loader2,
+  MapPin,
+  PlusCircle,
+  Users,
+  Wrench,
+} from "lucide-react";
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   getApiErrorMessage,
   getApiValidationErrors,
 } from "@/shared/utils/apiError";
+import { useCurrentUser } from "@/shared/auth/session";
+import { usePersistedDraft } from "@/shared/hooks/usePersistedDraft";
 import { criarOrdem } from "../ordensServico.service";
 
 type UnidadeType = "CR" | "ETA" | "EEE" | "ETE" | "CAPITACAO";
@@ -14,6 +29,12 @@ type Props = {
   onCriada?: () => void;
   mobileNavOffset?: boolean;
 };
+
+type FormSection =
+  | "abertura"
+  | "unidade"
+  | "responsaveis"
+  | "manutencao";
 
 function getDataAtualLocal() {
   const now = new Date();
@@ -36,18 +57,26 @@ const initialForm = {
   tipoManutencao: "" as MaintenanceType | "",
   servico: "",
   equipamento: "",
-  diagnostico: "",
-  procedimento: "",
-  materialUtilizado: "",
 };
 
 export default function FormularioETAETETecnico({
   onCriada,
   mobileNavOffset = false,
 }: Props) {
-  const [formData, setFormData] = useState(initialForm);
+  const currentUser = useCurrentUser("tecnico");
+  const {
+    value: formData,
+    setValue: setFormData,
+    clearDraft,
+  } = usePersistedDraft(
+    `draft:ordem-eta-ete:${currentUser.id ?? "tecnico"}`,
+    initialForm
+  );
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [secoesAbertas, setSecoesAbertas] = useState<FormSection[]>([
+    "abertura",
+  ]);
 
   function updateField<K extends keyof typeof initialForm>(
     field: K,
@@ -83,28 +112,24 @@ export default function FormularioETAETETecnico({
       `Tipo Manutencao: ${formData.tipoManutencao}`,
       `Servico: ${formData.servico}`,
       `Equipamento: ${formData.equipamento}`,
-      "",
-      `Diagnostico: ${formData.diagnostico}`,
-      `Procedimento: ${formData.procedimento}`,
-      `Material: ${formData.materialUtilizado}`,
     ];
 
     return linhas.filter(Boolean).join("\n");
   }
 
   function validarFormulario() {
-    if (!formData.dataAbertura) return "Informe a data de abertura.";
-    if (!formData.horaAbertura) return "Informe a hora de abertura.";
-    if (!formData.prioridade) return "Selecione a prioridade.";
-    if (!formData.unidade) return "Selecione a unidade.";
-    if (!formData.local.trim()) return "Informe o local operacional.";
-    if (!formData.setorRequisitante.trim()) return "Informe o setor requisitante.";
-    if (!formData.encarregado.trim()) return "Informe o encarregado.";
-    if (!formData.tipoManutencao) return "Selecione o tipo de manutenção.";
-    if (!formData.servico.trim()) return "Descreva o serviço.";
-    if (!formData.equipamento.trim()) return "Informe o equipamento.";
+    if (!formData.dataAbertura) return { mensagem: "Informe a data de abertura.", secao: "abertura" as const };
+    if (!formData.horaAbertura) return { mensagem: "Informe a hora de abertura.", secao: "abertura" as const };
+    if (!formData.prioridade) return { mensagem: "Selecione a prioridade.", secao: "abertura" as const };
+    if (!formData.unidade) return { mensagem: "Selecione a unidade.", secao: "unidade" as const };
+    if (!formData.local.trim()) return { mensagem: "Informe o local operacional.", secao: "unidade" as const };
+    if (!formData.setorRequisitante.trim()) return { mensagem: "Informe o setor requisitante.", secao: "responsaveis" as const };
+    if (!formData.encarregado.trim()) return { mensagem: "Informe o encarregado.", secao: "responsaveis" as const };
+    if (!formData.tipoManutencao) return { mensagem: "Selecione o tipo de manutenção.", secao: "manutencao" as const };
+    if (!formData.servico.trim()) return { mensagem: "Descreva o serviço.", secao: "manutencao" as const };
+    if (!formData.equipamento.trim()) return { mensagem: "Informe o equipamento.", secao: "manutencao" as const };
 
-    return "";
+    return null;
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -114,7 +139,12 @@ export default function FormularioETAETETecnico({
     const mensagemErro = validarFormulario();
 
     if (mensagemErro) {
-      setErro(mensagemErro);
+      setErro(mensagemErro.mensagem);
+      setSecoesAbertas((current) =>
+        current.includes(mensagemErro.secao)
+          ? current
+          : [...current, mensagemErro.secao]
+      );
       return;
     }
 
@@ -138,7 +168,7 @@ export default function FormularioETAETETecnico({
         },
       });
 
-      setFormData({
+      await clearDraft({
         ...initialForm,
         dataAbertura: getDataAtualLocal(),
         horaAbertura: getHoraAtualLocal(),
@@ -192,11 +222,18 @@ export default function FormularioETAETETecnico({
           </div>
         ) : null}
 
-        <section className="app-section-soft rounded-[1.2rem] p-4 sm:rounded-[1.35rem] sm:p-5">
-          <SectionHeader
+        <Accordion
+          type="multiple"
+          value={secoesAbertas}
+          onValueChange={(value) => setSecoesAbertas(value as FormSection[])}
+          className="space-y-4"
+        >
+          <FormAccordionSection
+            value="abertura"
             title="Abertura da OS"
             description="Registre somente o momento de abertura do chamado. As horas da equipe ficam para a finalização da execução."
-          />
+            icon={<ClipboardList className="h-5 w-5" />}
+          >
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Campo
@@ -244,13 +281,14 @@ export default function FormularioETAETETecnico({
               }
             />
           </div>
-        </section>
+          </FormAccordionSection>
 
-        <section className="app-section-soft rounded-[1.2rem] p-4 sm:rounded-[1.35rem] sm:p-5">
-          <SectionHeader
+          <FormAccordionSection
+            value="unidade"
             title="Unidade e local operacional"
             description="Identifique a unidade e o ponto exato do serviço. A geolocalização real será registrada depois nas evidências."
-          />
+            icon={<MapPin className="h-5 w-5" />}
+          >
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <fieldset>
@@ -297,13 +335,14 @@ export default function FormularioETAETETecnico({
           <div className="app-alert-info mt-4 rounded-xl px-4 py-3 text-sm">
             O endereço detalhado deixa de ser preenchido na abertura. O que valerá como localização de campo é a geolocalização capturada pelo técnico nas evidências.
           </div>
-        </section>
+          </FormAccordionSection>
 
-        <section className="app-section-soft rounded-[1.2rem] p-4 sm:rounded-[1.35rem] sm:p-5">
-          <SectionHeader
+          <FormAccordionSection
+            value="responsaveis"
             title="Responsáveis"
             description="Informe quem solicitou a OS e quem coordena a atividade."
-          />
+            icon={<Users className="h-5 w-5" />}
+          >
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Campo
@@ -339,13 +378,14 @@ export default function FormularioETAETETecnico({
             A equipe executora é registrada ao finalizar a execução, com seleção de
             funcionários e auxiliares cadastrados no sistema.
           </div>
-        </section>
+          </FormAccordionSection>
 
-        <section className="app-section-soft rounded-[1.2rem] p-4 sm:rounded-[1.35rem] sm:p-5">
-          <SectionHeader
+          <FormAccordionSection
+            value="manutencao"
             title="Manutenção"
             description="Descreva a natureza do serviço e o equipamento envolvido."
-          />
+            icon={<Wrench className="h-5 w-5" />}
+          >
 
           <fieldset>
             <legend className="mb-2 block text-sm font-medium text-[var(--text-main)]">
@@ -403,63 +443,10 @@ export default function FormularioETAETETecnico({
               />
             }
           />
-        </section>
+          </FormAccordionSection>
+        </Accordion>
 
-        <section className="app-section-soft rounded-[1.2rem] p-4 sm:rounded-[1.35rem] sm:p-5">
-          <SectionHeader
-            title="Contexto técnico"
-            description="Adicione o contexto inicial para facilitar a continuidade da OS."
-          />
-
-          <Campo
-            label="Diagnóstico"
-            htmlFor="eta-diagnostico"
-            input={
-              <textarea
-                id="eta-diagnostico"
-                rows={3}
-                value={formData.diagnostico}
-                onChange={(e) => updateField("diagnostico", e.target.value)}
-                placeholder="Diagnóstico do problema"
-                className="app-input px-4 py-3"
-              />
-            }
-          />
-
-          <Campo
-            label="Procedimento"
-            htmlFor="eta-procedimento"
-            input={
-              <textarea
-                id="eta-procedimento"
-                rows={3}
-                value={formData.procedimento}
-                onChange={(e) => updateField("procedimento", e.target.value)}
-                placeholder="Procedimentos previstos ou iniciais"
-                className="app-input px-4 py-3"
-              />
-            }
-          />
-
-          <Campo
-            label="Material utilizado"
-            htmlFor="eta-material-utilizado"
-            input={
-              <textarea
-                id="eta-material-utilizado"
-                rows={2}
-                value={formData.materialUtilizado}
-                onChange={(e) => updateField("materialUtilizado", e.target.value)}
-                placeholder="Liste os materiais utilizados"
-                className="app-input px-4 py-3"
-              />
-            }
-          />
-        </section>
-
-        <div
-          className="border-t border-[var(--border)] bg-transparent pt-4 sm:border-0 sm:pt-0"
-        >
+        <div className="app-mobile-sticky-actions">
           <div className="mx-auto max-w-7xl">
             <button
               type="submit"
@@ -485,18 +472,41 @@ export default function FormularioETAETETecnico({
   );
 }
 
-function SectionHeader({
+function FormAccordionSection({
+  value,
   title,
   description,
+  icon,
+  children,
 }: {
+  value: FormSection;
   title: string;
   description: string;
+  icon: ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="mb-5">
-      <h3 className="text-lg font-semibold text-[var(--text-main)] sm:text-xl">{title}</h3>
-      <p className="app-muted mt-1 text-sm">{description}</p>
-    </div>
+    <AccordionItem
+      value={value}
+      className="app-section-soft overflow-hidden rounded-[1.2rem] border border-[var(--border)] px-4 sm:rounded-[1.35rem] sm:px-5"
+    >
+      <AccordionTrigger className="py-4 sm:py-5">
+        <span className="flex min-w-0 items-start gap-3 text-left">
+          <span className="app-card inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--primary)] shadow-none">
+            {icon}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-base font-semibold text-[var(--text-main)] sm:text-lg">
+              {title}
+            </span>
+            <span className="app-muted mt-1 block text-xs font-normal leading-5 sm:text-sm">
+              {description}
+            </span>
+          </span>
+        </span>
+      </AccordionTrigger>
+      <AccordionContent className="pb-5">{children}</AccordionContent>
+    </AccordionItem>
   );
 }
 

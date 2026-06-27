@@ -6,7 +6,7 @@ default:
 
 frontend_quality:
   stage: quality
-  image: node:20-bookworm
+  image: node:22-bookworm
   cache:
     key:
       files:
@@ -20,6 +20,55 @@ frontend_quality:
     - npm run lint
     - npx tsc -b
     - npm run test:a11y
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+backend_quality:
+  stage: quality
+  image: php:8.4-cli-bookworm
+  cache:
+    key:
+      files:
+        - backend/composer.lock
+    paths:
+      - backend/vendor/
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends git unzip libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev libonig-dev libxml2-dev
+    - docker-php-ext-configure gd --with-freetype --with-jpeg
+    - docker-php-ext-install pdo_sqlite zip gd mbstring
+    - php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    - php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    - cd backend
+    - composer install --no-interaction --prefer-dist --no-progress
+  script:
+    - vendor/bin/pint --test app/Console/Commands app/Services/Auditoria app/Http/Middleware/AuthorizePulse.php app/Models/OrdemServicoEvento.php config/pulse.php config/techos.php database/migrations/2026_06_19_020000_create_ordem_servico_eventos_table.php tests/Feature/AuditoriaOperacionalTest.php tests/Feature/HealthApiTest.php tests/Feature/OperationalSecurityTest.php
+    - php artisan test
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+frontend_e2e:
+  stage: quality
+  image: mcr.microsoft.com/playwright:v1.61.0-noble
+  cache:
+    key:
+      files:
+        - frontend/package-lock.json
+    paths:
+      - frontend/.npm/
+  before_script:
+    - cd frontend
+    - npm ci --cache .npm --prefer-offline
+  script:
+    - npm run test:e2e
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - frontend/playwright-report/
+      - frontend/test-results/
   rules:
     - if: $CI_COMMIT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"

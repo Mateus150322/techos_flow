@@ -65,6 +65,9 @@ export type Execucao = {
   data_inicio: string;
   data_fim: string | null;
   observacao: string | null;
+  diagnostico?: string | null;
+  procedimento?: string | null;
+  material_utilizado?: string | null;
   tecnico?: Usuario;
   execucao_funcionarios?: ExecucaoFuncionario[];
   execucaoFuncionarios?: ExecucaoFuncionario[];
@@ -84,6 +87,7 @@ export type Anexo = {
   cidade_capturada?: string | null;
   estado_capturado?: string | null;
   endereco_capturado?: string | null;
+  sincronizacao_pendente?: boolean;
 };
 
 export type OrdemServico = {
@@ -108,6 +112,16 @@ export type OrdemServicoDetalhe = OrdemServico & {
   criada_por?: Usuario | null;
   execucoes?: Execucao[];
   anexos?: Anexo[];
+  eventos?: Array<{
+    id: string;
+    evento: string;
+    titulo?: string;
+    acao?: string;
+    descricao?: string | null;
+    data?: string | null;
+    created_at?: string | null;
+    usuario?: Usuario | null;
+  }>;
 };
 
 export function getTecnicoResponsavel(
@@ -205,6 +219,9 @@ export type FinalizarExecucaoPayload = {
   execucao_id: string;
   data_fim?: string;
   observacao?: string;
+  diagnostico: string;
+  procedimento: string;
+  material_utilizado?: string;
   funcionarios?: Array<{
     funcionario_id?: string;
     colaborador_operacional_id?: string;
@@ -215,19 +232,27 @@ export type FinalizarExecucaoPayload = {
 
 export async function iniciarExecucao(
   osId: string,
-  payload?: IniciarExecucaoPayload
+  payload?: IniciarExecucaoPayload,
+  clientOperationId?: string
 ) {
-  const { data } = await api.post(`/ordens-servico/${osId}/iniciar`, payload ?? {});
+  const { data } = await api.post(`/ordens-servico/${osId}/iniciar`, {
+    ...(payload ?? {}),
+    client_operation_id: clientOperationId,
+  });
   return data;
 }
 
 export async function finalizarExecucao(
   osId: string,
-  payload: FinalizarExecucaoPayload
+  payload: FinalizarExecucaoPayload,
+  clientOperationId?: string
 ) {
   const { data } = await api.post(
     `/ordens-servico/${osId}/execucoes/finalizar`,
-    payload
+    {
+      ...payload,
+      client_operation_id: clientOperationId,
+    }
   );
   return data;
 }
@@ -238,9 +263,13 @@ export type MarcarNaoExecutadaPayload = {
 
 export async function marcarNaoExecutada(
   osId: string,
-  payload: MarcarNaoExecutadaPayload
+  payload: MarcarNaoExecutadaPayload,
+  clientOperationId?: string
 ) {
-  const { data } = await api.post(`/ordens-servico/${osId}/nao-executada`, payload);
+  const { data } = await api.post(`/ordens-servico/${osId}/nao-executada`, {
+    ...payload,
+    client_operation_id: clientOperationId,
+  });
   return data;
 }
 
@@ -260,10 +289,15 @@ export type GeolocalizacaoAnexoPayload = {
 export async function enviarAnexo(
   osId: string,
   arquivo: File,
-  tipoOuPayload?: string | GeolocalizacaoAnexoPayload
+  tipoOuPayload?: string | GeolocalizacaoAnexoPayload,
+  clientOperationId?: string
 ) {
   const formData = new FormData();
   formData.append("arquivo", arquivo);
+
+  if (clientOperationId) {
+    formData.append("client_operation_id", clientOperationId);
+  }
 
   if (typeof tipoOuPayload === "string") {
     formData.append("tipo", tipoOuPayload);
@@ -361,8 +395,10 @@ export async function exportarRelatorioDetalhadoOrdem(osId: string) {
   };
 }
 
-export async function aceitarOrdem(osId: string) {
-  const { data } = await api.post(`/ordens-servico/${osId}/aceitar`);
+export async function aceitarOrdem(osId: string, clientOperationId?: string) {
+  const { data } = await api.post(`/ordens-servico/${osId}/aceitar`, {
+    client_operation_id: clientOperationId,
+  });
   return data;
 }
 

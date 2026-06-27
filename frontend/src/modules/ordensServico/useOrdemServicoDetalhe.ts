@@ -1,14 +1,11 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { TecnicoDashboardResponse } from "@/modules/dashboard/dashboard.service";
 
 import {
-  aceitarOrdem,
   buscarOrdem,
-  enviarAnexo,
-  finalizarExecucao,
   getCriadaPor,
   getTecnicoResponsavel,
-  iniciarExecucao,
-  marcarNaoExecutada,
   type FinalizarExecucaoPayload,
   type GeolocalizacaoAnexoPayload,
   type IniciarExecucaoPayload,
@@ -17,6 +14,18 @@ import {
 } from "./ordensServico.service";
 import { ORDEM_SERVICO_DETALHE_INCLUDES } from "./ordemServicoDetalhe.utils";
 import { type UserRole, useCurrentUser } from "@/shared/auth/session";
+import { useOnlineStatus } from "@/shared/hooks/useOnlineStatus";
+import { getOfflineOperation } from "@/shared/offline/database";
+import {
+  enqueueOfflineOperation,
+} from "@/shared/offline/queue";
+import { requestOfflineSync } from "@/shared/offline/sync";
+import type {
+  OfflineOperation,
+  OfflineOperationPayloadMap,
+  OfflineOperationType,
+} from "@/shared/offline/types";
+import { queryKeys } from "@/shared/query/queryClient";
 import { getApiErrorMessage } from "@/shared/utils/apiError";
 import {
   capturarGeolocalizacaoAtual,
@@ -48,11 +57,11 @@ export function useOrdemServicoDetalhe({
   fallbackRole = "atendente",
 }: UseOrdemServicoDetalheOptions) {
   const currentUser = useCurrentUser(fallbackRole);
+  const queryClient = useQueryClient();
+  const online = useOnlineStatus();
 
-  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
   const [actionFeedback, setActionFeedback] = useState<ActionFeedback | null>(null);
-  const [os, setOs] = useState<OrdemServicoDetalhe | null>(null);
   const [processandoAcao, setProcessandoAcao] = useState(false);
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File[]>([]);
   const [tipoAnexo, setTipoAnexo] = useState("foto");
@@ -67,34 +76,47 @@ export function useOrdemServicoDetalhe({
     diagnosticarGeolocalizacao()
   );
 
+  const buscarDetalheOrdem = useCallback(async () => {
+    if (!ordemId) {
+      throw new Error("ID não informado.");
+    }
+
+    return buscarOrdem(ordemId, [...ORDEM_SERVICO_DETALHE_INCLUDES]);
+  }, [ordemId]);
+
+  const ordemQuery = useQuery<OrdemServicoDetalhe>({
+    queryKey: queryKeys.ordemServico(ordemId ?? "sem-id"),
+    queryFn: buscarDetalheOrdem,
+    enabled: enabled && Boolean(ordemId),
+  });
+  const os = ordemQuery.data ?? null;
+  const loading =
+    ordemQuery.isPending && ordemQuery.fetchStatus !== "paused";
+  const loadError = ordemQuery.error
+    ? getApiErrorMessage(ordemQuery.error, "Erro ao carregar OS.")
+    : enabled && !ordemId
+      ? "ID não informado."
+      : !os && ordemQuery.fetchStatus === "paused"
+        ? "Sem internet e sem detalhes salvos para esta OS."
+        : "";
+
   const carregarOrdem = useCallback(async () => {
     if (!ordemId) {
-      setOs(null);
-      setLoading(false);
       setError("ID não informado.");
       return;
     }
 
-    try {
-      setLoading(true);
-      setError("");
+    setError("");
+    await queryClient.invalidateQueries({
+      queryKey: ["dashboard-tecnico"],
+    });
 
-      const data = await buscarOrdem(ordemId, [...ORDEM_SERVICO_DETALHE_INCLUDES]);
-      setOs(data);
-    } catch (loadError) {
-      setError(getApiErrorMessage(loadError, "Erro ao carregar OS."));
-    } finally {
-      setLoading(false);
+    const result = await ordemQuery.refetch();
+
+    if (result.error) {
+      throw result.error;
     }
-  }, [ordemId]);
-
-  useEffect(() => {
-    if (!enabled || !ordemId) {
-      return;
-    }
-
-    void carregarOrdem();
-  }, [carregarOrdem, enabled, ordemId]);
+  }, [ordemId, ordemQuery, queryClient]);
 
   useEffect(() => {
     setActionFeedback(null);
@@ -156,21 +178,111 @@ export function useOrdemServicoDetalhe({
     osEhMinha &&
     (os?.status === "em_execucao" || os?.status === "finalizada" || os?.status === "nao_executada");
 
-  async function executarAcao(
-    fn: () => Promise<void>,
-    fallback: string,
-    sucesso: string
+  function atualizarOrdemLocal(
+    updater: (current: OrdemServicoDetalhe) => OrdemServicoDetalhe
   ) {
+    if (!ordemId) {
+      return;
+    }
+
+    queryClient.setQueryData<OrdemServicoDetalhe>(
+      queryKeys.ordemServico(ordemId),
+      (current) => (current ? updater(current) : current)
+    );
+  }
+
+  function atualizarDashboardLocal(
+    patch: Partial<OrdemServicoDetalhe> & { id: string }
+  ) {
+    queryClient.setQueriesData<TecnicoDashboardResponse>(
+      { queryKey: ["dashboard-tecnico"] },
+      (current) => {
+        if (!current) {
+          return current;
+        }
+
+        const updateList = (items: typeof current.secoes.disponiveis) =>
+          items.map((item) =>
+            item.id === patch.id ? { ...item, ...patch } : item
+          );
+
+        return {
+          ...current,
+          secoes: {
+            disponiveis: updateList(current.secoes.disponiveis),
+            minhas: updateList(current.secoes.minhas),
+            em_execucao: updateList(current.secoes.em_execucao),
+            finalizadas: updateList(current.secoes.finalizadas),
+          },
+        };
+      }
+    );
+  }
+
+  async function executarOperacaoOffline<T extends OfflineOperationType>({
+    type,
+    payload,
+    aplicarLocalmente,
+    sucesso,
+  }: {
+    type: T;
+    payload: OfflineOperationPayloadMap[T];
+    aplicarLocalmente: (operation: OfflineOperation) => void;
+    sucesso: string;
+  }) {
+    if (!os?.id || !currentUser.id) {
+      const mensagem = "Não foi possível identificar o técnico ou a OS.";
+      setError(mensagem);
+      setActionFeedback({ tipo: "erro", mensagem });
+      return false;
+    }
+
     try {
       setProcessandoAcao(true);
       setError("");
       setActionFeedback(null);
-      await fn();
-      await carregarOrdem();
-      setActionFeedback({ tipo: "sucesso", mensagem: sucesso });
+      const operation = await enqueueOfflineOperation({
+        userId: currentUser.id,
+        orderId: os.id,
+        type,
+        payload,
+      });
+
+      aplicarLocalmente(operation);
+
+      if (online) {
+        await requestOfflineSync();
+        const storedOperation = await getOfflineOperation(operation.id);
+
+        if (storedOperation?.status === "failed") {
+          await ordemQuery.refetch();
+          const mensagem =
+            storedOperation.lastError ||
+            "Não foi possível sincronizar esta alteração.";
+          setError(mensagem);
+          setActionFeedback({ tipo: "erro", mensagem });
+          return false;
+        }
+
+        if (
+          !storedOperation ||
+          storedOperation.status === "completed"
+        ) {
+          await carregarOrdem();
+          setActionFeedback({ tipo: "sucesso", mensagem: sucesso });
+          return true;
+        }
+      }
+
+      const mensagem =
+        "Alteração salva neste aparelho e aguardando sincronização.";
+      setActionFeedback({ tipo: "sucesso", mensagem });
       return true;
     } catch (actionError) {
-      const mensagem = getApiErrorMessage(actionError, fallback);
+      const mensagem = getApiErrorMessage(
+        actionError,
+        "Não foi possível salvar a alteração no aparelho."
+      );
       setError(mensagem);
       setActionFeedback({ tipo: "erro", mensagem });
       return false;
@@ -180,51 +292,125 @@ export function useOrdemServicoDetalhe({
   }
 
   async function aceitar() {
-    if (!os?.id) {
-      return false;
-    }
-
-    return executarAcao(
-      () => aceitarOrdem(os.id),
-      "Não foi possível aceitar a OS.",
-      "Ordem de serviço aceita com sucesso."
-    );
+    return executarOperacaoOffline({
+      type: "accept_order",
+      payload: {},
+      aplicarLocalmente: () => {
+        atualizarOrdemLocal((current) => ({
+          ...current,
+          tecnico_responsavel_id: currentUser.id,
+          tecnicoResponsavel: {
+            id: currentUser.id!,
+            name: currentUser.name,
+            email: currentUser.email ?? "",
+            role: "tecnico",
+          },
+        }));
+        atualizarDashboardLocal({
+          id: os!.id,
+          tecnico_responsavel_id: currentUser.id,
+          tecnicoResponsavel: {
+            id: currentUser.id!,
+            name: currentUser.name,
+            email: currentUser.email ?? "",
+            role: "tecnico",
+          },
+        });
+      },
+      sucesso: "Ordem de serviço aceita com sucesso.",
+    });
   }
 
   async function iniciar(payload?: IniciarExecucaoPayload) {
-    if (!os?.id) {
-      return false;
-    }
+    const inicioPayload = payload ?? {};
 
-    return executarAcao(
-      () => iniciarExecucao(os.id, payload ?? {}),
-      "Não foi possível iniciar a execução.",
-      "Execução iniciada com sucesso."
-    );
+    return executarOperacaoOffline({
+      type: "start_execution",
+      payload: inicioPayload,
+      aplicarLocalmente: (operation) => {
+        atualizarOrdemLocal((current) => ({
+          ...current,
+          status: "em_execucao",
+          execucoes: [
+            {
+              id: `offline:${operation.id}`,
+              os_id: current.id,
+              tecnico_id: currentUser.id!,
+              data_inicio: inicioPayload.data_inicio ?? new Date().toISOString(),
+              data_fim: null,
+              observacao: inicioPayload.observacao ?? null,
+              tecnico: {
+                id: currentUser.id!,
+                name: currentUser.name,
+                email: currentUser.email ?? "",
+                role: "tecnico",
+              },
+            },
+            ...(current.execucoes ?? []),
+          ],
+        }));
+        atualizarDashboardLocal({
+          id: os!.id,
+          status: "em_execucao",
+        });
+      },
+      sucesso: "Execução iniciada com sucesso.",
+    });
   }
 
   async function finalizar(payload: FinalizarExecucaoPayload) {
-    if (!os?.id) {
-      return false;
-    }
+    const dataFim = payload.data_fim ?? new Date().toISOString();
 
-    return executarAcao(
-      () => finalizarExecucao(os.id, payload),
-      "Não foi possível finalizar a execução.",
-      "Execução finalizada com sucesso."
-    );
+    return executarOperacaoOffline({
+      type: "finish_execution",
+      payload,
+      aplicarLocalmente: () => {
+        atualizarOrdemLocal((current) => ({
+          ...current,
+          status: "finalizada",
+          data_encerramento: dataFim,
+          execucoes: (current.execucoes ?? []).map((execucao) =>
+            execucao.id === payload.execucao_id
+              ? {
+                  ...execucao,
+                  data_fim: dataFim,
+                  observacao: payload.observacao ?? execucao.observacao,
+                  diagnostico: payload.diagnostico,
+                  procedimento: payload.procedimento,
+                  material_utilizado: payload.material_utilizado ?? null,
+                }
+              : execucao
+          ),
+        }));
+        atualizarDashboardLocal({
+          id: os!.id,
+          status: "finalizada",
+          data_encerramento: dataFim,
+        });
+      },
+      sucesso: "Execução finalizada com sucesso.",
+    });
   }
 
   async function marcarComoNaoExecutada(payload: MarcarNaoExecutadaPayload) {
-    if (!os?.id) {
-      return false;
-    }
-
-    return executarAcao(
-      () => marcarNaoExecutada(os.id, payload),
-      "Não foi possível marcar a OS como não executada.",
-      "Ordem de serviço marcada como não executada."
-    );
+    return executarOperacaoOffline({
+      type: "mark_not_executed",
+      payload,
+      aplicarLocalmente: () => {
+        atualizarOrdemLocal((current) => ({
+          ...current,
+          status: "nao_executada",
+          data_encerramento: new Date().toISOString(),
+          motivo_nao_execucao: payload.motivo_nao_execucao,
+        }));
+        atualizarDashboardLocal({
+          id: os!.id,
+          status: "nao_executada",
+          motivo_nao_execucao: payload.motivo_nao_execucao,
+        });
+      },
+      sucesso: "Ordem de serviço marcada como não executada.",
+    });
   }
 
   async function capturarGeolocalizacao() {
@@ -313,6 +499,11 @@ export function useOrdemServicoDetalhe({
       return false;
     }
 
+    if (!currentUser.id) {
+      setError("Não foi possível identificar o técnico responsável pelo envio.");
+      return false;
+    }
+
     try {
       setProcessandoAcao(true);
       setError("");
@@ -351,25 +542,63 @@ export function useOrdemServicoDetalhe({
         };
       }
 
-      let arquivosEnviados = 0;
+      const arquivoInvalido = arquivoSelecionado.find(
+        (arquivo) => arquivo.size > 5 * 1024 * 1024
+      );
+
+      if (arquivoInvalido) {
+        setError(`O arquivo "${arquivoInvalido.name}" ultrapassa o limite de 5 MB.`);
+        return false;
+      }
+
+      const operations: OfflineOperation[] = [];
 
       for (const arquivo of arquivoSelecionado) {
-        try {
-          await enviarAnexo(os.id, arquivo, payload);
-          arquivosEnviados += 1;
-        } catch (uploadError) {
-          if (arquivosEnviados > 0) {
-            await carregarOrdem();
-            setArquivoSelecionado([]);
-            setError(
-              `${arquivosEnviados} arquivo(s) foram enviados antes da falha em "${arquivo.name}".`
-            );
-            return false;
-          }
-
-          throw uploadError;
-        }
+        const operation = await enqueueOfflineOperation({
+          userId: currentUser.id,
+          orderId: os.id,
+          type: "upload_attachment",
+          payload: {
+            file: {
+              blob: arquivo,
+              name: arquivo.name,
+              type: arquivo.type,
+              lastModified: arquivo.lastModified,
+            },
+            metadata: payload,
+          },
+        });
+        operations.push(operation);
       }
+
+      atualizarOrdemLocal((current) => ({
+        ...current,
+        anexos: [
+          ...(current.anexos ?? []),
+          ...operations.map((operation, index) => {
+            const arquivo = arquivoSelecionado[index];
+            const metadata =
+              typeof payload === "string" ? { tipo: payload } : payload;
+
+            return {
+              id: `offline:${operation.id}`,
+              nome_arquivo: arquivo?.name,
+              tipo: metadata.tipo ?? tipoAnexo,
+              latitude: metadata.latitude,
+              longitude: metadata.longitude,
+              precisao_metros: metadata.precisao_metros,
+              geolocalizacao_capturada_em:
+                metadata.geolocalizacao_capturada_em,
+              rua_capturada: metadata.rua_capturada,
+              bairro_capturado: metadata.bairro_capturado,
+              cidade_capturada: metadata.cidade_capturada,
+              estado_capturado: metadata.estado_capturado,
+              endereco_capturado: metadata.endereco_capturado,
+              sincronizacao_pendente: true,
+            };
+          }),
+        ],
+      }));
 
       setArquivoSelecionado([]);
       setTipoAnexo("foto");
@@ -377,7 +606,31 @@ export function useOrdemServicoDetalhe({
       setGeolocalizacaoCapturada(null);
       setFeedbackGeolocalizacao(null);
       setProcessandoEnderecoCapturado(false);
-      await carregarOrdem();
+      if (online) {
+        await requestOfflineSync();
+        const storedOperations = await Promise.all(
+          operations.map((operation) => getOfflineOperation(operation.id))
+        );
+        const failedOperation = storedOperations.find(
+          (operation) => operation?.status === "failed"
+        );
+
+        if (failedOperation) {
+          await ordemQuery.refetch();
+          setError(
+            failedOperation.lastError ||
+              "Não foi possível sincronizar uma das evidências."
+          );
+          return false;
+        }
+
+        await carregarOrdem();
+      } else {
+        setActionFeedback({
+          tipo: "sucesso",
+          mensagem: `${operations.length} evidência(s) salva(s) no aparelho e aguardando sincronização.`,
+        });
+      }
 
       return true;
     } catch (uploadError) {
@@ -426,7 +679,7 @@ export function useOrdemServicoDetalhe({
   return {
     currentUser,
     loading,
-    error,
+    error: error || loadError,
     setError,
     actionFeedback,
     setActionFeedback,

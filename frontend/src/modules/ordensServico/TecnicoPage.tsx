@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
   ClipboardList,
@@ -15,6 +16,7 @@ import {
 } from "@/modules/dashboard/dashboard.service";
 import { useCurrentUser } from "@/shared/auth/session";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { queryKeys } from "@/shared/query/queryClient";
 import { getApiErrorMessage } from "@/shared/utils/apiError";
 import { ConsultaOrdensPainel } from "./components/ConsultaOrdensPainel";
 import FormularioETAETETecnico from "./components/FormularioETAETETecnico";
@@ -28,11 +30,9 @@ type StatusFiltro = "todos" | "aberta" | "em_execucao" | "finalizada" | "nao_exe
 
 export default function TecnicoPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [abaPrincipal, setAbaPrincipal] = useState<AbaPrincipal>("consultar");
-  const [dashboard, setDashboard] = useState<TecnicoDashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos");
   const buscaAplicada = useDebouncedValue(busca, 300);
@@ -42,30 +42,28 @@ export default function TecnicoPage() {
 
   const currentUser = useCurrentUser("tecnico");
 
-  const carregarOrdens = useCallback(
-    async (search = buscaAplicada, status = statusFiltro) => {
-      try {
-        setLoading(true);
-        setErro("");
-        const response = await buscarDashboardTecnico(search, status);
-        setDashboard(response);
-      } catch (error) {
-        setDashboard(null);
-        setErro(getApiErrorMessage(error, "Não foi possível carregar as ordens de serviço."));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [buscaAplicada, statusFiltro]
-  );
+  const dashboardQuery = useQuery<TecnicoDashboardResponse>({
+    queryKey: queryKeys.dashboardTecnico(buscaAplicada, statusFiltro),
+    queryFn: () => buscarDashboardTecnico(buscaAplicada, statusFiltro),
+    enabled: abaPrincipal === "consultar",
+  });
+  const dashboard = dashboardQuery.data ?? null;
+  const loading =
+    dashboardQuery.isPending && dashboardQuery.fetchStatus !== "paused";
+  const erro = dashboardQuery.error
+    ? getApiErrorMessage(
+        dashboardQuery.error,
+        "Não foi possível carregar as ordens de serviço."
+      )
+    : !dashboard && dashboardQuery.fetchStatus === "paused"
+      ? "Sem internet e sem dados salvos para este filtro."
+      : "";
 
-  useEffect(() => {
-    if (abaPrincipal !== "consultar") {
-      return;
-    }
-
-    void carregarOrdens();
-  }, [abaPrincipal, buscaAplicada, carregarOrdens, statusFiltro]);
+  function atualizarDashboardTecnico() {
+    return queryClient.invalidateQueries({
+      queryKey: ["dashboard-tecnico"],
+    });
+  }
 
   async function handleLogout() {
     await logoutSession();
@@ -226,7 +224,7 @@ export default function TecnicoPage() {
         ref={mainRef}
         id="conteudo-principal"
         tabIndex={-1}
-        className="mx-auto max-w-7xl px-3 pt-4 sm:px-6 sm:py-6"
+        className="app-mobile-safe mx-auto max-w-7xl pt-3 sm:px-6 sm:py-6"
       >
         <div className="mb-6 hidden gap-3 sm:flex sm:flex-wrap">
           <button
@@ -258,7 +256,7 @@ export default function TecnicoPage() {
             onCriada={() => {
               setStatusFiltro("todos");
               handleAbaPrincipalChange("consultar");
-              void carregarOrdens("", "todos");
+              void atualizarDashboardTecnico();
             }}
           />
         )}
@@ -294,7 +292,7 @@ export default function TecnicoPage() {
         ordemId={ordemSelecionadaId}
         open={!!ordemSelecionadaId}
         onClose={() => setOrdemSelecionadaId(null)}
-        onAtualizou={() => void carregarOrdens()}
+        onAtualizou={() => void atualizarDashboardTecnico()}
       />
     </div>
   );

@@ -8,6 +8,7 @@ const EsqueciSenhaPage = lazy(() => import("@/modules/auth/EsqueciSenhaPage"));
 const PrimeiroAcessoPage = lazy(() => import("@/modules/auth/PrimeiroAcessoPage"));
 const RedefinirSenhaPage = lazy(() => import("@/modules/auth/RedefinirSenhaPage"));
 const DashboardPage = lazy(() => import("@/modules/dashboard/DashboardPage"));
+const CalendarioCorporativoPage = lazy(() => import("@/modules/admin/CalendarioCorporativoPage"));
 const HorasExtrasPage = lazy(() => import("@/modules/admin/HorasExtrasPage"));
 const RelatoriosPage = lazy(() => import("@/modules/admin/RelatoriosPage"));
 const UsuariosPage = lazy(() => import("@/modules/admin/UsuariosPage"));
@@ -88,7 +89,7 @@ export default function AppRouter() {
           <Route
             path="/ordens-servico/nova"
             element={
-              <PrivateRoute allowedRoles={["administrador", "atendente"]}>
+              <PrivateRoute allowedRoles={["atendente"]}>
                 <NovaOrdemPage />
               </PrivateRoute>
             }
@@ -108,6 +109,15 @@ export default function AppRouter() {
             element={
               <PrivateRoute allowedRoles={["administrador"]}>
                 <HorasExtrasPage />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/admin/calendario"
+            element={
+              <PrivateRoute allowedRoles={["administrador"]}>
+                <CalendarioCorporativoPage />
               </PrivateRoute>
             }
           />

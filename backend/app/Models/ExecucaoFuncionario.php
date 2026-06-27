@@ -21,11 +21,16 @@ class ExecucaoFuncionario extends Model
         'minutos_normais',
         'minutos_extras_50',
         'minutos_extras_100',
+        'aprovacao_status',
+        'aprovado_por_id',
+        'aprovado_em',
+        'aprovacao_observacao',
     ];
 
     protected $casts = [
         'data_inicio' => 'datetime',
         'data_fim' => 'datetime',
+        'aprovado_em' => 'datetime',
     ];
 
     public function execucao()
@@ -41,6 +46,11 @@ class ExecucaoFuncionario extends Model
     public function colaboradorOperacional()
     {
         return $this->belongsTo(ColaboradorOperacional::class, 'colaborador_operacional_id');
+    }
+
+    public function aprovador()
+    {
+        return $this->belongsTo(User::class, 'aprovado_por_id');
     }
 
     public function participanteId(): ?string

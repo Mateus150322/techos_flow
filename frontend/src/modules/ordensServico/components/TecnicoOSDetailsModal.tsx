@@ -3,23 +3,16 @@ import {
   CheckCircle2,
   ClipboardList,
   FileDown,
-  FileText,
-  MapPin,
+  Paperclip,
   User as UserIcon,
   Wrench,
   X,
 } from "lucide-react";
 
-import {
-  formatarDataHora,
-  formatarStatus,
-  obterResumoUnidadeOperacional,
-  obterUltimaGeolocalizacaoEvidencia,
-  formatarCoordenada,
-} from "../ordemServicoDetalhe.utils";
+import { formatarDataHora } from "../ordemServicoDetalhe.utils";
 import { exportarRelatorioDetalhadoOrdem } from "../ordensServico.service";
-import { AnexoItemCard } from "./AnexoItemCard";
 import { EvidenciaUploadPanel } from "./EvidenciaUploadPanel";
+import { OSAccordion } from "./OSAccordion";
 import { OrdemServicoAcoesPanel } from "./OrdemServicoAcoesPanel";
 import { PrioridadeBadge } from "./PrioridadeBadge";
 import { StatusBadge } from "./StatusBadge";
@@ -55,7 +48,6 @@ export default function TecnicoOSDetailsModal({
     actionFeedback,
     setActionFeedback,
     os,
-    criadaPor,
     tecnicoResponsavel,
     ultimaExecucaoAberta: execucaoAberta,
     execucaoParaFinalizacao,
@@ -92,11 +84,9 @@ export default function TecnicoOSDetailsModal({
     fallbackRole: "tecnico",
   });
 
-  const resumoUnidade = useMemo(() => obterResumoUnidadeOperacional(os), [os]);
-  const podeBaixarRelatorio = currentUser.role === "administrador";
-  const ultimaGeolocalizacao = useMemo(
-    () => obterUltimaGeolocalizacaoEvidencia(os?.anexos),
-    [os?.anexos]
+  const podeBaixarRelatorio = useMemo(
+    () => currentUser.role === "administrador",
+    [currentUser.role]
   );
   const avisoAcaoTipo = actionFeedback?.tipo ?? (erro ? "erro" : null);
   const avisoAcaoMensagem = actionFeedback?.mensagem ?? erro;
@@ -232,7 +222,7 @@ export default function TecnicoOSDetailsModal({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="relative h-full max-h-screen w-full overflow-y-auto rounded-t-[28px] border border-[var(--border)] bg-[var(--bg-card)] shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-5xl sm:rounded-[28px]"
+        className="relative h-full max-h-dvh w-full overflow-y-auto rounded-t-[24px] border border-[var(--border)] bg-[var(--bg-card)] pb-[env(safe-area-inset-bottom)] shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-5xl sm:rounded-[28px] sm:pb-0"
       >
         <button
           ref={closeButtonRef}
@@ -315,184 +305,88 @@ export default function TecnicoOSDetailsModal({
               </div>
             </section>
 
-            <div className="grid gap-4 p-4 sm:gap-6 sm:p-6 lg:grid-cols-[1.3fr,1fr]">
-              <section className="space-y-6">
-                <CardSection titulo="Resumo da OS" icone={<FileText className="h-5 w-5" />}>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Info label="Tipo de serviço" value={os.tipo} />
-                    <Info label="Cliente" value={os.nome_cliente} />
-                    <Info label="Status atual" value={formatarStatus(os.status)} />
-                    <Info label="Data de abertura" value={formatarDataHora(os.data_abertura)} />
-                    <Info
-                      label="Data de encerramento"
-                      value={formatarDataHora(os.data_encerramento)}
-                    />
-                    <Info
-                      label="Responsável atual"
-                      value={tecnicoResponsavel?.name || "Não atribuído"}
-                    />
-                    <Info label="Aberto por" value={criadaPor?.name} />
-                    <Info label="Email de abertura" value={criadaPor?.email} />
-                  </div>
-                  <Info label="Descrição" value={os.descricao} full />
-                </CardSection>
+            <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
+              <OSAccordion
+                ordemServico={os}
+                variant="modal"
+                abrirInicialmente={["dados"]}
+              />
 
-                <CardSection titulo="Resolução e ações" icone={<CheckCircle2 className="h-5 w-5" />}>
-                  <OrdemServicoAcoesPanel
+              <CardSection titulo="Resolução e ações" icone={<CheckCircle2 className="h-5 w-5" />}>
+                <OrdemServicoAcoesPanel
+                  variant="modal"
+                  status={os.status}
+                  processandoAcao={processandoAcao}
+                  currentUserId={currentUser.id}
+                  currentUserName={currentUser.name}
+                  podeAceitar={podeAceitar}
+                  podeIniciarExecucao={podeIniciarExecucao}
+                  podeFinalizarExecucao={podeFinalizarExecucao}
+                  podeMarcarNaoExecutada={podeMarcarNaoExecutada}
+                  osSemResponsavel={osSemResponsavel}
+                  osEhMinha={osEhMinha}
+                  osEhDeOutroTecnico={osEhDeOutroTecnico}
+                  tecnicoResponsavelNome={tecnicoResponsavel?.name}
+                  execucaoAbertaId={execucaoParaFinalizacao?.id}
+                  onError={(mensagem) => {
+                    setError(mensagem);
+                    setActionFeedback({ tipo: "erro", mensagem });
+                  }}
+                  onAceitar={() => executarAcao(() => aceitar())}
+                  onIniciarExecucao={() => executarAcao(() => iniciar({}))}
+                  onFinalizarExecucao={({
+                    execucaoId,
+                    dataFim,
+                    observacao,
+                    diagnostico,
+                    procedimento,
+                    materialUtilizado,
+                    funcionarios,
+                  }) =>
+                    executarAcao(() =>
+                      finalizar({
+                        execucao_id: execucaoId,
+                        data_fim: dataFim,
+                        observacao,
+                        diagnostico,
+                        procedimento,
+                        material_utilizado: materialUtilizado,
+                        funcionarios,
+                      })
+                    )
+                  }
+                  onMarcarNaoExecutada={(motivo: string) =>
+                    executarAcao(() =>
+                      marcarComoNaoExecutada({
+                        motivo_nao_execucao: motivo,
+                      })
+                    )
+                  }
+                />
+              </CardSection>
+
+              {podeEnviarAnexo ? (
+                <CardSection titulo="Nova evidência" icone={<Paperclip className="h-5 w-5" />}>
+                  <EvidenciaUploadPanel
                     variant="modal"
-                    status={os.status}
                     processandoAcao={processandoAcao}
-                    currentUserId={currentUser.id}
-                    currentUserName={currentUser.name}
-                    podeAceitar={podeAceitar}
-                    podeIniciarExecucao={podeIniciarExecucao}
-                    podeFinalizarExecucao={podeFinalizarExecucao}
-                    podeMarcarNaoExecutada={podeMarcarNaoExecutada}
-                    osSemResponsavel={osSemResponsavel}
-                    osEhMinha={osEhMinha}
-                    osEhDeOutroTecnico={osEhDeOutroTecnico}
-                    tecnicoResponsavelNome={tecnicoResponsavel?.name}
-                    execucaoAbertaId={execucaoParaFinalizacao?.id}
-                    onError={(mensagem) => {
-                      setError(mensagem);
-                      setActionFeedback({ tipo: "erro", mensagem });
-                    }}
-                    onAceitar={() => executarAcao(() => aceitar())}
-                    onIniciarExecucao={() => executarAcao(() => iniciar({}))}
-                    onFinalizarExecucao={({ execucaoId, dataFim, funcionarios }) =>
-                      executarAcao(() =>
-                        finalizar({
-                          execucao_id: execucaoId,
-                          data_fim: dataFim,
-                          funcionarios,
-                        })
-                      )
-                    }
-                    onMarcarNaoExecutada={(motivo: string) =>
-                      executarAcao(() =>
-                        marcarComoNaoExecutada({
-                          motivo_nao_execucao: motivo,
-                        })
-                      )
-                    }
+                    arquivoSelecionado={arquivoSelecionado}
+                    setArquivoSelecionado={setArquivoSelecionado}
+                    tipoAnexo={tipoAnexo}
+                    selecionarTipoAnexo={selecionarTipoAnexo}
+                    incluirGeolocalizacao={incluirGeolocalizacao}
+                    alternarIncluirGeolocalizacao={alternarIncluirGeolocalizacao}
+                    processandoGeolocalizacao={processandoGeolocalizacao}
+                    processandoEnderecoCapturado={processandoEnderecoCapturado}
+                    geolocalizacaoCapturada={geolocalizacaoCapturada}
+                    feedbackGeolocalizacao={feedbackGeolocalizacao}
+                    diagnosticoGeolocalizacao={diagnosticoGeolocalizacao}
+                    atualizarEnderecoCapturado={atualizarEnderecoCapturado}
+                    onCapturarGeolocalizacao={handleCapturarGeolocalizacao}
+                    onEnviar={handleEnviarAnexo}
                   />
                 </CardSection>
-
-                <CardSection titulo="Execuções registradas" icone={<Wrench className="h-5 w-5" />}>
-                  {os.execucoes?.length ? (
-                    <div className="space-y-3">
-                      {os.execucoes.map((execucao) => (
-                        <div
-                          key={execucao.id}
-                          className="app-card-soft rounded-2xl px-4 py-4"
-                        >
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            <Info label="Técnico" value={execucao.tecnico?.name} />
-                            <Info label="Início" value={formatarDataHora(execucao.data_inicio)} />
-                            <Info label="Fim" value={formatarDataHora(execucao.data_fim)} />
-                            <Info
-                              label="Observação"
-                              value={execucao.observacao || "Sem observações registradas."}
-                              full
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="app-muted text-sm">Nenhuma execução registrada até o momento.</p>
-                  )}
-                </CardSection>
-              </section>
-
-              <section className="space-y-6">
-                <CardSection titulo="Unidade e evidências" icone={<MapPin className="h-5 w-5" />}>
-                  <div className="app-card-soft rounded-2xl px-4 py-4">
-                    <p className="app-muted text-xs font-medium uppercase tracking-[0.16em]">
-                      Dados da unidade operacional
-                    </p>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      {resumoUnidade.map((item) => (
-                        <Info key={item.label} label={item.label} value={item.value} />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="app-card-soft rounded-2xl px-4 py-4">
-                    <p className="app-muted text-xs font-medium uppercase tracking-[0.16em]">
-                      Geolocalização da evidência
-                    </p>
-                    {ultimaGeolocalizacao ? (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <Info
-                          label="Latitude"
-                          value={formatarCoordenada(ultimaGeolocalizacao.latitude)}
-                        />
-                        <Info
-                          label="Longitude"
-                          value={formatarCoordenada(ultimaGeolocalizacao.longitude)}
-                        />
-                        <Info label="Rua" value={ultimaGeolocalizacao.rua_capturada} />
-                        <Info label="Bairro" value={ultimaGeolocalizacao.bairro_capturado} />
-                        <Info label="Cidade" value={ultimaGeolocalizacao.cidade_capturada} />
-                        <Info label="Estado" value={ultimaGeolocalizacao.estado_capturado} />
-                        <Info
-                          label="Endereço capturado"
-                          value={ultimaGeolocalizacao.endereco_capturado}
-                          full
-                        />
-                      </div>
-                    ) : (
-                      <p className="app-muted mt-3 text-sm">
-                        A localização aparecerá aqui quando o técnico enviar uma evidência com geolocalização.
-                      </p>
-                    )}
-                  </div>
-
-                  {podeEnviarAnexo && (
-                    <div className="app-card-soft rounded-2xl px-4 py-4">
-                      <p className="app-muted mb-3 text-xs font-medium uppercase tracking-[0.16em]">
-                        Nova evidência
-                      </p>
-                      <EvidenciaUploadPanel
-                        variant="modal"
-                        processandoAcao={processandoAcao}
-                        arquivoSelecionado={arquivoSelecionado}
-                        setArquivoSelecionado={setArquivoSelecionado}
-                        tipoAnexo={tipoAnexo}
-                        selecionarTipoAnexo={selecionarTipoAnexo}
-                        incluirGeolocalizacao={incluirGeolocalizacao}
-                        alternarIncluirGeolocalizacao={alternarIncluirGeolocalizacao}
-                        processandoGeolocalizacao={processandoGeolocalizacao}
-                        processandoEnderecoCapturado={processandoEnderecoCapturado}
-                        geolocalizacaoCapturada={geolocalizacaoCapturada}
-                        feedbackGeolocalizacao={feedbackGeolocalizacao}
-                        diagnosticoGeolocalizacao={diagnosticoGeolocalizacao}
-                        atualizarEnderecoCapturado={atualizarEnderecoCapturado}
-                        onCapturarGeolocalizacao={handleCapturarGeolocalizacao}
-                        onEnviar={handleEnviarAnexo}
-                      />
-                    </div>
-                  )}
-
-                  {os.anexos?.length ? (
-                    <div className="space-y-3">
-                      <p className="app-muted text-xs font-medium uppercase tracking-[0.16em]">
-                        Evidências enviadas
-                      </p>
-                      {os.anexos.map((anexo) => (
-                        <AnexoItemCard
-                          key={anexo.id}
-                          anexo={anexo}
-                          variant="modal"
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="app-muted text-sm">Sem anexos enviados até o momento.</p>
-                  )}
-                </CardSection>
-              </section>
+              ) : null}
             </div>
           </div>
         )}
@@ -540,25 +434,3 @@ function CardSection({
     </section>
   );
 }
-
-function Info({
-  label,
-  value,
-  full,
-}: {
-  label: string;
-  value?: string | null;
-  full?: boolean;
-}) {
-  return (
-    <div className={full ? "sm:col-span-2" : undefined}>
-      <p className="app-muted text-xs font-medium uppercase tracking-[0.16em]">{label}</p>
-      <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[var(--text-main)]">{value || "-"}</p>
-    </div>
-  );
-}
-
-
-
-
-

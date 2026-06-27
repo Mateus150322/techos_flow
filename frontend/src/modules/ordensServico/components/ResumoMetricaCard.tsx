@@ -8,8 +8,8 @@ type Props = {
 
 export function ResumoMetricaCard({ titulo, valor, icone }: Props) {
   return (
-    <div className="app-card rounded-[1.5rem] p-3 transition sm:rounded-[1.75rem] sm:p-4">
-      <div className="app-card-soft rounded-[1.2rem] p-3 sm:rounded-[1.35rem] sm:p-4">
+    <div className="app-card rounded-[1.35rem] p-3 transition sm:rounded-[1.75rem] sm:p-4">
+      <div className="app-card-soft rounded-[1.1rem] p-3 sm:rounded-[1.35rem] sm:p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <span className="app-muted text-xs font-semibold uppercase tracking-[0.14em]">

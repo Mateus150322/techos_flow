@@ -10,7 +10,9 @@ use Illuminate\Support\Collection;
 class RelatorioHoraExtraService
 {
     public function __construct(
-        private readonly HoraExtraService $horaExtraService
+        private readonly HoraExtraService $horaExtraService,
+        private readonly EscalaPlantaoService $escalaPlantaoService,
+        private readonly FechamentoHoraExtraService $fechamentoHoraExtraService
     ) {
     }
 
@@ -33,6 +35,7 @@ class RelatorioHoraExtraService
                 'data_fim',
                 'minutos_extras_50',
                 'minutos_extras_100',
+                'aprovacao_status',
             ])
             ->with([
                 'funcionario:id,name,role,valor_hora',
@@ -78,6 +81,8 @@ class RelatorioHoraExtraService
 
         return [
             'resumo' => $this->buildResumo($ordenadas),
+            'aprovacao' => $this->buildResumoAprovacao($ordenadas),
+            'fechamento' => $this->buildFechamento($filters),
             'indicadores' => [
                 'top_funcionarios' => $this->topFuncionarios($ordenadas),
             ],
@@ -113,11 +118,16 @@ class RelatorioHoraExtraService
                 ['key' => 'horas_extras_50', 'label' => 'Horas extras 50%'],
                 ['key' => 'horas_extras_100', 'label' => 'Horas extras 100%'],
                 ['key' => 'total_extras', 'label' => 'Total extras'],
+                ['key' => 'horas_feriados', 'label' => 'Feriados'],
+                ['key' => 'horas_pontos_facultativos', 'label' => 'Pontos facultativos'],
+                ['key' => 'horas_fins_semana', 'label' => 'Fins de semana'],
+                ['key' => 'horas_plantao', 'label' => 'Em escala'],
                 ['key' => 'horas_pagas', 'label' => 'Horas pagas'],
                 ['key' => 'horas_convertidas_folga', 'label' => 'Horas convertidas em folga'],
                 ['key' => 'dias_folga_gerados', 'label' => 'Dias de folga gerados'],
                 ['key' => 'saldo_banco', 'label' => 'Saldo banco'],
                 ['key' => 'valor_estimado', 'label' => 'Estimativa financeira'],
+                ['key' => 'aprovacao_status', 'label' => 'Aprovacao'],
             ],
             'rows' => collect($payload['rows'])
                 ->map(fn (array $row) => [
@@ -126,11 +136,16 @@ class RelatorioHoraExtraService
                     'horas_extras_50' => $this->formatarMinutos($row['horas_extras_50_minutos']),
                     'horas_extras_100' => $this->formatarMinutos($row['horas_extras_100_minutos']),
                     'total_extras' => $this->formatarMinutos($row['total_extras_minutos']),
+                    'horas_feriados' => $this->formatarMinutos($row['minutos_feriados']),
+                    'horas_pontos_facultativos' => $this->formatarMinutos($row['minutos_pontos_facultativos']),
+                    'horas_fins_semana' => $this->formatarMinutos($row['minutos_fins_semana']),
+                    'horas_plantao' => $this->formatarMinutos($row['minutos_plantao']),
                     'horas_pagas' => $this->formatarMinutos($row['horas_pagas_minutos']),
                     'horas_convertidas_folga' => $this->formatarMinutos($row['horas_convertidas_folga_minutos']),
                     'dias_folga_gerados' => (string) $row['dias_folga_gerados'],
                     'saldo_banco' => $this->formatarMinutos($row['saldo_banco_minutos']),
                     'valor_estimado' => 'R$ ' . number_format((float) $row['valor_estimado_financeiro'], 2, ',', '.'),
+                    'aprovacao_status' => $this->formatarStatusAprovacao($row['aprovacao_status']),
                 ])
                 ->values()
                 ->all(),
@@ -174,11 +189,20 @@ class RelatorioHoraExtraService
                     'role' => $registro->participanteCategoria(),
                     'funcao' => $registro->participanteFuncao(),
                     'valor_hora' => $registro->participanteValorHora(),
+                    'registro_id' => $registro->id,
+                    'aprovacao_status' => $registro->aprovacao_status ?? 'pendente',
                     'data' => $data,
                     'competencia' => $data->format('Y-m'),
                     'in_selected_range' => $this->estaNoPeriodoSelecionado($data, $inicio, $fim),
                     'minutos_extras_50' => (int) $segmento['minutos_extras_50'],
                     'minutos_extras_100' => (int) $segmento['minutos_extras_100'],
+                    'classificacao' => (string) ($segmento['classificacao'] ?? 'dia_util'),
+                    'minutos_plantao' => $this->escalaPlantaoService->minutosEmPlantao(
+                        $registro->participanteTipoVinculo(),
+                        $participanteId,
+                        CarbonImmutable::parse($segmento['inicio']),
+                        CarbonImmutable::parse($segmento['fim'])
+                    ),
                 ];
             }
         }
@@ -205,6 +229,15 @@ class RelatorioHoraExtraService
                 'dias_folga_gerados' => 0,
                 'saldo_banco_minutos' => 0,
                 'valor_estimado_financeiro' => 0.0,
+                'minutos_feriados' => 0,
+                'minutos_pontos_facultativos' => 0,
+                'minutos_fins_semana' => 0,
+                'minutos_plantao' => 0,
+                'aprovacao_pendentes' => 0,
+                'aprovacao_aprovadas' => 0,
+                'aprovacao_reprovadas' => 0,
+                'aprovacao_status' => 'sem_lancamentos',
+                '_aprovacao_registros' => [],
             ];
 
             foreach ($itemsFuncionario->groupBy('competencia')->sortKeys() as $entriesCompetencia) {
@@ -247,11 +280,21 @@ class RelatorioHoraExtraService
                         $minutosPagos100,
                         (float) $entry['valor_hora']
                     );
+                    $linha['minutos_plantao'] += (int) $entry['minutos_plantao'];
+                    $linha['_aprovacao_registros'][(string) $entry['registro_id']] = $entry['aprovacao_status'];
+
+                    match ($entry['classificacao']) {
+                        'feriado' => $linha['minutos_feriados'] += $totalEntry,
+                        'ponto_facultativo' => $linha['minutos_pontos_facultativos'] += $totalEntry,
+                        'fim_de_semana' => $linha['minutos_fins_semana'] += $totalEntry,
+                        default => null,
+                    };
                 }
             }
 
             if ($temSelecionado) {
                 $linha['saldo_banco_minutos'] = $carryBanco;
+                $this->finalizarResumoAprovacaoLinha($linha);
                 $linhas[] = $linha;
             }
         }
@@ -274,6 +317,88 @@ class RelatorioHoraExtraService
             'total_dias_folga_gerados' => (int) $rows->sum('dias_folga_gerados'),
             'saldo_total_banco_minutos' => (int) $rows->sum('saldo_banco_minutos'),
             'total_estimado_financeiro' => round((float) $rows->sum('valor_estimado_financeiro'), 2),
+            'total_minutos_feriados' => (int) $rows->sum('minutos_feriados'),
+            'total_minutos_pontos_facultativos' => (int) $rows->sum('minutos_pontos_facultativos'),
+            'total_minutos_fins_semana' => (int) $rows->sum('minutos_fins_semana'),
+            'total_minutos_plantao' => (int) $rows->sum('minutos_plantao'),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $linha
+     */
+    private function finalizarResumoAprovacaoLinha(array &$linha): void
+    {
+        $statusPorRegistro = collect($linha['_aprovacao_registros'] ?? []);
+
+        $linha['aprovacao_pendentes'] = $statusPorRegistro->filter(fn (string $status) => $status === 'pendente')->count();
+        $linha['aprovacao_aprovadas'] = $statusPorRegistro->filter(fn (string $status) => $status === 'aprovada')->count();
+        $linha['aprovacao_reprovadas'] = $statusPorRegistro->filter(fn (string $status) => $status === 'reprovada')->count();
+
+        $linha['aprovacao_status'] = match (true) {
+            $statusPorRegistro->isEmpty() => 'sem_lancamentos',
+            $linha['aprovacao_reprovadas'] > 0 => 'reprovada',
+            $linha['aprovacao_pendentes'] > 0 && $linha['aprovacao_aprovadas'] > 0 => 'parcial',
+            $linha['aprovacao_pendentes'] > 0 => 'pendente',
+            default => 'aprovada',
+        };
+
+        unset($linha['_aprovacao_registros']);
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private function buildResumoAprovacao(Collection $rows): array
+    {
+        $pendentes = (int) $rows->sum('aprovacao_pendentes');
+        $aprovadas = (int) $rows->sum('aprovacao_aprovadas');
+        $reprovadas = (int) $rows->sum('aprovacao_reprovadas');
+
+        return [
+            'pendentes' => $pendentes,
+            'aprovadas' => $aprovadas,
+            'reprovadas' => $reprovadas,
+            'status_geral' => match (true) {
+                $reprovadas > 0 => 'com_reprovacoes',
+                $pendentes > 0 && $aprovadas > 0 => 'parcial',
+                $pendentes > 0 => 'pendente',
+                $aprovadas > 0 => 'aprovada',
+                default => 'sem_lancamentos',
+            },
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>|null
+     */
+    private function buildFechamento(array $filters): ?array
+    {
+        if (empty($filters['mes']) || empty($filters['ano'])) {
+            return null;
+        }
+
+        $fechamento = $this->fechamentoHoraExtraService->buscar((int) $filters['ano'], (int) $filters['mes']);
+
+        if (! $fechamento) {
+            return [
+                'status' => 'aberta',
+                'id' => null,
+                'competencia' => sprintf('%04d-%02d', (int) $filters['ano'], (int) $filters['mes']),
+                'fechado_em' => null,
+                'fechado_por' => null,
+                'observacao' => null,
+            ];
+        }
+
+        return [
+            'status' => 'fechada',
+            'id' => $fechamento->id,
+            'competencia' => $fechamento->competencia?->format('Y-m'),
+            'fechado_em' => $fechamento->fechado_em?->toISOString(),
+            'fechado_por' => $fechamento->fechadoPor?->name,
+            'observacao' => $fechamento->observacao,
         ];
     }
 
@@ -413,5 +538,16 @@ class RelatorioHoraExtraService
         $resto = $minutos % 60;
 
         return sprintf('%dh%02d', $horas, $resto);
+    }
+
+    private function formatarStatusAprovacao(string $status): string
+    {
+        return match ($status) {
+            'aprovada' => 'Aprovada',
+            'reprovada' => 'Reprovada',
+            'parcial' => 'Parcial',
+            'pendente' => 'Pendente',
+            default => 'Sem lancamentos',
+        };
     }
 }

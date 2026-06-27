@@ -8,6 +8,8 @@ use App\Models\ColaboradorOperacional;
 use App\Models\Execucao;
 use App\Models\OrdemServico;
 use App\Models\User;
+use App\Services\Auditoria\OrdemServicoAuditService;
+use App\Services\HorasExtras\FechamentoHoraExtraService;
 use App\Services\HorasExtras\HoraExtraService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -18,11 +20,16 @@ class ExecucaoController extends Controller
 {
     use EnsuresTecnicoResponsavel;
 
+    public function __construct(
+        private readonly OrdemServicoAuditService $auditService
+    ) {}
+
     public function store(Request $request, string $id)
     {
         $data = $request->validate([
             'data_inicio' => 'nullable|date',
             'observacao' => 'nullable|string',
+            'client_operation_id' => 'nullable|uuid',
         ]);
 
         $user = $request->user();
@@ -38,6 +45,21 @@ class ExecucaoController extends Controller
             ], 422);
         }
 
+        if (! empty($data['client_operation_id'])) {
+            $execucaoExistente = Execucao::query()
+                ->where('client_operation_id', $data['client_operation_id'])
+                ->where('os_id', $os->id)
+                ->where('tecnico_id', $user->id)
+                ->first();
+
+            if ($execucaoExistente) {
+                return response()->json([
+                    'execucao' => $execucaoExistente,
+                    'os' => $os,
+                ]);
+            }
+        }
+
         $execucaoAberta = Execucao::query()
             ->where('os_id', $os->id)
             ->whereNull('data_fim')
@@ -50,17 +72,37 @@ class ExecucaoController extends Controller
             ], 422);
         }
 
-        $execucao = Execucao::create([
-            'os_id' => $os->id,
-            'tecnico_id' => $user->id,
-            'data_inicio' => $data['data_inicio'] ?? now(),
-            'observacao' => $data['observacao'] ?? null,
-        ]);
+        $execucao = DB::transaction(function () use ($data, $os, $user) {
+            $statusAnterior = $os->status;
+            $execucao = Execucao::create([
+                'os_id' => $os->id,
+                'tecnico_id' => $user->id,
+                'data_inicio' => $data['data_inicio'] ?? now(),
+                'observacao' => $data['observacao'] ?? null,
+                'client_operation_id' => $data['client_operation_id'] ?? null,
+            ]);
 
-        if ($os->status === 'aberta') {
-            $os->status = 'em_execucao';
-            $os->save();
-        }
+            if ($os->status === 'aberta') {
+                $os->status = 'em_execucao';
+                $os->save();
+            }
+
+            $this->auditService->registrar(
+                $os,
+                $user,
+                'execucao_iniciada',
+                'Execução técnica iniciada.',
+                ['status' => $statusAnterior],
+                [
+                    'status' => $os->status,
+                    'execucao_id' => $execucao->id,
+                    'data_inicio' => $execucao->data_inicio?->toISOString(),
+                ],
+                $data['client_operation_id'] ?? null
+            );
+
+            return $execucao;
+        });
 
         return response()->json([
             'execucao' => $execucao,
@@ -68,12 +110,21 @@ class ExecucaoController extends Controller
         ], 201);
     }
 
-    public function finalizar(Request $request, string $id, HoraExtraService $horaExtraService)
+    public function finalizar(
+        Request $request,
+        string $id,
+        HoraExtraService $horaExtraService,
+        FechamentoHoraExtraService $fechamentoHoraExtraService
+    )
     {
         $data = $request->validate([
             'execucao_id' => 'required|uuid|exists:execucoes,id',
             'data_fim' => 'nullable|date',
             'observacao' => 'nullable|string',
+            'diagnostico' => 'required|string',
+            'procedimento' => 'required|string',
+            'material_utilizado' => 'nullable|string',
+            'client_operation_id' => 'nullable|uuid',
             'funcionarios' => 'nullable|array',
             'funcionarios.*.funcionario_id' => 'nullable|uuid',
             'funcionarios.*.colaborador_operacional_id' => 'nullable|uuid',
@@ -86,6 +137,24 @@ class ExecucaoController extends Controller
 
         if ($response = $this->ensureTecnicoResponsavel($user, $os)) {
             return $response;
+        }
+
+        if (! empty($data['client_operation_id'])) {
+            $execucaoSincronizada = Execucao::query()
+                ->where('finalizacao_client_operation_id', $data['client_operation_id'])
+                ->where('os_id', $os->id)
+                ->where('tecnico_id', $user->id)
+                ->whereNotNull('data_fim')
+                ->first();
+
+            if ($execucaoSincronizada) {
+                return response()->json([
+                    'message' => 'Execucao ja sincronizada anteriormente.',
+                    'execucao' => $execucaoSincronizada,
+                    'participantes_registrados' => $execucaoSincronizada->execucaoFuncionarios()->count(),
+                    'os' => $os,
+                ]);
+            }
         }
 
         if ($os->status !== 'em_execucao') {
@@ -110,8 +179,8 @@ class ExecucaoController extends Controller
             ], 422);
         }
 
-        $dataInicioExecucao = CarbonImmutable::parse($os->data_abertura);
-        $dataInicioParticipantePadrao = CarbonImmutable::parse($execucao->data_inicio);
+        $dataInicioExecucao = CarbonImmutable::parse($execucao->data_inicio);
+        $dataInicioParticipantePadrao = $dataInicioExecucao;
         $dataFimExecucao = CarbonImmutable::parse($data['data_fim'] ?? now());
         $dataFimParticipantePadrao = $dataFimExecucao;
 
@@ -121,7 +190,6 @@ class ExecucaoController extends Controller
             ]);
         }
 
-        $execucao->data_inicio = $dataInicioExecucao;
         $execucao->data_fim = $dataFimExecucao;
         $participantesPayload = $this->resolveFuncionariosPayload(
             $data,
@@ -129,23 +197,35 @@ class ExecucaoController extends Controller
             $dataInicioParticipantePadrao,
             $dataFimParticipantePadrao
         );
+        $fechamentoHoraExtraService->assertPeriodoAberto($dataInicioExecucao, $dataFimExecucao);
+
+        foreach ($participantesPayload as $participante) {
+            $fechamentoHoraExtraService->assertPeriodoAberto(
+                CarbonImmutable::parse($participante['data_inicio']),
+                CarbonImmutable::parse($participante['data_fim'])
+            );
+        }
 
         $participantes = DB::transaction(function () use (
             $data,
-            $dataInicioExecucao,
             $dataFimExecucao,
             $execucao,
             $horaExtraService,
             $os,
-            $participantesPayload
+            $participantesPayload,
+            $user
         ) {
-            $execucao->data_inicio = $dataInicioExecucao;
             $execucao->data_fim = $dataFimExecucao;
 
             if (! empty($data['observacao'])) {
                 $execucao->observacao = $data['observacao'];
             }
 
+            $execucao->diagnostico = $data['diagnostico'];
+            $execucao->procedimento = $data['procedimento'];
+            $execucao->material_utilizado = $data['material_utilizado'] ?? null;
+            $execucao->finalizacao_client_operation_id =
+                $data['client_operation_id'] ?? null;
             $execucao->save();
 
             $participantesRegistrados = $horaExtraService->registrarFuncionariosExecucao(
@@ -156,6 +236,21 @@ class ExecucaoController extends Controller
             $os->status = 'finalizada';
             $os->data_encerramento = $dataFimExecucao;
             $os->save();
+
+            $this->auditService->registrar(
+                $os,
+                $user,
+                'execucao_finalizada',
+                'Execução concluída com diagnóstico e procedimento registrados.',
+                ['status' => 'em_execucao'],
+                [
+                    'status' => $os->status,
+                    'execucao_id' => $execucao->id,
+                    'data_fim' => $dataFimExecucao->toISOString(),
+                    'participantes_registrados' => $participantesRegistrados->count(),
+                ],
+                $data['client_operation_id'] ?? null
+            );
 
             return $participantesRegistrados;
         });
@@ -169,7 +264,7 @@ class ExecucaoController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      * @return array<int, array<string, string|null>>
      */
     private function resolveFuncionariosPayload(
@@ -177,8 +272,7 @@ class ExecucaoController extends Controller
         Execucao $execucao,
         CarbonImmutable $dataInicioPadrao,
         CarbonImmutable $dataFimPadrao
-    ): array
-    {
+    ): array {
         $funcionarios = collect($data['funcionarios'] ?? [])
             ->map(fn (mixed $item) => is_array($item) ? $item : [])
             ->values();
@@ -268,8 +362,8 @@ class ExecucaoController extends Controller
 
         return $participantes
             ->unique(fn (array $participante) => ! empty($participante['funcionario_id'])
-                ? 'usuario:' . $participante['funcionario_id']
-                : 'colaborador:' . ($participante['colaborador_operacional_id'] ?? '')
+                ? 'usuario:'.$participante['funcionario_id']
+                : 'colaborador:'.($participante['colaborador_operacional_id'] ?? '')
             )
             ->values()
             ->all();

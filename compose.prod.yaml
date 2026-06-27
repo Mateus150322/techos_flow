@@ -21,6 +21,10 @@ services:
       dockerfile: Dockerfile.prod
       args:
         VITE_API_URL: /api/v1
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+        VITE_SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
     restart: unless-stopped
 
   backend:
@@ -58,8 +62,54 @@ services:
       MAIL_FROM_NAME: ${MAIL_FROM_NAME}
       LARAVEL_PDF_DRIVER: ${LARAVEL_PDF_DRIVER}
       LARAVEL_PDF_DOMPDF_REMOTE_ENABLED: ${LARAVEL_PDF_DOMPDF_REMOTE_ENABLED}
+      TECHOS_BACKUP_ENABLED: ${TECHOS_BACKUP_ENABLED:-true}
+      TECHOS_BACKUP_PATH: /var/backups/techos-flow
+      TECHOS_BACKUP_RETENTION_DAYS: ${TECHOS_BACKUP_RETENTION_DAYS:-30}
+      TECHOS_BACKUP_SCHEDULE: ${TECHOS_BACKUP_SCHEDULE:-02:00}
+      PULSE_ENABLED: ${PULSE_ENABLED:-true}
+      PULSE_PATH: ${PULSE_PATH:-pulse}
+      PULSE_STORAGE_KEEP: ${PULSE_STORAGE_KEEP:-7 days}
+      PULSE_USERNAME: ${PULSE_USERNAME}
+      PULSE_PASSWORD: ${PULSE_PASSWORD}
+      SENTRY_LARAVEL_DSN: ${SENTRY_LARAVEL_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      SENTRY_SEND_DEFAULT_PII: "false"
     volumes:
       - ${BACKEND_STORAGE_PATH}:/var/www/html/storage
+      - ${BACKUP_PATH}:/var/backups/techos-flow
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work"]
+    environment:
+      APP_NAME: ${APP_NAME}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY}
+      APP_URL: https://${APP_HOST}
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: ${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      FILESYSTEM_DISK: local
+      ANEXOS_DISK: local
+      TECHOS_BACKUP_ENABLED: ${TECHOS_BACKUP_ENABLED:-true}
+      TECHOS_BACKUP_PATH: /var/backups/techos-flow
+      TECHOS_BACKUP_RETENTION_DAYS: ${TECHOS_BACKUP_RETENTION_DAYS:-30}
+      TECHOS_BACKUP_SCHEDULE: ${TECHOS_BACKUP_SCHEDULE:-02:00}
+    volumes:
+      - ${BACKEND_STORAGE_PATH}:/var/www/html/storage
+      - ${BACKUP_PATH}:/var/backups/techos-flow
     depends_on:
       postgres:
         condition: service_healthy

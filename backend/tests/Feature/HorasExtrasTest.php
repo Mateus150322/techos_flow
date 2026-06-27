@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\ColaboradorOperacional;
 use App\Models\Endereco;
+use App\Models\EscalaPlantao;
 use App\Models\Execucao;
 use App\Models\ExecucaoFuncionario;
+use App\Models\Feriado;
 use App\Models\OrdemServico;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -35,6 +37,8 @@ class HorasExtrasTest extends TestCase
         $finalizar = $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
             'execucao_id' => $execucaoId,
             'data_fim' => '2026-04-22 20:00:00',
+            'diagnostico' => 'Diagnostico de teste.',
+            'procedimento' => 'Procedimento de teste.',
             'funcionarios' => [
                 [
                     'funcionario_id' => $tecnico->id,
@@ -50,7 +54,14 @@ class HorasExtrasTest extends TestCase
         $finalizar
             ->assertOk()
             ->assertJsonPath('os.status', 'finalizada')
+            ->assertJsonPath('execucao.data_inicio', '2026-04-22T18:00:00.000000Z')
             ->assertJsonPath('participantes_registrados', 2);
+
+        $this->assertDatabaseHas('execucoes', [
+            'id' => $execucaoId,
+            'data_inicio' => '2026-04-22 18:00:00',
+            'data_fim' => '2026-04-22 20:00:00',
+        ]);
 
         $this->assertDatabaseHas('execucao_funcionarios', [
             'execucao_id' => $execucaoId,
@@ -89,6 +100,8 @@ class HorasExtrasTest extends TestCase
         $finalizar = $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
             'execucao_id' => $execucaoId,
             'data_fim' => '2026-04-23 20:00:00',
+            'diagnostico' => 'Diagnostico de teste.',
+            'procedimento' => 'Procedimento de teste.',
             'funcionarios' => [
                 [
                     'funcionario_id' => $adminParticipante->id,
@@ -117,6 +130,33 @@ class HorasExtrasTest extends TestCase
         ]);
     }
 
+    public function test_finalizacao_rejeita_data_anterior_ao_inicio_real_da_execucao(): void
+    {
+        $tecnico = $this->criarUsuario('tecnico', 'Tecnico Campo', 25);
+        $os = $this->criarOs($tecnico->id);
+
+        Sanctum::actingAs($tecnico);
+
+        $iniciar = $this->postJson("/api/v1/ordens-servico/{$os->id}/iniciar", [
+            'data_inicio' => '2026-04-22 18:00:00',
+        ]);
+
+        $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
+            'execucao_id' => $iniciar->json('execucao.id'),
+            'data_fim' => '2026-04-22 17:59:00',
+            'diagnostico' => 'Diagnostico de teste.',
+            'procedimento' => 'Procedimento de teste.',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('data_fim');
+
+        $this->assertDatabaseHas('execucoes', [
+            'id' => $iniciar->json('execucao.id'),
+            'data_inicio' => '2026-04-22 18:00:00',
+            'data_fim' => null,
+        ]);
+    }
+
     public function test_finalizacao_aceita_periodo_individual_atravessando_meia_noite_em_dia_util(): void
     {
         $tecnico = $this->criarUsuario('tecnico', 'Tecnico Noturno', 25);
@@ -135,6 +175,8 @@ class HorasExtrasTest extends TestCase
         $finalizar = $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
             'execucao_id' => $execucaoId,
             'data_fim' => '2026-04-29 02:00:00',
+            'diagnostico' => 'Diagnostico de teste.',
+            'procedimento' => 'Procedimento de teste.',
             'funcionarios' => [
                 [
                     'funcionario_id' => $adminParticipante->id,
@@ -211,6 +253,8 @@ class HorasExtrasTest extends TestCase
         $finalizar = $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
             'execucao_id' => $execucaoId,
             'data_fim' => '2026-04-24 20:00:00',
+            'diagnostico' => 'Diagnostico de teste.',
+            'procedimento' => 'Procedimento de teste.',
             'funcionarios' => [
                 [
                     'colaborador_operacional_id' => $auxiliar->id,
@@ -287,6 +331,158 @@ class HorasExtrasTest extends TestCase
             ->assertJsonPath('rows.0.valor_estimado_financeiro', 720);
     }
 
+    public function test_calendario_corporativo_aplica_ponto_facultativo_no_calculo(): void
+    {
+        $admin = $this->criarUsuario('administrador', 'Admin Calendario');
+        $tecnico = $this->criarUsuario('tecnico', 'Tecnico Campo', 25);
+        $os = $this->criarOs($tecnico->id);
+
+        Feriado::query()->create([
+            'nome' => 'Ponto facultativo operacional',
+            'data' => '2026-04-22',
+            'tipo' => 'ponto_facultativo',
+            'escopo' => 'municipal',
+            'estado' => 'AC',
+            'municipio' => 'Rio Branco',
+            'percentual_hora_extra' => 100,
+            'ativo' => true,
+        ]);
+
+        Sanctum::actingAs($tecnico);
+
+        $iniciar = $this->postJson("/api/v1/ordens-servico/{$os->id}/iniciar", [
+            'data_inicio' => '2026-04-22 08:00:00',
+        ]);
+
+        $finalizar = $this->postJson("/api/v1/ordens-servico/{$os->id}/execucoes/finalizar", [
+            'execucao_id' => $iniciar->json('execucao.id'),
+            'data_fim' => '2026-04-22 12:00:00',
+            'diagnostico' => 'Diagnostico de teste.',
+            'procedimento' => 'Procedimento de teste.',
+        ]);
+
+        $finalizar->assertOk();
+
+        $this->assertDatabaseHas('execucao_funcionarios', [
+            'execucao_id' => $iniciar->json('execucao.id'),
+            'funcionario_id' => $tecnico->id,
+            'minutos_normais' => 0,
+            'minutos_extras_50' => 0,
+            'minutos_extras_100' => 240,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson("/api/v1/relatorios/horas-extras?mes=4&ano=2026&funcionario_id={$tecnico->id}")
+            ->assertOk()
+            ->assertJsonPath('rows.0.minutos_pontos_facultativos', 240)
+            ->assertJsonPath('resumo.total_minutos_pontos_facultativos', 240);
+    }
+
+    public function test_escala_de_plantao_aparece_no_relatorio_de_horas_extras(): void
+    {
+        $admin = $this->criarUsuario('administrador', 'Admin Plantao');
+        $tecnico = $this->criarUsuario('tecnico', 'Tecnico Plantonista', 25);
+        $os = $this->criarOs($tecnico->id, ['status' => 'finalizada']);
+        $execucao = Execucao::query()->create([
+            'os_id' => $os->id,
+            'tecnico_id' => $tecnico->id,
+            'data_inicio' => '2026-04-25 08:00:00',
+            'data_fim' => '2026-04-25 12:00:00',
+            'observacao' => 'Execucao em plantao',
+        ]);
+
+        ExecucaoFuncionario::query()->create([
+            'execucao_id' => $execucao->id,
+            'funcionario_id' => $tecnico->id,
+            'data_inicio' => '2026-04-25 08:00:00',
+            'data_fim' => '2026-04-25 12:00:00',
+            'minutos_trabalhados' => 240,
+            'minutos_normais' => 0,
+            'minutos_extras_50' => 0,
+            'minutos_extras_100' => 240,
+        ]);
+
+        EscalaPlantao::query()->create([
+            'funcionario_id' => $tecnico->id,
+            'descricao' => 'Plantao de fim de semana',
+            'data_inicio' => '2026-04-25 07:00:00',
+            'data_fim' => '2026-04-25 13:00:00',
+            'ativo' => true,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson("/api/v1/relatorios/horas-extras?mes=4&ano=2026&funcionario_id={$tecnico->id}")
+            ->assertOk()
+            ->assertJsonPath('rows.0.minutos_plantao', 240)
+            ->assertJsonPath('resumo.total_minutos_plantao', 240);
+    }
+
+    public function test_aprovacao_e_fechamento_bloqueiam_lancamento_em_competencia_fechada(): void
+    {
+        $admin = $this->criarUsuario('administrador', 'Admin Fechamento');
+        $tecnico = $this->criarUsuario('tecnico', 'Tecnico Fechamento', 25);
+        $osFinalizada = $this->criarOs($tecnico->id, [
+            'numero' => '2026-000200',
+            'status' => 'finalizada',
+        ]);
+        $execucao = Execucao::query()->create([
+            'os_id' => $osFinalizada->id,
+            'tecnico_id' => $tecnico->id,
+            'data_inicio' => '2026-04-22 18:00:00',
+            'data_fim' => '2026-04-22 20:00:00',
+            'observacao' => 'Execucao para fechamento',
+        ]);
+
+        ExecucaoFuncionario::query()->create([
+            'execucao_id' => $execucao->id,
+            'funcionario_id' => $tecnico->id,
+            'data_inicio' => '2026-04-22 18:00:00',
+            'data_fim' => '2026-04-22 20:00:00',
+            'minutos_trabalhados' => 120,
+            'minutos_normais' => 0,
+            'minutos_extras_50' => 120,
+            'minutos_extras_100' => 0,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/v1/relatorios/horas-extras/aprovacoes', [
+            'mes' => 4,
+            'ano' => 2026,
+            'status' => 'aprovada',
+        ])
+            ->assertOk()
+            ->assertJsonPath('registros_atualizados', 1);
+
+        $this->postJson('/api/v1/relatorios/horas-extras/fechamentos', [
+            'mes' => 4,
+            'ano' => 2026,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('status', 'fechada');
+
+        $osAberta = $this->criarOs($tecnico->id, ['numero' => '2026-000201']);
+
+        Sanctum::actingAs($tecnico);
+
+        $iniciar = $this->postJson("/api/v1/ordens-servico/{$osAberta->id}/iniciar", [
+            'data_inicio' => '2026-04-23 18:00:00',
+        ]);
+
+        $iniciar->assertCreated();
+
+        $this->postJson("/api/v1/ordens-servico/{$osAberta->id}/execucoes/finalizar", [
+            'execucao_id' => $iniciar->json('execucao.id'),
+            'data_fim' => '2026-04-23 20:00:00',
+            'diagnostico' => 'Diagnostico de teste.',
+            'procedimento' => 'Procedimento de teste.',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('data_inicio');
+    }
+
     public function test_relatorio_de_horas_extras_e_restrito_ao_administrador(): void
     {
         $tecnico = $this->criarUsuario('tecnico');
@@ -351,7 +547,7 @@ class HorasExtrasTest extends TestCase
         bool $ativo = true
     ): User {
         return User::query()->create([
-            'name' => $name ?? ucfirst($role) . ' Teste',
+            'name' => $name ?? ucfirst($role).' Teste',
             'email' => fake()->unique()->safeEmail(),
             'password' => Hash::make('password'),
             'role' => $role,

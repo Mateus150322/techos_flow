@@ -184,7 +184,7 @@ export function AtendenteDashboardContent({
         ref={mainRef}
         id="conteudo-principal"
         tabIndex={-1}
-        className="mx-auto max-w-7xl px-3 pt-4 sm:px-6 sm:py-6"
+        className="app-mobile-safe mx-auto max-w-7xl pt-3 sm:px-6 sm:py-6"
       >
         <div className="mb-6 hidden gap-3 sm:flex sm:flex-wrap">
           <button

@@ -72,7 +72,7 @@ export function SpreadsheetExportMenu({
       {isMenuOpen ? (
         <div
           role="menu"
-          className={`absolute right-0 z-20 mt-2 min-w-[220px] rounded-2xl border p-2 shadow-xl sm:left-0 sm:right-auto ${menuClass}`}
+          className={`absolute inset-x-0 z-20 mt-2 w-full max-w-full rounded-2xl border p-2 shadow-xl sm:left-0 sm:right-auto sm:w-64 ${menuClass}`}
         >
           <button
             type="button"

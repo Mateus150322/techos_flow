@@ -84,7 +84,8 @@ class OrdemServicoDetalhadaPdfService
             'prioridade' => $this->formatPrioridade((int) $ordemServico->prioridade),
             'prioridadeTone' => $this->prioridadeTone((int) $ordemServico->prioridade),
             'descricaoSolicitacao' => $camposDescricao['descricao_os'] ?: (string) $ordemServico->descricao,
-            'execucaoServico' => $camposDescricao['procedimento']
+            'execucaoServico' => $execucaoPrincipal?->procedimento
+                ?: $camposDescricao['procedimento']
                 ?: ($execucaoPrincipal?->observacao ?: 'Execução sem observações registradas.'),
             'conclusaoTecnica' => $this->buildConclusaoTecnica($camposDescricao, $execucaoPrincipal),
             'linhas_esquerda' => $this->buildLinhasEsquerda(
@@ -163,7 +164,16 @@ class OrdemServicoDetalhadaPdfService
             $this->linha('Local operacional', $camposDescricao['local'] ?? ''),
             $this->linha('Setor', $camposDescricao['setor'] ?? ''),
             $this->linha('Encarregado', $camposDescricao['encarregado'] ?? ''),
-            $this->linha('Diagnóstico', $camposDescricao['diagnostico'] ?? ''),
+            $this->linha(
+                'Diagnóstico',
+                $execucaoPrincipal?->diagnostico
+                    ?: ($camposDescricao['diagnostico'] ?? '')
+            ),
+            $this->linha(
+                'Material utilizado',
+                $execucaoPrincipal?->material_utilizado
+                    ?: ($camposDescricao['material'] ?? '')
+            ),
             $this->linha('Observação da execução', $execucaoPrincipal?->observacao ?? ''),
         ], fn (mixed $item) => $item !== null));
     }
@@ -339,6 +349,10 @@ class OrdemServicoDetalhadaPdfService
 
     private function buildConclusaoTecnica(array $camposDescricao, mixed $execucaoPrincipal): string
     {
+        if (! empty($execucaoPrincipal?->procedimento)) {
+            return (string) $execucaoPrincipal->procedimento;
+        }
+
         if (! empty($camposDescricao['procedimento'])) {
             return $camposDescricao['procedimento'];
         }

@@ -2,9 +2,8 @@
 set -eu
 
 if [ -z "${APP_KEY:-}" ]; then
-  echo "APP_KEY nao configurada. Gerando chave temporaria para iniciar o ambiente de producao."
-  APP_KEY="base64:$(openssl rand -base64 32)"
-  export APP_KEY
+  echo "APP_KEY nao configurada. O backend nao pode iniciar em producao."
+  exit 1
 fi
 
 export DB_HOST="${DB_HOST:-${PGHOST:-postgres}}"

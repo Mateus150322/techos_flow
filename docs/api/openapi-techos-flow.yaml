@@ -188,6 +188,10 @@ paths:
     post:
       tags: [Ordens de Serviço]
       summary: Criar ordem de serviço
+      description: >
+        Disponível para atendente criar OS geral e para técnico criar OS de
+        Manutenção ETA/ETE. O administrador não abre OS pelo sistema; ele consulta,
+        acompanha indicadores e gera relatórios.
       requestBody:
         required: true
         content:

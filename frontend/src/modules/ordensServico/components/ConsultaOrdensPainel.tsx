@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { Search } from "lucide-react";
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { ResumoMetricaCard } from "./ResumoMetricaCard";
 import { TabelaOrdensSection } from "./TabelaOrdensSection";
 import type { OrdemServico } from "../ordensServico.service";
@@ -54,6 +60,11 @@ export function ConsultaOrdensPainel({
 }: ConsultaOrdensPainelProps) {
   const descricaoId = `${titulo.toLowerCase().replace(/\s+/g, "-")}-descricao`;
   const buscaId = `${titulo.toLowerCase().replace(/\s+/g, "-")}-busca`;
+  const sectionValues = secoes.map((secao, index) => ({
+    ...secao,
+    value: `secao-${index}-${secao.titulo.toLowerCase().replace(/\s+/g, "-")}`,
+  }));
+  const initiallyOpen = sectionValues.length ? [sectionValues[0].value] : [];
 
   return (
     <div className="space-y-6">
@@ -115,18 +126,47 @@ export function ConsultaOrdensPainel({
           </div>
         ) : null}
 
-        {secoes.map((secao) => (
-          <TabelaOrdensSection
-            key={secao.titulo}
-            titulo={secao.titulo}
-            descricao={secao.descricao}
-            ordens={secao.ordens}
-            loading={loading}
-            onVer={onVer}
-            formatarData={formatarData}
-            nomeResponsavel={nomeResponsavel}
-          />
-        ))}
+        <Accordion
+          type="multiple"
+          defaultValue={initiallyOpen}
+          className="overflow-hidden rounded-2xl border border-[var(--border)]"
+        >
+          {sectionValues.map((secao) => (
+            <AccordionItem
+              key={secao.value}
+              value={secao.value}
+              className="px-4 sm:px-5"
+            >
+              <AccordionTrigger className="py-4">
+                <span className="flex min-w-0 flex-1 items-start justify-between gap-3 pr-1">
+                  <span className="min-w-0">
+                    <span className="block text-base font-semibold text-[var(--text-main)]">
+                      {secao.titulo}
+                    </span>
+                    <span className="app-muted mt-1 block text-xs font-normal leading-5">
+                      {secao.descricao}
+                    </span>
+                  </span>
+                  <span className="app-card-soft inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold text-[var(--text-muted)]">
+                    {secao.ordens.length} OS
+                  </span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <TabelaOrdensSection
+                  titulo={secao.titulo}
+                  descricao={secao.descricao}
+                  ordens={secao.ordens}
+                  loading={loading}
+                  showHeader={false}
+                  onVer={onVer}
+                  formatarData={formatarData}
+                  nomeResponsavel={nomeResponsavel}
+                />
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
 
         {rodape}
       </div>

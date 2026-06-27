@@ -233,7 +233,7 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
   }
 
   return (
-    <section className={`rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading || saving}>
+    <section className={`rounded-3xl border p-4 shadow-sm sm:p-6 ${cardBg}`} aria-busy={loading || saving}>
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <AdminMetricCard
           value={stats.total}
@@ -269,7 +269,7 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
 
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className={`text-2xl font-semibold ${titleText}`}>
+          <h2 className={`text-xl font-semibold sm:text-2xl ${titleText}`}>
             Colaboradores operacionais
           </h2>
           <p className={`mt-1 text-sm ${mutedText}`}>
@@ -317,8 +317,8 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
       ) : null}
 
       {showForm ? (
-        <div ref={formPanelRef} className={`mb-6 rounded-3xl border p-5 ${softBg}`}>
-          <div className="mb-4 flex items-start justify-between gap-4">
+        <div ref={formPanelRef} className={`mb-6 scroll-mt-4 rounded-3xl border p-4 sm:p-5 ${softBg}`}>
+          <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
             <div>
               <h3 className={`text-lg font-semibold ${titleText}`}>
                 {editingId ? "Editar colaborador" : "Novo colaborador"}
@@ -332,7 +332,7 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
             <button
               type="button"
               onClick={resetForm}
-              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${secondaryButton}`}
+              className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm transition sm:w-auto ${secondaryButton}`}
             >
               <X className="h-4 w-4" />
               Fechar
@@ -393,11 +393,11 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
             </div>
 
             <div className="md:col-span-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <div className="app-mobile-sticky-actions flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <button
                   type="submit"
                   disabled={saving}
-                  className={`inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-medium transition ${primaryButton} disabled:cursor-not-allowed disabled:opacity-70`}
+                  className={`inline-flex min-h-11 items-center justify-center rounded-2xl px-5 py-3 text-sm font-medium transition ${primaryButton} disabled:cursor-not-allowed disabled:opacity-70`}
                 >
                   {saving
                     ? "Salvando..."
@@ -410,7 +410,7 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
                   <button
                     type="button"
                     onClick={resetForm}
-                    className={`inline-flex items-center justify-center rounded-2xl border px-5 py-3 text-sm font-medium transition ${secondaryButton}`}
+                    className={`inline-flex min-h-11 items-center justify-center rounded-2xl border px-5 py-3 text-sm font-medium transition ${secondaryButton}`}
                   >
                     Cancelar edição
                   </button>
@@ -467,7 +467,7 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
         </div>
       </div>
 
-      <div className="space-y-4 md:hidden">
+      <div className="space-y-4 xl:hidden">
         {loading ? (
           <div className={`rounded-3xl border p-6 text-center text-sm ${softBg} ${mutedText}`}>
             Carregando colaboradores...
@@ -493,9 +493,8 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
         )}
       </div>
 
-      <div className="hidden overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 md:block">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-sm">
+      <div className="hidden overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 xl:block">
+          <table className="w-full table-fixed text-sm">
             <caption id={tabelaCaptionId} className="sr-only">
               Tabela de colaboradores operacionais com nome, função,
               valor/hora, status e ações administrativas.
@@ -595,7 +594,6 @@ export function ColaboradoresOperacionaisSection({ isDark }: Props) {
               )}
             </tbody>
           </table>
-        </div>
       </div>
     </section>
   );

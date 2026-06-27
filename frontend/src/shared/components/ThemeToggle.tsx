@@ -1,8 +1,13 @@
 import { Moon, Sun } from "lucide-react";
 
 import { useTheme } from "@/shared/hooks/useTheme";
+import { cn } from "@/lib/utils";
 
-export function ThemeToggle() {
+type ThemeToggleProps = {
+  className?: string;
+};
+
+export function ThemeToggle({ className }: ThemeToggleProps) {
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -10,7 +15,10 @@ export function ThemeToggle() {
       type="button"
       onClick={toggleTheme}
       aria-pressed={theme === "dark"}
-      className="app-button-outline inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition sm:min-w-[6.25rem]"
+      className={cn(
+        "app-button-outline inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition sm:min-w-[6.25rem]",
+        className
+      )}
       aria-label="Alternar tema"
       title={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
     >

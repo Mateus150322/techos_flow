@@ -47,15 +47,15 @@ export default function EsqueciSenhaPage() {
 
   return (
     <div className={`min-h-screen ${pageBg}`}>
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-6">
+      <div className="app-mobile-safe mx-auto flex min-h-dvh max-w-7xl flex-col py-4 sm:px-4 sm:py-6">
         <div className="flex flex-1 items-center justify-center">
-          <div className="grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-            <section className={`rounded-3xl border p-8 shadow-sm ${panelBg}`}>
+          <div className="grid w-full max-w-5xl gap-4 sm:gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+            <section className={`rounded-2xl border p-5 shadow-sm sm:rounded-3xl sm:p-8 ${panelBg}`}>
               <div className="flex items-center gap-4">
-                <BrandMark className="h-14 w-14 rounded-2xl shadow-sm" />
+                <BrandMark className="h-12 w-12 rounded-xl shadow-sm sm:h-14 sm:w-14 sm:rounded-2xl" />
 
                 <div>
-                  <h1 className={`text-3xl font-semibold ${titleText}`}>Recuperar acesso</h1>
+                  <h1 className={`text-2xl font-semibold sm:text-3xl ${titleText}`}>Recuperar acesso</h1>
                   <p className={`mt-1 text-sm ${mutedText}`}>
                     Enviaremos um link seguro para redefinir a senha da sua conta.
                   </p>
@@ -74,7 +74,7 @@ export default function EsqueciSenhaPage() {
               </div>
             </section>
 
-            <section className={`rounded-3xl border p-8 shadow-sm ${panelBg}`}>
+            <section className={`rounded-2xl border p-5 shadow-sm sm:rounded-3xl sm:p-8 ${panelBg}`}>
               <div className="mb-6">
                 <h2 className={`text-2xl font-semibold ${titleText}`}>Esqueci minha senha</h2>
                 <p className={`mt-2 text-sm ${mutedText}`}>

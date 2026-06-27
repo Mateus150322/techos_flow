@@ -333,7 +333,7 @@ export function diagnosticarGeolocalizacao(): DiagnosticoGeolocalizacao {
       disponivel: false,
       requerHttps: true,
       mensagem:
-        "A captura de localizacao no celular precisa de HTTPS ou acesso local. Pelo link de rede do Vite, o navegador pode bloquear a geolocalizacao.",
+        "A captura de localizacao local funciona em http://localhost:5173. Em celular ou outro aparelho da rede, use HTTPS local para o navegador liberar a geolocalizacao.",
     };
   }
 

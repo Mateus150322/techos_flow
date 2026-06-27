@@ -33,7 +33,7 @@ Arquivos principais de producao:
 
 ### `backend`
 
-- PHP 8.2
+- PHP 8.4
 - instala dependencias com Composer quando necessario
 - gera `APP_KEY` se necessario
 - aguarda o PostgreSQL
@@ -42,7 +42,7 @@ Arquivos principais de producao:
 
 ### `frontend`
 
-- Node 20
+- Node 22
 - instala dependencias com `npm install` quando necessario
 - sobe o Vite em `http://localhost:5173`
 - usa proxy interno para o backend Docker

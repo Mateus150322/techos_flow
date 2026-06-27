@@ -5,26 +5,21 @@ import {
   ArrowLeft,
   CheckCircle2,
   FileDown,
-  FileText,
   MapPin,
   Paperclip,
-  UserCircle2,
-  Wrench,
 } from "lucide-react";
 
 import {
   formatarDataHora,
-  formatarStatus,
   obterResumoUnidadeOperacional,
   obterUltimaGeolocalizacaoEvidencia,
   formatarCoordenada,
 } from "./ordemServicoDetalhe.utils";
 import { exportarRelatorioDetalhadoOrdem } from "./ordensServico.service";
-import { AnexoItemCard } from "./components/AnexoItemCard";
 import { EvidenciaUploadPanel } from "./components/EvidenciaUploadPanel";
+import { OSAccordion } from "./components/OSAccordion";
 import { OrdemServicoAcoesPanel } from "./components/OrdemServicoAcoesPanel";
 import { PrioridadeBadge } from "./components/PrioridadeBadge";
-import { formatPrioridade } from "./prioridade.utils";
 import { StatusBadge } from "./components/StatusBadge";
 import { useOrdemServicoDetalhe } from "./useOrdemServicoDetalhe";
 import { useTheme } from "@/shared/hooks/useTheme";
@@ -37,6 +32,10 @@ export default function OrdemDetalhePage() {
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const avisoAcaoRef = useRef<HTMLDivElement | null>(null);
+  const detalhesRef = useRef<HTMLDivElement | null>(null);
+  const acoesRef = useRef<HTMLDivElement | null>(null);
+  const evidenciasRef = useRef<HTMLDivElement | null>(null);
+  const relatorioRef = useRef<HTMLDivElement | null>(null);
 
   const {
     currentUser,
@@ -129,6 +128,16 @@ export default function OrdemDetalhePage() {
   const osId = os?.id;
   const avisoAcaoTipo = actionFeedback?.tipo ?? (error ? "erro" : null);
   const avisoAcaoMensagem = actionFeedback?.mensagem ?? error;
+  const atalhosRapidos = [
+    { label: "Detalhes", ref: detalhesRef, visivel: true },
+    { label: "Ações", ref: acoesRef, visivel: temAcoesOperacionais },
+    { label: "Evidências", ref: evidenciasRef, visivel: podeEnviarAnexo || Boolean(os?.anexos?.length) },
+    { label: "PDF", ref: relatorioRef, visivel: podeBaixarRelatorio },
+  ].filter((atalho) => atalho.visivel);
+
+  function scrollPara(ref: React.RefObject<HTMLDivElement | null>) {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   useEffect(() => {
     if (!loading && osId) {
@@ -152,7 +161,7 @@ export default function OrdemDetalhePage() {
   if (loading) {
     return (
       <div className={pageBg}>
-        <div className="mx-auto max-w-7xl px-4 py-6">
+        <div className="app-mobile-safe mx-auto max-w-7xl py-3 sm:px-4 sm:py-6">
           <div className={`${cardBg} rounded-2xl p-6`}>
             <p className={`text-sm ${mutedText}`}>Carregando detalhes...</p>
           </div>
@@ -164,7 +173,7 @@ export default function OrdemDetalhePage() {
   if (error && !os) {
     return (
       <div className={pageBg}>
-        <div className="mx-auto max-w-7xl px-4 py-6">
+        <div className="app-mobile-safe mx-auto max-w-7xl py-3 sm:px-4 sm:py-6">
           <div className={`${cardBg} rounded-2xl p-6`}>
             <p className="app-alert-danger rounded-xl px-4 py-3 text-sm">{error}</p>
 
@@ -185,7 +194,7 @@ export default function OrdemDetalhePage() {
   if (!os) {
     return (
       <div className={pageBg}>
-        <div className="mx-auto max-w-7xl px-4 py-6">
+        <div className="app-mobile-safe mx-auto max-w-7xl py-3 sm:px-4 sm:py-6">
           <div className={`${cardBg} rounded-2xl p-6`}>
             <p className={`text-sm ${mutedText}`}>Ordem de serviço não encontrada.</p>
 
@@ -205,8 +214,8 @@ export default function OrdemDetalhePage() {
 
   return (
     <div className={pageBg}>
-      <div className="mx-auto max-w-7xl px-4 py-6">
-        <div className={`${cardBg} rounded-[1.75rem] p-4 sm:rounded-3xl sm:p-6`}>
+      <div className="app-mobile-safe mx-auto max-w-7xl py-3 sm:px-4 sm:py-6">
+        <div className={`${cardBg} rounded-[1.25rem] p-4 sm:rounded-3xl sm:p-6`}>
           <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-3">
@@ -217,7 +226,7 @@ export default function OrdemDetalhePage() {
               <h1
                 ref={titleRef}
                 tabIndex={-1}
-                className={`mt-3 text-2xl font-bold outline-none sm:text-3xl ${titleText}`}
+                className={`mt-3 text-2xl font-bold leading-tight outline-none sm:text-3xl ${titleText}`}
               >
                 {os.numero}
               </h1>
@@ -301,100 +310,108 @@ export default function OrdemDetalhePage() {
             />
           </div>
 
+          <nav
+            className="mt-4 flex flex-wrap gap-2"
+            aria-label="Navegação rápida da ordem de serviço"
+          >
+            {atalhosRapidos.map((atalho) => (
+              <button
+                key={atalho.label}
+                type="button"
+                onClick={() => scrollPara(atalho.ref)}
+                className="app-button-outline inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2 text-sm font-medium"
+              >
+                {atalho.label}
+              </button>
+            ))}
+          </nav>
+
+          <div ref={detalhesRef} className="scroll-mt-24">
+            <OSAccordion ordemServico={os} className="mt-5" />
+          </div>
+
           <div className="mt-6 grid gap-4 xl:grid-cols-3">
             <div className="space-y-4 xl:col-span-2">
-              <Section title="Resumo da OS" icon={<FileText className="h-4 w-4" />} cardBg={cardBg}>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <DetailItem label="Tipo de serviço" value={os.tipo} bodyText={bodyText} mutedText={mutedText} />
-                  <DetailItem label="Cliente" value={os.nome_cliente} bodyText={bodyText} mutedText={mutedText} />
-                  <DetailItem label="Status atual" value={formatarStatus(os.status)} bodyText={bodyText} mutedText={mutedText} />
-                  <DetailItem
-                    label="Prioridade"
-                    value={formatPrioridade(os.prioridade)}
-                    bodyText={bodyText}
-                    mutedText={mutedText}
-                  />
-                  <DetailItem label="Responsável atual" value={tecnicoResponsavel?.name || "Não atribuído"} bodyText={bodyText} mutedText={mutedText} />
-                  <DetailItem label="Aberto por" value={criadaPor?.name} bodyText={bodyText} mutedText={mutedText} />
-                  <DetailItem
-                    label="Descrição"
-                    value={os.descricao}
-                    bodyText={bodyText}
-                    mutedText={mutedText}
-                    full
-                  />
-                </div>
-              </Section>
-
               {temAcoesOperacionais && (
-                <Section
-                  title="Ações da OS"
-                  icon={<CheckCircle2 className="h-4 w-4" />}
-                  cardBg={cardBg}
-                >
-                  <OrdemServicoAcoesPanel
-                    variant="page"
-                    isDark={isDark}
-                    processandoAcao={processandoAcao}
-                    currentUserId={currentUser.id}
-                    currentUserName={currentUser.name}
-                    podeIniciarExecucao={podeIniciarExecucao}
-                    podeFinalizarExecucao={podeFinalizarExecucao}
-                    podeMarcarNaoExecutada={podeMarcarNaoExecutada}
-                    execucaoAbertaId={execucaoParaFinalizacao?.id}
-                    onError={(mensagem) => {
-                      setError(mensagem);
-                      setActionFeedback({ tipo: "erro", mensagem });
-                    }}
-                    onIniciarExecucao={(observacao) =>
-                      iniciar({
+                <div ref={acoesRef} className="scroll-mt-24">
+                  <Section
+                    title="Ações da OS"
+                    icon={<CheckCircle2 className="h-4 w-4" />}
+                    cardBg={cardBg}
+                  >
+                    <OrdemServicoAcoesPanel
+                      variant="page"
+                      isDark={isDark}
+                      processandoAcao={processandoAcao}
+                      currentUserId={currentUser.id}
+                      currentUserName={currentUser.name}
+                      podeIniciarExecucao={podeIniciarExecucao}
+                      podeFinalizarExecucao={podeFinalizarExecucao}
+                      podeMarcarNaoExecutada={podeMarcarNaoExecutada}
+                      execucaoAbertaId={execucaoParaFinalizacao?.id}
+                      onError={(mensagem) => {
+                        setError(mensagem);
+                        setActionFeedback({ tipo: "erro", mensagem });
+                      }}
+                      onIniciarExecucao={(observacao) =>
+                        iniciar({
+                          observacao,
+                        })
+                      }
+                      onFinalizarExecucao={({
+                        execucaoId,
+                        dataFim,
                         observacao,
-                      })
-                    }
-                    onFinalizarExecucao={({ execucaoId, dataFim, observacao, funcionarios }) =>
-                      finalizar({
-                        execucao_id: execucaoId,
-                        data_fim: dataFim,
-                        observacao,
+                        diagnostico,
+                        procedimento,
+                        materialUtilizado,
                         funcionarios,
-                      })
-                    }
-                    onMarcarNaoExecutada={(motivo) =>
-                      marcarComoNaoExecutada({
-                        motivo_nao_execucao: motivo,
-                      })
-                    }
-                  />
-                </Section>
+                      }) =>
+                        finalizar({
+                          execucao_id: execucaoId,
+                          data_fim: dataFim,
+                          observacao,
+                          diagnostico,
+                          procedimento,
+                          material_utilizado: materialUtilizado,
+                          funcionarios,
+                        })
+                      }
+                      onMarcarNaoExecutada={(motivo) =>
+                        marcarComoNaoExecutada({
+                          motivo_nao_execucao: motivo,
+                        })
+                      }
+                    />
+                  </Section>
+                </div>
               )}
 
-              <Section title="Execuções" icon={<Wrench className="h-4 w-4" />} cardBg={cardBg}>
-                {os.execucoes?.length ? (
-                  <div className="space-y-3">
-                    {os.execucoes.map((execucao) => (
-                      <div
-                        key={execucao.id}
-                        className={`${innerCardBg} rounded-xl px-4 py-3`}
-                      >
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <DetailItem label="Técnico" value={execucao.tecnico?.name} bodyText={bodyText} mutedText={mutedText} />
-                          <DetailItem label="Início" value={formatarDataHora(execucao.data_inicio)} bodyText={bodyText} mutedText={mutedText} />
-                          <DetailItem label="Fim" value={formatarDataHora(execucao.data_fim)} bodyText={bodyText} mutedText={mutedText} />
-                          <DetailItem
-                            label="Observação"
-                            value={execucao.observacao || "Sem observações registradas."}
-                            bodyText={bodyText}
-                            mutedText={mutedText}
-                            full
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className={`text-sm ${mutedText}`}>Nenhuma execução registrada.</p>
-                )}
-              </Section>
+              {podeEnviarAnexo && (
+                <div ref={evidenciasRef} className="scroll-mt-24">
+                  <Section title="Nova evidência" icon={<Paperclip className="h-4 w-4" />} cardBg={cardBg}>
+                    <EvidenciaUploadPanel
+                      variant="page"
+                      isDark={isDark}
+                      processandoAcao={processandoAcao}
+                      arquivoSelecionado={arquivoSelecionado}
+                      setArquivoSelecionado={setArquivoSelecionado}
+                      tipoAnexo={tipoAnexo}
+                      selecionarTipoAnexo={selecionarTipoAnexo}
+                      incluirGeolocalizacao={incluirGeolocalizacao}
+                      alternarIncluirGeolocalizacao={alternarIncluirGeolocalizacao}
+                      processandoGeolocalizacao={processandoGeolocalizacao}
+                      processandoEnderecoCapturado={processandoEnderecoCapturado}
+                      geolocalizacaoCapturada={geolocalizacaoCapturada}
+                      feedbackGeolocalizacao={feedbackGeolocalizacao}
+                      diagnosticoGeolocalizacao={diagnosticoGeolocalizacao}
+                      atualizarEnderecoCapturado={atualizarEnderecoCapturado}
+                      onCapturarGeolocalizacao={handleCapturarGeolocalizacao}
+                      onEnviar={handleEnviarAnexo}
+                    />
+                  </Section>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -474,56 +491,24 @@ export default function OrdemDetalhePage() {
                 </div>
               </Section>
 
-              {podeEnviarAnexo && (
-                <Section title="Nova evidência" icon={<Paperclip className="h-4 w-4" />} cardBg={cardBg}>
-                  <EvidenciaUploadPanel
-                    variant="page"
-                    isDark={isDark}
-                    processandoAcao={processandoAcao}
-                    arquivoSelecionado={arquivoSelecionado}
-                    setArquivoSelecionado={setArquivoSelecionado}
-                    tipoAnexo={tipoAnexo}
-                    selecionarTipoAnexo={selecionarTipoAnexo}
-                    incluirGeolocalizacao={incluirGeolocalizacao}
-                    alternarIncluirGeolocalizacao={alternarIncluirGeolocalizacao}
-                    processandoGeolocalizacao={processandoGeolocalizacao}
-                    processandoEnderecoCapturado={processandoEnderecoCapturado}
-                    geolocalizacaoCapturada={geolocalizacaoCapturada}
-                    feedbackGeolocalizacao={feedbackGeolocalizacao}
-                    diagnosticoGeolocalizacao={diagnosticoGeolocalizacao}
-                    atualizarEnderecoCapturado={atualizarEnderecoCapturado}
-                    onCapturarGeolocalizacao={handleCapturarGeolocalizacao}
-                    onEnviar={handleEnviarAnexo}
-                  />
-                </Section>
-              )}
-
-              <Section
-                title="Criada por"
-                icon={<UserCircle2 className="h-4 w-4" />}
-                cardBg={cardBg}
-              >
-                <p className={`text-sm ${bodyText}`}>{criadaPor?.name || "-"}</p>
-                <p className={`mt-1 text-xs ${mutedText}`}>{criadaPor?.email || "-"}</p>
-              </Section>
-
-              <Section title="Anexos" icon={<Paperclip className="h-4 w-4" />} cardBg={cardBg}>
-                {os.anexos?.length ? (
-                  <ul className="space-y-2">
-                    {os.anexos.map((anexo) => (
-                      <AnexoItemCard
-                        key={anexo.id}
-                        anexo={anexo}
-                        variant="page"
-                        isDark={isDark}
-                        wrapper="li"
-                      />
-                    ))}
-                  </ul>
-                ) : (
-                  <p className={`text-sm ${mutedText}`}>Sem anexos.</p>
-                )}
-              </Section>
+              {podeBaixarRelatorio ? (
+                <div ref={relatorioRef} className="scroll-mt-24">
+                  <Section title="Relatório" icon={<FileDown className="h-4 w-4" />} cardBg={cardBg}>
+                    <p className={`text-sm ${mutedText}`}>
+                      Gere o PDF detalhado quando precisar compartilhar ou arquivar a OS.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleBaixarRelatorio}
+                      disabled={baixandoRelatorio}
+                      className="app-button-primary mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      {baixandoRelatorio ? "Gerando PDF..." : "Baixar PDF"}
+                    </button>
+                  </Section>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

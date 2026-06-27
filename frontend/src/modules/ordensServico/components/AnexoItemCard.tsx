@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, MapPin } from "lucide-react";
+import { Clock3, Loader2, MapPin } from "lucide-react";
 
 import { obterArquivoAnexo, type Anexo } from "../ordensServico.service";
 import { formatarCoordenada, formatarDataHora } from "../ordemServicoDetalhe.utils";
@@ -79,7 +79,8 @@ export function AnexoItemCard({
   const classes = getClasses(variant);
   const Wrapper = wrapper;
   const fileLabel = anexo.nome_arquivo || anexo.id;
-  const ehFoto = anexo.tipo === "foto";
+  const sincronizacaoPendente = Boolean(anexo.sincronizacao_pendente);
+  const ehFoto = anexo.tipo === "foto" && !sincronizacaoPendente;
 
   useEffect(() => {
     if (!ehFoto || !anexo.id) {
@@ -214,7 +215,15 @@ export function AnexoItemCard({
 
   return (
     <Wrapper className={classes.outer}>
-      <p className="font-medium text-[var(--text-main)]">{anexo.tipo || "Arquivo"}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium text-[var(--text-main)]">{anexo.tipo || "Arquivo"}</p>
+        {sincronizacaoPendente ? (
+          <span className="app-alert-warning inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold">
+            <Clock3 className="h-3.5 w-3.5" />
+            Aguardando sincronização
+          </span>
+        ) : null}
+      </div>
 
       {ehFoto ? (
         <button
@@ -241,7 +250,7 @@ export function AnexoItemCard({
         </button>
       ) : null}
 
-      {anexo.id ? (
+      {anexo.id && !sincronizacaoPendente ? (
         <button
           type="button"
           onClick={() => void handleAbrirArquivo()}
@@ -257,6 +266,8 @@ export function AnexoItemCard({
             fileLabel
           )}
         </button>
+      ) : sincronizacaoPendente ? (
+        <p className={classes.fallback}>{fileLabel}</p>
       ) : (
         <p className={classes.fallback}>{anexo.nome_arquivo || "-"}</p>
       )}

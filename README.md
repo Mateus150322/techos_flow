@@ -55,6 +55,9 @@ Serviços expostos:
 - backend: `http://localhost:8000`
 - PostgreSQL: `localhost:5432`
 
+Para testar a geolocalização no computador, abra o frontend por `http://localhost:5173`.
+Navegadores aceitam geolocalização em `localhost`, mesmo sem HTTPS.
+
 Comandos úteis:
 
 ```bash
@@ -96,6 +99,20 @@ Para acessar o frontend local por nome em vez de IP, use:
 - `http://techosflow.test:5173`
 
 No Windows, isso depende de uma entrada local no arquivo `hosts` apontando `techosflow.test` para `127.0.0.1`.
+Esse host customizado não é recomendado para testar geolocalização local, porque o navegador pode tratar o acesso HTTP como inseguro. Use `http://localhost:5173` no próprio computador ou habilite HTTPS local para testar em celular/outro aparelho da rede.
+
+### Geolocalização local em celular
+
+Para capturar localização em um celular apontando para o projeto rodando no computador, o navegador exige HTTPS. O Vite aceita certificados locais via variáveis:
+
+```env
+VITE_DEV_HTTPS=true
+VITE_DEV_HTTPS_KEY=C:/caminho/para/local-key.pem
+VITE_DEV_HTTPS_CERT=C:/caminho/para/local-cert.pem
+VITE_APP_HOST=seu-ip-ou-host-local
+```
+
+Depois abra `https://seu-ip-ou-host-local:5173` no celular e permita o acesso à localização.
 
 ## Comandos principais
 

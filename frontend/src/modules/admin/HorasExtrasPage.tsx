@@ -1,13 +1,26 @@
 ﻿import { useEffect, useId, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { CalendarRange, FileDown, TimerReset, Users } from "lucide-react";
+import { useRef } from "react";
+import {
+  CalendarRange,
+  CheckCircle2,
+  FileDown,
+  LockKeyhole,
+  RotateCcw,
+  TimerReset,
+  Users,
+  XCircle,
+} from "lucide-react";
 
 import { AdminShell } from "./AdminShell";
 import { AdminMetricCard } from "./components/AdminMetricCard";
 import { SpreadsheetExportMenu } from "./components/SpreadsheetExportMenu";
 import {
+  atualizarAprovacaoHorasExtras,
   buscarRelatorioHorasExtras,
   exportarRelatorioHorasExtras,
+  fecharCompetenciaHorasExtras,
+  reabrirCompetenciaHorasExtras,
   type HoraExtraExportFormat,
   type HorasExtrasResponse,
 } from "./horasExtras.service";
@@ -24,12 +37,15 @@ export default function HorasExtrasPage() {
   const filtrosHintId = useId();
   const tabelaCaptionId = useId();
   const destaqueHintId = useId();
+  const feedbackRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [dados, setDados] = useState<HorasExtrasResponse | null>(null);
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [exportandoFormato, setExportandoFormato] = useState<HoraExtraExportFormat | null>(null);
+  const [processandoApuracao, setProcessandoApuracao] = useState<string | null>(null);
+  const [sucesso, setSucesso] = useState("");
   const [filtros, setFiltros] = useState({
     funcionarioId: "todos",
     dataInicio: "",
@@ -50,6 +66,7 @@ export default function HorasExtrasPage() {
       try {
         setLoading(true);
         setErro("");
+        setSucesso("");
 
         const response = await buscarRelatorioHorasExtras({
           funcionarioId:
@@ -72,6 +89,17 @@ export default function HorasExtrasPage() {
 
     void load();
   }, [filtrosAplicados, paginaAtual]);
+
+  useEffect(() => {
+    if (!erro && !sucesso) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      feedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      feedbackRef.current?.focus({ preventScroll: true });
+    });
+  }, [erro, sucesso]);
 
   const cardBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
   const softCard = isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200";
@@ -102,19 +130,23 @@ export default function HorasExtrasPage() {
     setFiltrosAplicados({ ...filtros });
   }
 
+  function filtrosConsulta() {
+    return {
+      funcionarioId:
+        filtrosAplicados.funcionarioId !== "todos" ? filtrosAplicados.funcionarioId : undefined,
+      dataInicio: filtrosAplicados.mes ? undefined : filtrosAplicados.dataInicio || undefined,
+      dataFim: filtrosAplicados.mes ? undefined : filtrosAplicados.dataFim || undefined,
+      mes: filtrosAplicados.mes || undefined,
+      ano: filtrosAplicados.mes ? filtrosAplicados.ano : undefined,
+    };
+  }
+
   async function handleExportar(formato: HoraExtraExportFormat) {
     try {
       setErro("");
       setExportandoFormato(formato);
 
-      const { blob, fileName } = await exportarRelatorioHorasExtras(formato, {
-        funcionarioId:
-          filtrosAplicados.funcionarioId !== "todos" ? filtrosAplicados.funcionarioId : undefined,
-        dataInicio: filtrosAplicados.mes ? undefined : filtrosAplicados.dataInicio || undefined,
-        dataFim: filtrosAplicados.mes ? undefined : filtrosAplicados.dataFim || undefined,
-        mes: filtrosAplicados.mes || undefined,
-        ano: filtrosAplicados.mes ? filtrosAplicados.ano : undefined,
-      });
+      const { blob, fileName } = await exportarRelatorioHorasExtras(formato, filtrosConsulta());
 
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
@@ -127,6 +159,80 @@ export default function HorasExtrasPage() {
       setErro(getApiErrorMessage(error, "Não foi possível exportar o relatório de horas extras."));
     } finally {
       setExportandoFormato(null);
+    }
+  }
+
+  async function recarregarRelatorio() {
+    const response = await buscarRelatorioHorasExtras({
+      ...filtrosConsulta(),
+      page: paginaAtual,
+      perPage: ROWS_PER_PAGE,
+    });
+
+    setDados(response);
+  }
+
+  async function handleAprovacao(status: "pendente" | "aprovada" | "reprovada") {
+    try {
+      setErro("");
+      setSucesso("");
+      setProcessandoApuracao(status);
+
+      const response = await atualizarAprovacaoHorasExtras(status, filtrosConsulta());
+
+      setSucesso(`${response.registros_atualizados} lançamento(s) atualizados.`);
+      await recarregarRelatorio();
+    } catch (error) {
+      setErro(getApiErrorMessage(error, "Não foi possível atualizar a aprovação das horas extras."));
+    } finally {
+      setProcessandoApuracao(null);
+    }
+  }
+
+  async function handleFecharCompetencia() {
+    if (!filtrosAplicados.mes) {
+      setErro("Selecione mês e ano para fechar a competência.");
+      return;
+    }
+
+    try {
+      setErro("");
+      setSucesso("");
+      setProcessandoApuracao("fechar");
+
+      await fecharCompetenciaHorasExtras({
+        mes: filtrosAplicados.mes,
+        ano: filtrosAplicados.ano,
+      });
+
+      setSucesso("Competência fechada com sucesso.");
+      await recarregarRelatorio();
+    } catch (error) {
+      setErro(getApiErrorMessage(error, "Não foi possível fechar a competência."));
+    } finally {
+      setProcessandoApuracao(null);
+    }
+  }
+
+  async function handleReabrirCompetencia() {
+    const fechamentoId = dados?.fechamento?.id;
+
+    if (!fechamentoId) {
+      return;
+    }
+
+    try {
+      setErro("");
+      setSucesso("");
+      setProcessandoApuracao("reabrir");
+
+      await reabrirCompetenciaHorasExtras(fechamentoId);
+      setSucesso("Competência reaberta para ajustes.");
+      await recarregarRelatorio();
+    } catch (error) {
+      setErro(getApiErrorMessage(error, "Não foi possível reabrir a competência."));
+    } finally {
+      setProcessandoApuracao(null);
     }
   }
 
@@ -154,7 +260,33 @@ export default function HorasExtrasPage() {
     saldo_total_banco_minutos: 0,
     saldo_total_banco: "0h00",
     total_estimado_financeiro: 0,
+    total_minutos_feriados: 0,
+    total_feriados: "0h00",
+    total_minutos_pontos_facultativos: 0,
+    total_pontos_facultativos: "0h00",
+    total_minutos_fins_semana: 0,
+    total_fins_semana: "0h00",
+    total_minutos_plantao: 0,
+    total_plantao: "0h00",
   };
+  const competenciaMensalSelecionada = Boolean(filtrosAplicados.mes);
+  const competenciaFechada = dados?.fechamento?.status === "fechada";
+  const aprovacao = dados?.aprovacao ?? {
+    pendentes: 0,
+    aprovadas: 0,
+    reprovadas: 0,
+    status_geral: "sem_lancamentos" as const,
+  };
+  const apuracaoMensagem = competenciaFechada
+    ? "Mês fechado. Reabra somente se precisar corrigir algum lançamento."
+    : !competenciaMensalSelecionada
+      ? "Selecione um mês no filtro para liberar o fechamento."
+      : aprovacao.pendentes > 0
+        ? "Existem lançamentos pendentes. Aprove ou reprove antes de fechar o mês."
+        : "Sem pendências. A competência já pode ser fechada.";
+  const filtroAtualDescricao = competenciaMensalSelecionada
+    ? `${filtrosAplicados.mes.padStart(2, "0")}/${filtrosAplicados.ano}`
+    : "período livre";
 
   return (
     <AdminShell currentUser={currentUser} activeTab="horas_extras">
@@ -337,19 +469,146 @@ export default function HorasExtrasPage() {
         </div>
       </section>
 
-      {erro ? (
-        <div
-          className={`mb-6 rounded-2xl border px-4 py-3 text-sm ${
-            isDark
-              ? "border-red-900 bg-red-950 text-red-300"
-              : "border-red-200 bg-red-50 text-red-700"
-          }`}
-          role="alert"
-          aria-live="assertive"
-        >
-          {erro}
+      <section className={`mb-6 rounded-3xl border p-4 shadow-sm sm:p-6 ${cardBg}`}>
+        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className={`text-xl font-semibold ${titleText}`}>Apuração mensal</h3>
+            <p className={`mt-1 text-sm ${mutedText}`}>
+              As ações abaixo consideram o filtro atual: {filtroAtualDescricao}.
+            </p>
+          </div>
+
+          <span
+            className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+              competenciaFechada
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200"
+                : "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-200"
+            }`}
+          >
+            <LockKeyhole className="h-3.5 w-3.5" />
+            {competenciaFechada ? "Competência fechada" : "Competência aberta"}
+          </span>
         </div>
-      ) : null}
+
+        <div
+          className={`mb-5 rounded-2xl border px-4 py-3 text-sm ${
+            competenciaFechada
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200"
+              : "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
+          }`}
+        >
+          <span className="font-semibold">Próxima ação: </span>
+          {apuracaoMensagem}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <InfoBox
+            label="Pendentes"
+            value={String(aprovacao.pendentes)}
+            cardBg={softCard}
+            titleText={titleText}
+            mutedText={mutedText}
+          />
+          <InfoBox
+            label="Aprovadas"
+            value={String(aprovacao.aprovadas)}
+            cardBg={softCard}
+            titleText={titleText}
+            mutedText={mutedText}
+          />
+          <InfoBox
+            label="Reprovadas"
+            value={String(aprovacao.reprovadas)}
+            cardBg={softCard}
+            titleText={titleText}
+            mutedText={mutedText}
+          />
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <button
+            type="button"
+            disabled={!dados || competenciaFechada || processandoApuracao !== null}
+            onClick={() => void handleAprovacao("aprovada")}
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${secondaryButton}`}
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {processandoApuracao === "aprovada" ? "Aprovando..." : "Aprovar lançamentos do filtro"}
+          </button>
+
+          <button
+            type="button"
+            disabled={!dados || competenciaFechada || processandoApuracao !== null}
+            onClick={() => void handleAprovacao("reprovada")}
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${secondaryButton}`}
+          >
+            <XCircle className="h-4 w-4" />
+            {processandoApuracao === "reprovada" ? "Reprovando..." : "Reprovar lançamentos do filtro"}
+          </button>
+
+          {competenciaFechada ? (
+            <button
+              type="button"
+              disabled={processandoApuracao !== null}
+              onClick={() => void handleReabrirCompetencia()}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${secondaryButton}`}
+            >
+              <RotateCcw className="h-4 w-4" />
+              {processandoApuracao === "reabrir" ? "Reabrindo..." : "Reabrir mês para ajuste"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={
+                !dados ||
+                !competenciaMensalSelecionada ||
+                aprovacao.pendentes > 0 ||
+                processandoApuracao !== null
+              }
+              onClick={() => void handleFecharCompetencia()}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${primaryButton}`}
+            >
+              <LockKeyhole className="h-4 w-4" />
+              {processandoApuracao === "fechar" ? "Fechando..." : "Fechar mês"}
+            </button>
+          )}
+        </div>
+
+        {!competenciaMensalSelecionada ? (
+          <p className={`mt-4 text-sm ${mutedText}`}>
+            Selecione um mês para liberar o fechamento mensal da competência.
+          </p>
+        ) : null}
+      </section>
+
+      <div ref={feedbackRef} tabIndex={-1} className="outline-none">
+        {sucesso ? (
+          <div
+            className={`mb-6 rounded-2xl border px-4 py-3 text-sm ${
+              isDark
+                ? "border-emerald-900 bg-emerald-950 text-emerald-300"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            }`}
+            role="status"
+          >
+            {sucesso}
+          </div>
+        ) : null}
+
+        {erro ? (
+          <div
+            className={`mb-6 rounded-2xl border px-4 py-3 text-sm ${
+              isDark
+                ? "border-red-900 bg-red-950 text-red-300"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+            role="alert"
+            aria-live="assertive"
+          >
+            {erro}
+          </div>
+        ) : null}
+      </div>
 
       <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading}>
         <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -370,7 +629,7 @@ export default function HorasExtrasPage() {
             ) : (
               <ul className="mt-2 space-y-1">
                 {(dados?.indicadores.top_funcionarios ?? []).map((item) => (
-                  <li key={item.funcionario_id} className={`flex items-center justify-between gap-4 ${mutedText}`}>
+                  <li key={item.funcionario_id} className={`flex flex-wrap items-center justify-between gap-2 ${mutedText}`}>
                     <span className="flex flex-wrap items-center gap-2">
                       <span>{item.funcionario_nome}</span>
                       <span
@@ -392,7 +651,7 @@ export default function HorasExtrasPage() {
           </div>
         </div>
 
-        <div className="space-y-4 md:hidden">
+        <div className="space-y-4 xl:hidden">
           {loading ? (
             <div className={`rounded-3xl border p-6 text-center text-sm ${softCard} ${mutedText}`}>
               Carregando relatório...
@@ -414,9 +673,8 @@ export default function HorasExtrasPage() {
           )}
         </div>
 
-        <div className="hidden overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 md:block">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] text-sm">
+        <div className="hidden overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 xl:block">
+            <table className="w-full table-fixed text-sm">
               <caption id={tabelaCaptionId} className="sr-only">
                 Consolidado por funcionário com horas extras de 50%, 100%, horas pagas, folga, saldo em banco e estimativa financeira.
               </caption>
@@ -426,6 +684,8 @@ export default function HorasExtrasPage() {
                   <th scope="col" className="p-4 text-left font-semibold">Horas 50%</th>
                   <th scope="col" className="p-4 text-left font-semibold">Horas 100%</th>
                   <th scope="col" className="p-4 text-left font-semibold">Total extras</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Calendário</th>
+                  <th scope="col" className="p-4 text-left font-semibold">Plantão</th>
                   <th scope="col" className="p-4 text-left font-semibold">Horas pagas</th>
                   <th scope="col" className="p-4 text-left font-semibold">Folga</th>
                   <th scope="col" className="p-4 text-left font-semibold">Dias de folga</th>
@@ -436,13 +696,13 @@ export default function HorasExtrasPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="p-6 text-center">
+                    <td colSpan={11} className="p-6 text-center">
                       <span className={mutedText}>Carregando relatório...</span>
                     </td>
                   </tr>
                 ) : (dados?.rows ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-6 text-center">
+                    <td colSpan={11} className="p-6 text-center">
                       <span className={mutedText}>Nenhum lançamento encontrado para os filtros aplicados.</span>
                     </td>
                   </tr>
@@ -485,6 +745,14 @@ export default function HorasExtrasPage() {
                       <td className="p-4">{row.horas_extras_50}</td>
                       <td className="p-4">{row.horas_extras_100}</td>
                       <td className="p-4">{row.total_extras}</td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1 text-xs">
+                          <span>Feriados: {row.horas_feriados}</span>
+                          <span>Pontos: {row.horas_pontos_facultativos}</span>
+                          <span>Fim semana: {row.horas_fins_semana}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">{row.horas_plantao}</td>
                       <td className="p-4">{row.horas_pagas}</td>
                       <td className="p-4">{row.horas_convertidas_folga}</td>
                       <td className="p-4">{row.dias_folga_gerados}</td>
@@ -495,7 +763,6 @@ export default function HorasExtrasPage() {
                 )}
               </tbody>
             </table>
-          </div>
         </div>
 
         {(dados?.pagination?.last_page ?? 1) > 1 ? (
@@ -547,6 +814,10 @@ export default function HorasExtrasPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <InfoBox label="Horas 50%" value={resumo.total_horas_extras_50} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
           <InfoBox label="Horas 100%" value={resumo.total_horas_extras_100} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <InfoBox label="Feriados" value={resumo.total_feriados} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <InfoBox label="Pontos facultativos" value={resumo.total_pontos_facultativos} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <InfoBox label="Fins de semana" value={resumo.total_fins_semana} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
+          <InfoBox label="Horas em escala" value={resumo.total_plantao} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
           <InfoBox label="Horas pagas" value={resumo.total_horas_pagas} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
           <InfoBox label="Horas em folga" value={resumo.total_horas_convertidas_folga} cardBg={softCard} titleText={titleText} mutedText={mutedText} />
         </div>
@@ -660,6 +931,10 @@ function HoraExtraMobileCard({
       <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         <MobileValue label="Horas 50%" value={row.horas_extras_50} titleText={titleText} mutedText={mutedText} />
         <MobileValue label="Horas 100%" value={row.horas_extras_100} titleText={titleText} mutedText={mutedText} />
+        <MobileValue label="Feriados" value={row.horas_feriados} titleText={titleText} mutedText={mutedText} />
+        <MobileValue label="Pontos facultativos" value={row.horas_pontos_facultativos} titleText={titleText} mutedText={mutedText} />
+        <MobileValue label="Fins de semana" value={row.horas_fins_semana} titleText={titleText} mutedText={mutedText} />
+        <MobileValue label="Em escala" value={row.horas_plantao} titleText={titleText} mutedText={mutedText} />
         <MobileValue label="Horas pagas" value={row.horas_pagas} titleText={titleText} mutedText={mutedText} />
         <MobileValue label="Folga" value={row.horas_convertidas_folga} titleText={titleText} mutedText={mutedText} />
         <MobileValue label="Dias de folga" value={String(row.dias_folga_gerados)} titleText={titleText} mutedText={mutedText} />

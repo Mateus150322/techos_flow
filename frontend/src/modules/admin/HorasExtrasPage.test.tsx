@@ -7,14 +7,23 @@ import { renderWithProviders } from "@/test/test-utils";
 import type { HorasExtrasResponse } from "./horasExtras.service";
 
 const horasExtrasServiceMock = vi.hoisted(() => ({
+  atualizarAprovacaoHorasExtras: vi.fn(),
   buscarRelatorioHorasExtras: vi.fn(),
   exportarRelatorioHorasExtras: vi.fn(),
+  fecharCompetenciaHorasExtras: vi.fn(),
+  reabrirCompetenciaHorasExtras: vi.fn(),
 }));
 
 vi.mock("./horasExtras.service", () => ({
+  atualizarAprovacaoHorasExtras:
+    horasExtrasServiceMock.atualizarAprovacaoHorasExtras,
   buscarRelatorioHorasExtras: horasExtrasServiceMock.buscarRelatorioHorasExtras,
   exportarRelatorioHorasExtras:
     horasExtrasServiceMock.exportarRelatorioHorasExtras,
+  fecharCompetenciaHorasExtras:
+    horasExtrasServiceMock.fecharCompetenciaHorasExtras,
+  reabrirCompetenciaHorasExtras:
+    horasExtrasServiceMock.reabrirCompetenciaHorasExtras,
 }));
 
 vi.mock("@/shared/auth/session", () => ({
@@ -44,6 +53,28 @@ const responseMock: HorasExtrasResponse = {
     saldo_total_banco_minutos: 0,
     saldo_total_banco: "0h00",
     total_estimado_financeiro: 150,
+    total_minutos_feriados: 60,
+    total_feriados: "1h00",
+    total_minutos_pontos_facultativos: 0,
+    total_pontos_facultativos: "0h00",
+    total_minutos_fins_semana: 0,
+    total_fins_semana: "0h00",
+    total_minutos_plantao: 120,
+    total_plantao: "2h00",
+  },
+  aprovacao: {
+    pendentes: 1,
+    aprovadas: 0,
+    reprovadas: 0,
+    status_geral: "pendente",
+  },
+  fechamento: {
+    status: "aberta",
+    id: null,
+    competencia: "2026-05",
+    fechado_em: null,
+    fechado_por: null,
+    observacao: null,
   },
   indicadores: {
     top_funcionarios: [
@@ -86,6 +117,18 @@ const responseMock: HorasExtrasResponse = {
       saldo_banco_minutos: 0,
       saldo_banco: "0h00",
       valor_estimado_financeiro: 150,
+      minutos_feriados: 60,
+      minutos_pontos_facultativos: 0,
+      minutos_fins_semana: 0,
+      minutos_plantao: 120,
+      horas_feriados: "1h00",
+      horas_pontos_facultativos: "0h00",
+      horas_fins_semana: "0h00",
+      horas_plantao: "2h00",
+      aprovacao_status: "pendente",
+      aprovacao_pendentes: 1,
+      aprovacao_aprovadas: 0,
+      aprovacao_reprovadas: 0,
     },
   ],
   pagination: {

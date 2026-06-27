@@ -6,6 +6,7 @@ type Props = {
   descricao: string;
   ordens: OrdemServico[];
   loading: boolean;
+  showHeader?: boolean;
   onVer: (id: string) => void;
   formatarData: (data?: string | null) => string;
   nomeResponsavel: (os: OrdemServico) => string;
@@ -16,24 +17,27 @@ export function TabelaOrdensSection({
   descricao,
   ordens,
   loading,
+  showHeader = true,
   onVer,
   formatarData,
   nomeResponsavel,
 }: Props) {
   return (
     <section className="mb-8 last:mb-0">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-[var(--text-main)]">{titulo}</h3>
-          <p className="app-muted text-sm">{descricao}</p>
+      {showHeader ? (
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-[var(--text-main)]">{titulo}</h3>
+            <p className="app-muted text-sm">{descricao}</p>
+          </div>
+
+          <span className="app-card-soft inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold text-[var(--text-muted)]">
+            {ordens.length} OS
+          </span>
         </div>
+      ) : null}
 
-        <span className="app-card-soft inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold text-[var(--text-muted)]">
-          {ordens.length} OS
-        </span>
-      </div>
-
-      <div className="space-y-3 md:hidden">
+      <div className="space-y-3 lg:hidden">
         {loading ? (
           <div className="app-card rounded-2xl px-4 py-6 text-center">
             <span className="app-muted text-sm">Carregando ordens de servico...</span>
@@ -52,9 +56,9 @@ export function TabelaOrdensSection({
           ordens.map((os) => (
             <article key={os.id} className="app-card rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-base font-semibold text-[var(--text-main)]">{os.numero}</p>
-                  <p className="app-muted mt-1 text-sm">{os.tipo}</p>
+                <div className="min-w-0">
+                  <p className="break-words text-base font-semibold text-[var(--text-main)]">{os.numero}</p>
+                  <p className="app-muted mt-1 break-words text-sm">{os.tipo}</p>
                 </div>
                 <StatusBadge status={os.status} />
               </div>
@@ -77,9 +81,8 @@ export function TabelaOrdensSection({
           ))}
       </div>
 
-      <div className="app-table-shell hidden md:block">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm" aria-busy={loading}>
+      <div className="app-table-shell hidden lg:block">
+          <table className="w-full table-fixed text-sm" aria-busy={loading}>
             <caption className="sr-only">
               {titulo}. {descricao}
             </caption>
@@ -155,7 +158,6 @@ export function TabelaOrdensSection({
                 ))}
             </tbody>
           </table>
-        </div>
       </div>
     </section>
   );
@@ -165,7 +167,7 @@ function MobileInfo({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="app-muted text-[11px] font-semibold uppercase tracking-[0.14em]">{label}</p>
-      <p className="mt-1 text-sm text-[var(--text-main)]">{value}</p>
+      <p className="mt-1 break-words text-sm text-[var(--text-main)]">{value}</p>
     </div>
   );
 }

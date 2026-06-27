@@ -149,7 +149,7 @@ Os seguintes diagramas devem ser mantidos junto desta arquitetura:
 
 Os arquivos-fonte sugeridos estão em:
 
-- [docs/diagramas](c:/Users/VAIO/Documents/projetos/techos-flow/docs/diagramas/README.md)
+- os diagramas podem ser gerados a partir desta documentação textual quando forem necessários como artefatos derivados.
 
 ## 8. Restrições conhecidas
 

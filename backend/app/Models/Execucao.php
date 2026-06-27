@@ -17,7 +17,12 @@ class Execucao extends Model
         'tecnico_id',
         'data_inicio',
         'data_fim',
-        'observacao'
+        'observacao',
+        'diagnostico',
+        'procedimento',
+        'material_utilizado',
+        'client_operation_id',
+        'finalizacao_client_operation_id',
     ];
 
     protected $casts = [

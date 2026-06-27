@@ -6,7 +6,6 @@ Esta pasta concentra a documentação funcional, técnica e acadêmica do `TechO
 
 - documentação central revisada para refletir o comportamento real do sistema;
 - textos normalizados em UTF-8;
-- novos artefatos de modelagem disponíveis em `docs/diagramas`;
 - exports acadêmicos (`.docx`, `.html`, `.pdf`) mantidos como artefatos derivados, não como fonte principal.
 
 ## Estrutura principal
@@ -23,10 +22,7 @@ Esta pasta concentra a documentação funcional, técnica e acadêmica do `TechO
 - `testes/`: plano de testes e casos de teste.
 - `implantacao/`: instruções de deploy, Docker e validação em ambiente real.
 - `seguranca-lgpd/`: segurança, privacidade, retenção e alinhamento com LGPD.
-- `diagramas/`: fontes Mermaid e PlantUML para geração de artefatos visuais.
-- `issues/`: backlog e histórico de issues do projeto.
 - `changelog/`: histórico consolidado de evolução.
-- `tcc_media/`: artefatos acadêmicos auxiliares e imagens exportadas.
 
 ## Documentos de referência rápida
 
@@ -40,24 +36,11 @@ Esta pasta concentra a documentação funcional, técnica e acadêmica do `TechO
 - [Documentação da API](api/documentacao-api.md)
 - [Manual técnico do projeto](manuais/manual-tecnico-projeto.md)
 - [Validação em ambiente real](implantacao/validacao-ambiente-real.md)
-- [Guia de estrutura do TCC](tcc_media/guia-estrutura-tcc.md)
-- [TCC consolidado com apêndices e figuras](tcc_media/TCC_consolidado_2026-05-28.md)
-- [TCC pronto para colar no Word](tcc_media/TCC_pronto_para_word.txt)
-- [TCC final formatado em HTML](tcc_media/TCC_final_formatado.html)
-- [TCC final formatado em RTF](tcc_media/TCC_final_formatado.rtf)
-- [TCC final em DOCX no padrão UNINORTE/ABNT](tcc_media/TCC_final_UNINORTE_ABNT.docx)
-- [Revisão do TCC para banca](tcc_media/revisao_banca_tcc_2026-05-28.md)
-
-## Diagramas e modelagens
-
-Os arquivos-fonte para diagramas e imagens dos artefatos estão em:
-
-- [Índice de diagramas](diagramas/README.md)
-- [Prompt mestre para artefatos visuais](diagramas/prompt-artefatos-visuais.md)
+- [Operação em produção](implantacao/operacao-producao.md)
 
 ## Observações importantes
 
 - os documentos em `docs/` são a fonte oficial de texto do projeto;
-- arquivos de TCC exportados em `.docx`, `.html` e `.pdf` devem ser regenerados quando a documentação-base for alterada;
+- arquivos de TCC exportados em `.docx`, `.html` e `.pdf` são artefatos derivados e permanecem fora do repositório principal;
 - o ambiente publicado já possui domínio, `HTTPS` e Resend configurados;
 - a validação final ainda deve confirmar storage persistente para anexos, backup, restauração e monitoramento.

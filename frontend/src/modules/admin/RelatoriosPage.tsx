@@ -301,13 +301,13 @@ export default function RelatoriosPage() {
         ))}
       </section>
 
-      <section className={`mb-6 rounded-3xl border p-6 shadow-sm ${cardBg}`} aria-busy={loading}>
+      <section className={`mb-6 rounded-3xl border p-4 shadow-sm sm:p-6 ${cardBg}`} aria-busy={loading}>
         <div className="mb-6 flex items-start gap-3">
           <div className="rounded-2xl bg-slate-950 p-3 text-white dark:bg-slate-100 dark:text-slate-950">
             <FileText className="h-5 w-5" />
           </div>
           <div>
-            <h2 className={`text-2xl font-semibold ${titleText}`}>Gerar relatório</h2>
+          <h2 className={`text-xl font-semibold sm:text-2xl ${titleText}`}>Gerar relatório</h2>
             <p className={`mt-1 text-sm ${mutedText}`}>
               Use o contexto operacional para acompanhar fila, gargalos e carga da equipe. Os
               demais modos continuam disponíveis para visão gerencial e exportação.
@@ -507,11 +507,11 @@ export default function RelatoriosPage() {
       <section
         ref={resultadoRelatorioRef}
         tabIndex={-1}
-        className={`mb-6 scroll-mt-4 rounded-3xl border p-6 shadow-sm outline-none ${cardBg}`}
+        className={`mb-6 scroll-mt-4 rounded-3xl border p-4 shadow-sm outline-none sm:p-6 ${cardBg}`}
         aria-busy={loading}
       >
         <div className="mb-5">
-          <h3 className={`text-2xl font-semibold ${titleText}`}>{reportDefinition.title}</h3>
+          <h3 className={`text-xl font-semibold sm:text-2xl ${titleText}`}>{reportDefinition.title}</h3>
           <p className={`mt-1 text-sm ${mutedText}`}>
             Data de emissão: {dadosRelatorio?.dataEmissao || "-"} | Período:{" "}
             {dadosRelatorio?.periodoDescricao || "-"}
@@ -575,7 +575,7 @@ export default function RelatoriosPage() {
         </div>
 
         {isOperationalView && (
-          <div className="space-y-4 lg:hidden">
+          <div className="space-y-4 2xl:hidden">
             {loading ? (
               <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
                 Carregando dados do relatório...
@@ -620,7 +620,7 @@ export default function RelatoriosPage() {
         )}
 
         {!isOperationalView && (
-          <div className="space-y-4 md:hidden">
+          <div className="space-y-4 xl:hidden">
             {loading ? (
               <div className={`rounded-2xl border border-dashed p-6 text-sm ${mutedText}`}>
                 Carregando dados do relatório...
@@ -648,11 +648,10 @@ export default function RelatoriosPage() {
 
         <div
           className={`overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 ${
-            isOperationalView ? "hidden lg:block" : "hidden md:block"
+            isOperationalView ? "hidden 2xl:block" : "hidden xl:block"
           }`}
         >
-          <div className="overflow-x-auto">
-            <table className={`w-full text-sm ${isOperationalView ? "min-w-[1420px]" : "min-w-[980px]"}`}>
+            <table className="w-full table-fixed text-sm">
               <caption id={tabelaCaptionId} className="sr-only">
                 Tabela do relatório atual com as colunas e linhas retornadas para os filtros aplicados.
               </caption>
@@ -781,7 +780,6 @@ export default function RelatoriosPage() {
                 )}
               </tbody>
             </table>
-          </div>
         </div>
 
         <div className={`mt-4 text-sm ${mutedText}`}>

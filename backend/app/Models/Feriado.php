@@ -12,15 +12,20 @@ class Feriado extends Model
     protected $fillable = [
         'nome',
         'data',
+        'tipo',
         'escopo',
         'estado',
         'municipio',
+        'percentual_hora_extra',
+        'recorrente',
+        'observacao',
         'ativo',
     ];
 
     protected $casts = [
         'data' => 'date',
+        'percentual_hora_extra' => 'integer',
+        'recorrente' => 'boolean',
         'ativo' => 'boolean',
     ];
 }
-
