@@ -116,10 +116,12 @@ export async function removerDataCalendario(id: string) {
 }
 
 export async function listarEscalasPlantao(ano: string, mes?: string) {
+  const mesParam = mes ? Number(mes) : undefined;
+
   const { data } = await api.get<EscalasPlantaoResponse>("/escalas-plantoes", {
     params: {
       ano,
-      mes: mes || undefined,
+      mes: Number.isFinite(mesParam) ? mesParam : undefined,
       status: "todos",
     },
   });

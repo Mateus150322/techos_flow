@@ -419,6 +419,49 @@ class HorasExtrasTest extends TestCase
             ->assertJsonPath('resumo.total_minutos_plantao', 240);
     }
 
+    public function test_filtros_mensais_aceitam_mes_com_zero_a_esquerda(): void
+    {
+        $admin = $this->criarUsuario('administrador', 'Admin Calendario');
+        $tecnico = $this->criarUsuario('tecnico', 'Tecnico Calendario', 25);
+        $os = $this->criarOs($tecnico->id, ['status' => 'finalizada']);
+        $execucao = Execucao::query()->create([
+            'os_id' => $os->id,
+            'tecnico_id' => $tecnico->id,
+            'data_inicio' => '2026-04-25 08:00:00',
+            'data_fim' => '2026-04-25 12:00:00',
+            'observacao' => 'Execucao em filtro mensal',
+        ]);
+
+        ExecucaoFuncionario::query()->create([
+            'execucao_id' => $execucao->id,
+            'funcionario_id' => $tecnico->id,
+            'data_inicio' => '2026-04-25 08:00:00',
+            'data_fim' => '2026-04-25 12:00:00',
+            'minutos_trabalhados' => 240,
+            'minutos_normais' => 0,
+            'minutos_extras_50' => 0,
+            'minutos_extras_100' => 240,
+        ]);
+
+        EscalaPlantao::query()->create([
+            'funcionario_id' => $tecnico->id,
+            'descricao' => 'Plantao de teste',
+            'data_inicio' => '2026-04-25 07:00:00',
+            'data_fim' => '2026-04-25 13:00:00',
+            'ativo' => true,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/v1/relatorios/horas-extras?mes=04&ano=2026')
+            ->assertOk()
+            ->assertJsonPath('rows.0.funcionario_nome', 'Tecnico Calendario');
+
+        $this->getJson('/api/v1/escalas-plantoes?ano=2026&mes=04')
+            ->assertOk()
+            ->assertJsonPath('data.0.participante_nome', 'Tecnico Calendario');
+    }
+
     public function test_aprovacao_e_fechamento_bloqueiam_lancamento_em_competencia_fechada(): void
     {
         $admin = $this->criarUsuario('administrador', 'Admin Fechamento');

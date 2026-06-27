@@ -15,6 +15,8 @@ class EscalaPlantaoController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $this->normalizarMes($request);
+
         $data = $request->validate([
             'ano' => ['nullable', 'integer', 'between:2000,2100'],
             'mes' => ['nullable', 'integer', 'between:1,12'],
@@ -128,6 +130,15 @@ class EscalaPlantaoController extends Controller
         unset($data['participante_id'], $data['tipo_vinculo']);
 
         return $data;
+    }
+
+    private function normalizarMes(Request $request): void
+    {
+        $mes = $request->input('mes');
+
+        if (is_string($mes) && preg_match('/^\d{1,2}$/', $mes)) {
+            $request->merge(['mes' => (int) $mes]);
+        }
     }
 
     /**

@@ -121,12 +121,14 @@ export type BuscarHorasExtrasParams = {
 };
 
 export async function buscarRelatorioHorasExtras(params?: BuscarHorasExtrasParams) {
+  const mesParam = params?.mes ? Number(params.mes) : undefined;
+
   const { data } = await api.get<HorasExtrasResponse>("/relatorios/horas-extras", {
     params: {
       funcionario_id: params?.funcionarioId || undefined,
       data_inicio: params?.dataInicio || undefined,
       data_fim: params?.dataFim || undefined,
-      mes: params?.mes || undefined,
+      mes: Number.isFinite(mesParam) ? mesParam : undefined,
       ano: params?.ano || undefined,
       page: params?.page,
       per_page: params?.perPage,
@@ -140,12 +142,14 @@ export async function exportarRelatorioHorasExtras(
   format: HoraExtraExportFormat,
   params?: Omit<BuscarHorasExtrasParams, "page" | "perPage">
 ) {
+  const mesParam = params?.mes ? Number(params.mes) : undefined;
+
   const response = await api.get<Blob>(`/relatorios/horas-extras/exportar/${format}`, {
     params: {
       funcionario_id: params?.funcionarioId || undefined,
       data_inicio: params?.dataInicio || undefined,
       data_fim: params?.dataFim || undefined,
-      mes: params?.mes || undefined,
+      mes: Number.isFinite(mesParam) ? mesParam : undefined,
       ano: params?.ano || undefined,
     },
     responseType: "blob",
@@ -168,6 +172,8 @@ export async function atualizarAprovacaoHorasExtras(
   status: "pendente" | "aprovada" | "reprovada",
   params: Omit<BuscarHorasExtrasParams, "page" | "perPage"> & { observacao?: string }
 ) {
+  const mesParam = params.mes ? Number(params.mes) : undefined;
+
   const { data } = await api.post<{
     status: string;
     registros_atualizados: number;
@@ -177,7 +183,7 @@ export async function atualizarAprovacaoHorasExtras(
     funcionario_id: params.funcionarioId || undefined,
     data_inicio: params.dataInicio || undefined,
     data_fim: params.dataFim || undefined,
-    mes: params.mes || undefined,
+    mes: Number.isFinite(mesParam) ? mesParam : undefined,
     ano: params.ano || undefined,
   });
 
@@ -192,7 +198,7 @@ export async function fecharCompetenciaHorasExtras(params: {
   const { data } = await api.post<NonNullable<HorasExtrasResponse["fechamento"]>>(
     "/relatorios/horas-extras/fechamentos",
     {
-      mes: params.mes,
+      mes: Number(params.mes),
       ano: params.ano,
       observacao: params.observacao || undefined,
     }

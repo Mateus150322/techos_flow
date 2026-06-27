@@ -74,6 +74,8 @@ class HoraExtraController extends Controller
         Request $request,
         HoraExtraAprovacaoService $horaExtraAprovacaoService
     ): JsonResponse {
+        $this->normalizarMes($request);
+
         $data = $request->validate([
             'status' => ['required', 'string', 'in:pendente,aprovada,reprovada'],
             'observacao' => ['nullable', 'string', 'max:1000'],
@@ -99,6 +101,8 @@ class HoraExtraController extends Controller
         Request $request,
         FechamentoHoraExtraService $fechamentoHoraExtraService
     ): JsonResponse {
+        $this->normalizarMes($request);
+
         $data = $request->validate([
             'mes' => ['required', 'integer', 'between:1,12'],
             'ano' => ['required', 'integer', 'between:2000,2100'],
@@ -172,6 +176,8 @@ class HoraExtraController extends Controller
      */
     private function validatedFilters(Request $request): array
     {
+        $this->normalizarMes($request);
+
         $data = $request->validate([
             'funcionario_id' => ['nullable', 'uuid'],
             'participante_id' => ['nullable', 'uuid'],
@@ -188,6 +194,15 @@ class HoraExtraController extends Controller
         }
 
         return $data;
+    }
+
+    private function normalizarMes(Request $request): void
+    {
+        $mes = $request->input('mes');
+
+        if (is_string($mes) && preg_match('/^\d{1,2}$/', $mes)) {
+            $request->merge(['mes' => (int) $mes]);
+        }
     }
 
     private function formatarMinutos(int $minutos): string
