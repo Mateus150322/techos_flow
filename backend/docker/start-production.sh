@@ -6,12 +6,22 @@ if [ -z "${APP_KEY:-}" ]; then
   exit 1
 fi
 
-export DB_HOST="${DB_HOST:-${PGHOST:-postgres}}"
+export DB_HOST="${DB_HOST:-${PGHOST:-Postgres.railway.internal}}"
 export DB_PORT="${DB_PORT:-${PGPORT:-5432}}"
 export DB_DATABASE="${DB_DATABASE:-${PGDATABASE:-postgres}}"
 export DB_USERNAME="${DB_USERNAME:-${PGUSER:-postgres}}"
 export DB_PASSWORD="${DB_PASSWORD:-${PGPASSWORD:-}}"
 export PORT="${PORT:-8080}"
+
+echo "DEBUG: DB_HOST=${DB_HOST}"
+echo "DEBUG: DB_PORT=${DB_PORT}"
+echo "DEBUG: DB_DATABASE=${DB_DATABASE}"
+echo "DEBUG: DB_USERNAME=${DB_USERNAME}"
+echo "DEBUG: DB_PASSWORD=${DB_PASSWORD:-<empty>}"
+echo "DEBUG: PGHOST=${PGHOST:-<not set>}"
+echo "DEBUG: PGPORT=${PGPORT:-<not set>}"
+echo "DEBUG: PGDATABASE=${PGDATABASE:-<not set>}"
+echo "DEBUG: PGUSER=${PGUSER:-<not set>}"
 
 mkdir -p storage/app storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
